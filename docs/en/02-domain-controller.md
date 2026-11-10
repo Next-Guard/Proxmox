@@ -278,7 +278,7 @@ From here on you can work over **Remote Desktop** (`mstsc`) to `172.27.199.20` f
        Format-Table HostName, RecordType, @{n='IPv4Address';e={$_.RecordData.IPv4Address}} -AutoSize
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    HostName     RecordType IPv4Address
    --------     ---------- -----------
    desopve-dc01 A          172.27.199.20

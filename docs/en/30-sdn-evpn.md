@@ -81,8 +81,8 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
    The primary node can also be set from the command line:
 
-   ```console
-   root@desopve01:~# pvesh set /cluster/sdn/zones/evpnz --exitnodes-primary desopve01
+   ```bash title="root@desopve01"
+   pvesh set /cluster/sdn/zones/evpnz --exitnodes-primary desopve01
    ```
 
 ### 3. Two VNets with subnet and SNAT
@@ -93,10 +93,10 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 2. The second VNet from the command line, then Apply:
 
-   ```console
-   root@desopve01:~# pvesh create /cluster/sdn/vnets --vnet vnev2 --zone evpnz --tag 10072
-   root@desopve01:~# pvesh create /cluster/sdn/vnets/vnev2/subnets --subnet 10.72.72.0/24 --type subnet --gateway 10.72.72.1 --snat 1
-   root@desopve01:~# pvesh set /cluster/sdn
+   ```bash title="root@desopve01"
+   pvesh create /cluster/sdn/vnets --vnet vnev2 --zone evpnz --tag 10072
+   pvesh create /cluster/sdn/vnets/vnev2/subnets --subnet 10.72.72.0/24 --type subnet --gateway 10.72.72.1 --snat 1
+   pvesh set /cluster/sdn
    ```
 
 ### 4. What the SDN generates: FRR, VRF and gateway
@@ -136,14 +136,23 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 2. The BGP sessions with the other two nodes and the known VNIs:
 
-   ```console
-   root@desopve01:~# vtysh -c "show bgp l2vpn evpn summary"
+   ```bash title="root@desopve01"
+   vtysh -c "show bgp l2vpn evpn summary"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    BGP router identifier 10.61.10.21, local AS number 65000 VRF default vrf-id 0
    ...
    Neighbor               V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd   PfxSnt Desc
    desopve02(10.61.10.22) 4      65000        25        31        3    0    0 00:00:37            3        7 FRRouting/10.6.1
    desopve03(10.61.10.23) 4      65000        25        24        3    0    0 00:00:30            5        7 FRRouting/10.6.1
-   root@desopve01:~# vtysh -c "show evpn vni"
+   ```
+
+   ```bash title="root@desopve01"
+   vtysh -c "show evpn vni"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    VNI        Type VxLAN IF              # MACs   # ARPs   # Remote VTEPs  Tenant VRF      VLAN       BRIDGE
    10072      L2   vxlan_vnev2           0        0        2               vrf_evpnz       1          vnev2
    10071      L2   vxlan_vnev1           0        0        2               vrf_evpnz       1          vnev1
@@ -155,12 +164,27 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 3. The anycast gateway: same IP and same MAC on `desopve01` and `desopve03`:
 
-   ```console
-   root@desopve01:~# ip -br link show vnev1
+   ```bash title="root@desopve01"
+   ip -br link show vnev1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    vnev1            UP             bc:24:11:f3:ac:a9 <BROADCAST,MULTICAST,UP,LOWER_UP>
-   root@desopve03:~# ip -br link show vnev1
+   ```
+
+   ```bash title="root@desopve03"
+   ip -br link show vnev1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    vnev1            UP             bc:24:11:f3:ac:a9 <BROADCAST,MULTICAST,UP,LOWER_UP>
-   root@desopve03:~# ip -br -4 addr show vnev1
+   ```
+
+   ```bash title="root@desopve03"
+   ip -br -4 addr show vnev1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    vnev1            UP             10.71.71.1/24
    ```
 
@@ -168,40 +192,61 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 1. CT 301 on `desopve01` in the `vnev1` VNet and CT 302 on `desopve03` in the `vnev2` VNet, with the subnet gateway and an MTU of 1450. As in lab 29, the MTU must also be written into the container's network file, then the container is restarted:
 
-   ```console
-   root@desopve01:~# pct create 301 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname evpn-ct1 \
+   ```bash title="root@desopve01"
+   pct create 301 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname evpn-ct1 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnev1,ip=10.71.71.11/24,gw=10.71.71.1,mtu=1450 --password
-   root@desopve01:~# pct start 301
-   root@desopve01:~# pct exec 301 -- sed -i '/address 10.71.71.11/a\	mtu 1450' /etc/network/interfaces
-   root@desopve01:~# pct reboot 301
-   root@desopve03:~# pct create 302 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname evpn-ct2 \
+   pct start 301
+   pct exec 301 -- sed -i '/address 10.71.71.11/a\	mtu 1450' /etc/network/interfaces
+   pct reboot 301
+   ```
+
+   ```bash title="root@desopve03"
+   pct create 302 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname evpn-ct2 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnev2,ip=10.72.72.12/24,gw=10.72.72.1,mtu=1450 --password
-   root@desopve03:~# pct start 302
-   root@desopve03:~# pct exec 302 -- sed -i '/address 10.72.72.12/a\	mtu 1450' /etc/network/interfaces
-   root@desopve03:~# pct reboot 302
+   pct start 302
+   pct exec 302 -- sed -i '/address 10.72.72.12/a\	mtu 1450' /etc/network/interfaces
+   pct reboot 302
    ```
 
 2. CT 302 reaches CT 301 in another VNet and on another node. The first hop is the anycast gateway on the local node; the second, the remote node, does not answer traceroute:
 
-   ```console
-   root@desopve03:~# pct exec 302 -- ping -c3 -W1 10.71.71.11
+   ```bash title="root@desopve03"
+   pct exec 302 -- ping -c3 -W1 10.71.71.11
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2031ms
-   root@desopve03:~# pct exec 302 -- apt-get install -y traceroute    # the CT goes out through the exit node; apt proxy set as in the other guests
-   root@desopve03:~# pct exec 302 -- traceroute -n -w1 -q1 10.71.71.11
+   ```
+
+   ```bash title="root@desopve03"
+   pct exec 302 -- apt-get install -y traceroute    # the CT goes out through the exit node; apt proxy set as in the other guests
+   pct exec 302 -- traceroute -n -w1 -q1 10.71.71.11
+   ```
+
+   ``` { .text .no-copy title="Output" }
    traceroute to 10.71.71.11 (10.71.71.11), 30 hops max, 60 byte packets
     1  10.72.72.1  0.130 ms
     2  *
     3  10.71.71.11  1.096 ms
-   root@desopve03:~# pct exec 302 -- ip neigh show 10.72.72.1
+   ```
+
+   ```bash title="root@desopve03"
+   pct exec 302 -- ip neigh show 10.72.72.1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    10.72.72.1 dev eth0 lladdr bc:24:11:f3:ac:a9 REACHABLE
    ```
 
 3. On node `desopve03`, which is not an exit node, the VRF table contains the default route toward the primary exit node and a /32 route for each remote guest, learned from BGP:
 
-   ```console
-   root@desopve03:~# vtysh -c "show ip route vrf vrf_evpnz"
+   ```bash title="root@desopve03"
+   vtysh -c "show ip route vrf vrf_evpnz"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    B>* 0.0.0.0/0 [200/0] via 10.61.10.21, vrfbr_evpnz onlink, weight 1, 00:02:34
    K * 0.0.0.0/0 [255/8192] unreachable (ICMP unreachable), weight 1, 00:02:39
@@ -214,8 +259,11 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 4. The type 2 routes with the guests' MACs and IPs:
 
-   ```console
-   root@desopve01:~# vtysh -c "show bgp l2vpn evpn route type macip"
+   ```bash title="root@desopve01"
+   vtysh -c "show bgp l2vpn evpn route type macip"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    Route Distinguisher: 10.61.10.21:4
     *>  [2]:[0]:[48]:[bc:24:11:ca:34:84]:[32]:[10.71.71.11] RD 10.61.10.21:4
@@ -227,21 +275,39 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 1. CT 302 reaches the domain controller, outside the zone. On the management network of `desopve01`, the primary exit node, the traffic goes out with the node's address:
 
-   ```console
-   root@desopve03:~# pct exec 302 -- ping -c3 -W1 172.27.199.20
+   ```bash title="root@desopve03"
+   pct exec 302 -- ping -c3 -W1 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2003ms
-   root@desopve01:~# tcpdump -lnni vmbr0 -c2 "icmp[icmptype]=icmp-echo and dst host 172.27.199.20"
+   ```
+
+   ```bash title="root@desopve01"
+   tcpdump -lnni vmbr0 -c2 "icmp[icmptype]=icmp-echo and dst host 172.27.199.20"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    21:40:37.078886 IP 172.27.199.21 > 172.27.199.20: ICMP echo request, id 282, seq 1, length 64
    21:40:38.080689 IP 172.27.199.21 > 172.27.199.20: ICMP echo request, id 282, seq 2, length 64
    ```
 
 2. The SNAT rules were written by the SDN, on each exit node with its own address:
 
-   ```console
-   root@desopve01:~# iptables -t nat -S POSTROUTING | grep -E "10.7[12]"
+   ```bash title="root@desopve01"
+   iptables -t nat -S POSTROUTING | grep -E "10.7[12]"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -A POSTROUTING -s 10.71.71.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.21
    -A POSTROUTING -s 10.72.72.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.21
-   root@desopve02:~# iptables -t nat -S POSTROUTING | grep -E "10.7[12]"
+   ```
+
+   ```bash title="root@desopve02"
+   iptables -t nat -S POSTROUTING | grep -E "10.7[12]"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -A POSTROUTING -s 10.71.71.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.22
    -A POSTROUTING -s 10.72.72.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.22
    ```
@@ -250,14 +316,17 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 1. A VM from the Debian cloud image, with cloud-init (covered in depth in lab 40) and a network device that inherits the VNet MTU (`mtu=1`):
 
-   ```console
-   root@desopve01:~# qm create 303 --name evpn-vm1 --ostype l26 --memory 1024 --cores 1 \
+   ```bash title="root@desopve01"
+   qm create 303 --name evpn-vm1 --ostype l26 --memory 1024 --cores 1 \
      --net0 virtio,bridge=vnev1,mtu=1 --scsihw virtio-scsi-single \
      --scsi0 rbd-vm:0,import-from=local:import/debian-13-genericcloud-amd64.qcow2 \
      --ide2 rbd-vm:cloudinit --ipconfig0 ip=10.71.71.30/24,gw=10.71.71.1 \
      --ciuser labuser --cipassword '<lab-password>' --boot order=scsi0 --serial0 socket --vga serial0
-   root@desopve01:~# qm start 303
-   root@desopve01:~# qm showcmd 303 | grep -o 'host_mtu=[0-9]*'
+   qm start 303
+   qm showcmd 303 | grep -o 'host_mtu=[0-9]*'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    host_mtu=1450
    ```
 
@@ -265,8 +334,11 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 2. Before the migration, `desopve03` sees the VM's MAC (`bc:24:11:45:63:6d`) behind the VTEP of `desopve01`:
 
-   ```console
-   root@desopve03:~# vtysh -c "show evpn mac vni 10071"
+   ```bash title="root@desopve03"
+   vtysh -c "show evpn mac vni 10071"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    MAC               Type   Flags Intf/Remote ES/VTEP                     VLAN  Seq #'s
    bc:24:11:ca:34:84 remote       10.61.10.21                                   0/0
    bc:24:11:45:63:6d remote       10.61.10.21                                   1/0
@@ -274,16 +346,22 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 3. From CT 302, a ping every 100 ms toward the VM, while the VM live-migrates from `desopve01` to `desopve02`:
 
-   ```console
-   root@desopve03:~# pct exec 302 -- ping -i 0.1 -c 450 -q 10.71.71.30
-   root@desopve01:~# qm migrate 303 desopve02 --online
+   ```bash title="root@desopve03"
+   pct exec 302 -- ping -i 0.1 -c 450 -q 10.71.71.30
+   ```
+
+   ```bash title="root@desopve01"
+   qm migrate 303 desopve02 --online
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    2026-11-09 21:42:03 average migration speed: 512.4 MiB/s - downtime 45 ms
    2026-11-09 21:42:03 migration status: completed
    2026-11-09 21:42:07 migration finished successfully (duration 00:00:10)
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    450 packets transmitted, 440 received, 2.22222% packet loss, time 45465ms
    ```
 
@@ -291,8 +369,11 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 4. After the migration the MAC is behind the VTEP of `desopve02` and the sequence number has increased: this is the EVPN *MAC mobility* mechanism.
 
-   ```console
-   root@desopve03:~# vtysh -c "show evpn mac vni 10071"
+   ```bash title="root@desopve03"
+   vtysh -c "show evpn mac vni 10071"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    MAC               Type   Flags Intf/Remote ES/VTEP                     VLAN  Seq #'s
    bc:24:11:ca:34:84 remote       10.61.10.21                                   0/0
    bc:24:11:45:63:6d remote       10.61.10.22                                   2/1
@@ -304,19 +385,31 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
 1. From CT 302, a continuous ping toward the domain controller. On `desopve01`, bring down the underlay interface, as if the node disappeared from the network between the nodes:
 
-   ```console
-   root@desopve03:~# pct exec 302 -- ping -i 0.1 -c 300 -q 172.27.199.20
-   root@desopve01:~# ip link set vmbr1.61 down
+   ```bash title="root@desopve03"
+   pct exec 302 -- ping -i 0.1 -c 300 -q 172.27.199.20
+   ```
+
+   ```bash title="root@desopve01"
+   ip link set vmbr1.61 down
    ```
 
 2. Within moments BFD tears down the sessions: on `desopve03` the default route switches to the backup exit node, and on `desopve02` the traffic goes out with that node's address:
 
-   ```console
-   root@desopve03:~# vtysh -c "show ip route vrf vrf_evpnz 0.0.0.0/0"
+   ```bash title="root@desopve03"
+   vtysh -c "show ip route vrf vrf_evpnz 0.0.0.0/0"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Routing entry for 0.0.0.0/0
      Known via "bgp", distance 200, metric 200, vrf vrf_evpnz, best
      * 10.61.10.22, via vrfbr_evpnz onlink, weight 1
-   root@desopve02:~# tcpdump -lnni vmbr0 -c2 "icmp and host 172.27.199.20"
+   ```
+
+   ```bash title="root@desopve02"
+   tcpdump -lnni vmbr0 -c2 "icmp and host 172.27.199.20"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    21:44:53.644292 IP 172.27.199.22 > 172.27.199.20: ICMP echo request, id 294, seq 37, length 64
    21:44:53.644875 IP 172.27.199.20 > 172.27.199.22: ICMP echo reply, id 294, seq 37, length 64
    ```
@@ -332,23 +425,32 @@ Here too, **SDN Fabric** is the alternative to the peer list (lab 31).
 
    In tests 1 and 3 the connection tracking of `desopve02` had recorded the flow **without NAT**: the replies went back toward 10.72.72.12, an address that nobody outside the zone knows how to reach.
 
-   ```console
-   root@desopve02:~# conntrack -L -p icmp | grep 10.72.72.12
+   ```bash title="root@desopve02"
+   conntrack -L -p icmp | grep 10.72.72.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    icmp     1 29 src=10.72.72.12 dst=172.27.199.20 type=8 code=0 id=295 [UNREPLIED] src=172.27.199.20 dst=10.72.72.12 type=0 code=0 id=295 mark=0 use=1
    ```
 
    The first packets had reached `desopve02` while it still had its default route toward `desopve01`, so they did not go through the SNAT rule on `vmbr0`. That entry stayed valid as long as the ping kept it alive. A **new** ping, started during the failure, worked with no loss:
 
-   ```console
-   root@desopve03:~# pct exec 302 -- ping -c5 -W1 172.27.199.20
+   ```bash title="root@desopve03"
+   pct exec 302 -- ping -c5 -W1 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    5 packets transmitted, 5 received, 0% packet loss, time 4006ms
    ```
 
 4. Restore the link, and the BGP sessions come back up:
 
-   ```console
-   root@desopve01:~# ip link set vmbr1.61 up
-   root@desopve01:~# vtysh -c "show bgp l2vpn evpn summary" | grep ^desopve
+   ```bash title="root@desopve01"
+   ip link set vmbr1.61 up
+   vtysh -c "show bgp l2vpn evpn summary" | grep ^desopve
+   ```
+
+   ``` { .text .no-copy title="Output" }
    desopve02(10.61.10.22) 4      65000       231       253       40    0    0 00:00:46            3        8 FRRouting/10.6.1
    desopve03(10.61.10.23) 4      65000       231       247       40    0    0 00:00:46            8        8 FRRouting/10.6.1
    ```

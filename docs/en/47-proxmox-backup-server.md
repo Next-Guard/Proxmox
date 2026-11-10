@@ -98,7 +98,7 @@ systemctl restart chrony
 chronyc sources | tail -1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ^* netsvc.proxmox.community      3   6    17     1    -22us[  -71us] +/-   22ms
 ```
 
@@ -109,7 +109,7 @@ apt update && apt full-upgrade -y
 proxmox-backup-manager versions
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 proxmox-backup-server 4.2.9-1 running version: 4.2.9
 ```
 
@@ -123,7 +123,7 @@ proxmox-backup-server 4.2.9-1 running version: 4.2.9
 cat /etc/sysctl.d/90-ipv6-host.conf
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 # Indirizzi IPv6 del nodo solo statici: nessuna interfaccia accetta gli RA o si autoconfigura (SLAAC).
 # Il carattere * vale anche per le schede che compaiono dopo l'avvio (systemd le applica a ogni nuova interfaccia).
 net.ipv6.conf.*.accept_ra = 0
@@ -149,7 +149,7 @@ net.ipv6.conf.default.addr_gen_mode = 3
 proxmox-backup-manager datastore list
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ┌──────┬─────────────────────┬─────────┐
 │ name │ path                │ comment │
 ╞══════╪═════════════════════╪═════════╡
@@ -168,7 +168,7 @@ proxmox-backup-manager user create pve-backup@pbs --comment "Backup dal cluster 
 proxmox-backup-manager user generate-token pve-backup@pbs pve --comment "token per il cluster PVE"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Result: {
   "tokenid": "pve-backup@pbs!pve",
   "value": "<segreto>"
@@ -184,7 +184,7 @@ done
 proxmox-backup-manager acl list
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ┌────────────────────┬─────────────────┬───────────┬─────────────────┐
 │ ugid               │ path            │ propagate │ roleid          │
 ╞════════════════════╪═════════════════╪═══════════╪═════════════════╡
@@ -208,7 +208,7 @@ You need the fingerprint of the PBS certificate. You can read it in **Dashboard 
 proxmox-backup-manager cert info | grep -i fingerprint
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Fingerprint (sha256): 31:0b:24:ed:32:07:8f:84:23:bd:2d:66:4f:15:aa:66:da:55:c0:e0:26:45:8f:19:78:f5:3e:cc:a6:2f:34:18
 ```
 
@@ -222,7 +222,7 @@ On PVE: **Datacenter → Storage → Add → Proxmox Backup Server**. ID `pbs01`
 pvesm status --storage pbs01
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Name         Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
 pbs01         pbs     active       101088896           24960       101063936    0.02%
 ```
@@ -239,7 +239,7 @@ First backup of VM 104 (`web01`, 8 GiB disk):
 vzdump 104 --storage pbs01 --mode snapshot
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: scsi0: dirty-bitmap status: created new
 INFO: backup is sparse: 6.61 GiB (82%) total zero data
 INFO: backup was done incrementally, reused 6.82 GiB (85%)
@@ -321,7 +321,7 @@ proxmox-backup-manager prune-job create prune-zpbs --store zpbs --schedule daily
 proxmox-backup-manager prune-job run prune-zpbs
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 retention options: --keep-last 2 --keep-daily 7 --keep-weekly 4
 keep ct/121/2026-11-10T04:08:40Z
 keep ct/121/2026-11-10T04:09:24Z
@@ -339,7 +339,7 @@ keep vm/104/2026-11-10T04:09:50Z
 proxmox-backup-manager garbage-collection start zpbs
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Removed garbage: 0 B
 Removed chunks: 0
 Pending removals: 1.963 MiB (in 5 chunks)
@@ -379,7 +379,7 @@ pvesm add pbs pbs01-cifrato --server 172.27.199.40 --datastore zpbs --namespace 
 ls -l /etc/pve/priv/storage/ | grep pbs
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -rw------- 1 root www-data 255 Nov 10 05:11 pbs01-cifrato.enc
 -rw------- 1 root www-data  37 Nov 10 05:11 pbs01-cifrato.pw
 -rw------- 1 root www-data  37 Nov 10 05:06 pbs01.pw
@@ -389,7 +389,7 @@ ls -l /etc/pve/priv/storage/ | grep pbs
 vzdump 105 --storage pbs01-cifrato --mode snapshot
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: enabling encryption
 INFO: transferred 8.00 GiB in 13 seconds (630.2 MiB/s)
 INFO: Finished Backup of VM 105 (00:00:14)
@@ -405,7 +405,7 @@ PBS shows the backup as **Encrypted**. You cannot open it from the PBS GUI: the 
 proxmox-backup-client key show /etc/pve/priv/storage/pbs01-cifrato.enc
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 │ path        │ "/etc/pve/priv/storage/pbs01-cifrato.enc" │
 │ kdf         │ none                                      │
 │ fingerprint │ ea:2f:5a:2f:aa:61:d2:14:4f:ad:39:3c:...   │
@@ -423,7 +423,7 @@ pvesm add pbs pbs01-senza-chiave … --namespace cifrati      # same parameters,
 qmrestore pbs01-senza-chiave:backup/vm/105/2026-11-10T04:11:45Z 4799 --storage rbd-vm
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Error: missing key - manifest was created with key ea:2f:5a:2f:aa:61:d2:14
 error before or during data restore, some or all disks were not completely restored. VM 4799 state is NOT cleaned up.
 ```
@@ -444,7 +444,7 @@ vzdump 4771 --storage pbs01 --mode snapshot
 qm stop 4771 && qm destroy 4771 --purge
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: issuing guest-agent 'fs-freeze' command
 INFO: issuing guest-agent 'fs-thaw' command
 INFO: transferred 8.00 GiB in 12 seconds (682.7 MiB/s)
@@ -466,7 +466,7 @@ proxmox-file-restore extract $S /drive-scsi0.img.fidx/part/1/root/marker.txt /tm
 cat /tmp/ripristino/marker.txt
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 │ d    │ 1    │               │ 8455699968 │
 │ d    │ 14   │               │    3145728 │
 │ d    │ 15   │               │  130023424 │
@@ -486,7 +486,7 @@ Disaster recovery scenario: VM 4771 `dr-test`, backed up and destroyed in step 1
 qmrestore pbs01:backup/vm/4771/2026-11-10T04:27:36Z 4771 --storage rbd-vm --live-restore 1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 starting VM for live-restore
 repository: 'pve-backup@pbs!pve@172.27.199.40:zpbs', snapshot: 'vm/4771/2026-11-10T04:27:36Z'
 restoring 'drive-scsi0' to 'rbd-vm:vm-4771-disk-0'
@@ -528,7 +528,7 @@ proxmox-backup-manager sync-job create sync-replica --store replica --remote-sto
 proxmox-backup-manager sync-job run sync-replica     # 11 s the first time, 1 s the second
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 NAME           USED  REFER
 zpbs          1.72G  1.02G
 zpbs/replica   718M   718M

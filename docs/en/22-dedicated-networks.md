@@ -93,16 +93,31 @@ In **Datacenter** → **Options** → **Migration Settings** you choose:
 
 On `desopve02` and `desopve03` add the same two blocks (with `.22` and `.23`) before the `source` line, after making a copy of the file (`/root/interfaces.bak-lab22`), then run `ifreload -a`. Check from `desopve01`:
 
-```console
-root@desopve01:~# for ip in 10.40.10.22 10.40.10.23 10.100.10.22 10.100.10.23; do printf "%s " $ip; ping -c2 -W1 $ip >/dev/null && echo ok || echo NO; done
+```bash title="root@desopve01"
+for ip in 10.40.10.22 10.40.10.23 10.100.10.22 10.100.10.23; do printf "%s " $ip; ping -c2 -W1 $ip >/dev/null && echo ok || echo NO; done
+```
+
+``` { .text .no-copy title="Output" }
 10.40.10.22 ok
 10.40.10.23 ok
 10.100.10.22 ok
 10.100.10.23 ok
-root@desopve01:~# ip route get 10.40.10.22
+```
+
+```bash title="root@desopve01"
+ip route get 10.40.10.22
+```
+
+``` { .text .no-copy title="Output" }
 10.40.10.22 dev nic1.40 src 10.40.10.21 uid 0
     cache
-root@desopve01:~# ping -c1 -W1 10.40.10.1 >/dev/null 2>&1 || echo "nessun router su 10.40.10.0/24"
+```
+
+```bash title="root@desopve01"
+ping -c1 -W1 10.40.10.1 >/dev/null 2>&1 || echo "nessun router su 10.40.10.0/24"
+```
+
+``` { .text .no-copy title="Output" }
 nessun router su 10.40.10.0/24
 ```
 
@@ -110,8 +125,11 @@ nessun router su 10.40.10.0/24
 
 1. The starting point:
 
-   ```console
-   root@desopve01:~# corosync-cfgtool -n
+   ```bash title="root@desopve01"
+   corosync-cfgtool -n
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Local node ID 1, transport knet
    nodeid: 2 reachable
       LINK: 0 udp (172.27.199.21->172.27.199.22) enabled connected mtu: 1397
@@ -124,14 +142,23 @@ nessun router su 10.40.10.0/24
 
 2. **Always** edit a copy of `/etc/pve/corosync.conf`, check it, and then move it into place with a single `mv`. A half-written or wrong file would be distributed to all nodes immediately. Besides the addresses you must increment **`config_version`**, otherwise the nodes ignore the change. The value depends on the cluster's history (here it is 5, after `desopve04` joined and left in lab 18): the `perl` command reads it and increases it by one, whatever it is.
 
-   ```console
-   root@desopve01:~# cp /etc/pve/corosync.conf /root/corosync.conf.bak-lab22
-   root@desopve01:~# cp /etc/pve/corosync.conf /etc/pve/corosync.conf.new
-   root@desopve01:~# grep config_version /etc/pve/corosync.conf.new
+   ```bash title="root@desopve01"
+   cp /etc/pve/corosync.conf /root/corosync.conf.bak-lab22
+   cp /etc/pve/corosync.conf /etc/pve/corosync.conf.new
+   grep config_version /etc/pve/corosync.conf.new
+   ```
+
+   ``` { .text .no-copy title="Output" }
      config_version: 5
-   root@desopve01:~# sed -i "s/ring1_addr: 172.32.199.2/ring1_addr: 10.40.10.2/" /etc/pve/corosync.conf.new
-   root@desopve01:~# perl -pi -e 's/(config_version: )(\d+)/$1.($2+1)/e' /etc/pve/corosync.conf.new
-   root@desopve01:~# diff -u /etc/pve/corosync.conf /etc/pve/corosync.conf.new
+   ```
+
+   ```bash title="root@desopve01"
+   sed -i "s/ring1_addr: 172.32.199.2/ring1_addr: 10.40.10.2/" /etc/pve/corosync.conf.new
+   perl -pi -e 's/(config_version: )(\d+)/$1.($2+1)/e' /etc/pve/corosync.conf.new
+   diff -u /etc/pve/corosync.conf /etc/pve/corosync.conf.new
+   ```
+
+   ``` { .text .no-copy title="Output" }
    @@ -9,21 +9,21 @@
         nodeid: 1
         quorum_votes: 1
@@ -152,13 +179,19 @@ nessun router su 10.40.10.0/24
       interface {
         linknumber: 0
       }
-   root@desopve01:~# mv /etc/pve/corosync.conf.new /etc/pve/corosync.conf
+   ```
+
+   ```bash title="root@desopve01"
+   mv /etc/pve/corosync.conf.new /etc/pve/corosync.conf
    ```
 
 3. Corosync rereads the file, but **does not change the address of a link that is already active**, and says so clearly in the log:
 
-   ```console
-   root@desopve01:~# journalctl -u corosync --since "-1min" --no-pager
+   ```bash title="root@desopve01"
+   journalctl -u corosync --since "-1min" --no-pager
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ... [CFG   ] Config reload requested by node 1
    ... [TOTEM ] new config has different address for link 1 (addr changed from 172.32.199.21 to 10.40.10.21). Internal value was NOT changed.
    ...
@@ -167,12 +200,27 @@ nessun router su 10.40.10.0/24
 
    The new address takes effect when you restart Corosync, **one node at a time**: while one node restarts, link 0 keeps the other two together and quorum is maintained.
 
-   ```console
-   root@desopve03:~# systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
+   ```bash title="root@desopve03"
+   systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Quorate:          Yes
-   root@desopve02:~# systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
+   ```
+
+   ```bash title="root@desopve02"
+   systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Quorate:          Yes
-   root@desopve01:~# systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
+   ```
+
+   ```bash title="root@desopve01"
+   systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Quorate:          Yes
    ```
 
@@ -180,8 +228,11 @@ nessun router su 10.40.10.0/24
 
 4. Link 1 now uses VLAN 40:
 
-   ```console
-   root@desopve01:~# corosync-cfgtool -n
+   ```bash title="root@desopve01"
+   corosync-cfgtool -n
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Local node ID 1, transport knet
    nodeid: 2 reachable
       LINK: 0 udp (172.27.199.21->172.27.199.22) enabled connected mtu: 1397
@@ -200,8 +251,11 @@ nessun router su 10.40.10.0/24
 
 1. **Before:** VM 100 (disk on Ceph, 2 GiB of RAM) migrates from `desopve01` to `desopve02` with the default settings, that is, over the management network:
 
-   ```console
-   root@desopve01:~# qm migrate 100 desopve02 --online
+   ```bash title="root@desopve01"
+   qm migrate 100 desopve02 --online
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    2026-11-09 19:35:29 start remote tunnel
    2026-11-09 19:35:30 ssh tunnel ver 1
@@ -219,9 +273,12 @@ nessun router su 10.40.10.0/24
 
    The GUI saves the node's address (`10.100.10.21/24`): this works, because it applies to the whole network that contains it. For clarity it is better to write the network address:
 
-   ```console
-   root@desopve01:~# pvesh set /cluster/options --migration network=10.100.10.0/24,type=secure
-   root@desopve01:~# grep migration /etc/pve/datacenter.cfg
+   ```bash title="root@desopve01"
+   pvesh set /cluster/options --migration network=10.100.10.0/24,type=secure
+   grep migration /etc/pve/datacenter.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    migration: network=10.100.10.0/24,type=secure
    ```
 
@@ -229,14 +286,23 @@ nessun router su 10.40.10.0/24
 
 3. **After:** the VM goes back to `desopve01`. By counting the bytes received by the interfaces of `desopve01` before and after the migration, you can see which way it went:
 
-   ```console
-   root@desopve01:~# cat /sys/class/net/vmbr1.100/statistics/rx_bytes /sys/class/net/vmbr0/statistics/rx_bytes
-   root@desopve02:~# qm migrate 100 desopve01 --online
+   ```bash title="root@desopve01"
+   cat /sys/class/net/vmbr1.100/statistics/rx_bytes /sys/class/net/vmbr0/statistics/rx_bytes
+   ```
+
+   ```bash title="root@desopve02"
+   qm migrate 100 desopve01 --online
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    2026-11-09 19:38:19 average migration speed: 1.0 GiB/s - downtime 9 ms
    2026-11-09 19:38:19 migration completed, transferred 290.4 MiB VM-state
    2026-11-09 19:38:24 migration finished successfully (duration 00:00:11)
-   root@desopve01:~# cat /sys/class/net/vmbr1.100/statistics/rx_bytes /sys/class/net/vmbr0/statistics/rx_bytes
+   ```
+
+   ```bash title="root@desopve01"
+   cat /sys/class/net/vmbr1.100/statistics/rx_bytes /sys/class/net/vmbr0/statistics/rx_bytes
    ```
 
    The difference between the two readings:
@@ -254,24 +320,48 @@ nessun router su 10.40.10.0/24
 
 On `desopve03` bring down only VLAN 40 (the `nic1` card stays up, with the iSCSI path):
 
-```console
-root@desopve03:~# ip link set nic1.40 down
-root@desopve01:~# corosync-cfgtool -n | sed -n "/nodeid: 3/,\$p"
+```bash title="root@desopve03"
+ip link set nic1.40 down
+```
+
+```bash title="root@desopve01"
+corosync-cfgtool -n | sed -n "/nodeid: 3/,\$p"
+```
+
+``` { .text .no-copy title="Output" }
 nodeid: 3 reachable
    LINK: 0 udp (172.27.199.21->172.27.199.23) enabled connected mtu: 1397
    LINK: 1 udp (10.40.10.21->10.40.10.23) enabled mtu: 1397
-root@desopve01:~# pvecm status | grep -E "^Quorate|Total votes"
+```
+
+```bash title="root@desopve01"
+pvecm status | grep -E "^Quorate|Total votes"
+```
+
+``` { .text .no-copy title="Output" }
 Quorate:          Yes
 Total votes:      3
-root@desopve03:~# multipath -ll | grep -c "active ready"
+```
+
+```bash title="root@desopve03"
+multipath -ll | grep -c "active ready"
+```
+
+``` { .text .no-copy title="Output" }
 2
 ```
 
 Link 1 to `desopve03` is no longer `connected`, but the node is still reachable over link 0 and the cluster has all three votes. Storage does not notice: both iSCSI paths are active. Bring the VLAN back up and Corosync picks it up again on its own:
 
-```console
-root@desopve03:~# ip link set nic1.40 up
-root@desopve01:~# journalctl -u corosync --since "-2min" --no-pager | grep "host: 3 link: 1"
+```bash title="root@desopve03"
+ip link set nic1.40 up
+```
+
+```bash title="root@desopve01"
+journalctl -u corosync --since "-2min" --no-pager | grep "host: 3 link: 1"
+```
+
+``` { .text .no-copy title="Output" }
 Nov 09 19:38:34 desopve01 corosync[120106]:   [KNET  ] link: host: 3 link: 1 is down
 Nov 09 19:38:44 desopve01 corosync[120106]:   [KNET  ] rx: host: 3 link: 1 is up
 ```

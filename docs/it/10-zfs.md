@@ -73,8 +73,11 @@ L'**ARC** è la cache di lettura di ZFS in RAM. Più è grande, più letture evi
 
 L'installazione del lab 03 ha creato `rpool`, un mirror sulle partizioni 3 dei due dischi da 50 GB:
 
-```console
-root@desopve01:~# zpool status rpool
+```bash title="root@desopve01"
+zpool status rpool
+```
+
+``` { .text .no-copy title="Output" }
   pool: rpool
  state: ONLINE
 config:
@@ -86,7 +89,13 @@ config:
 	    scsi-<seriale-disco-sdb>-part3     ONLINE       0     0     0
 
 errors: No known data errors
-root@desopve01:~# zpool list
+```
+
+```bash title="root@desopve01"
+zpool list
+```
+
+``` { .text .no-copy title="Output" }
 NAME    SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
 rpool    49G  5.44G  43.6G        -         -     3%    11%  1.00x    ONLINE  -
 ```
@@ -106,8 +115,11 @@ L'installer usa i nomi in `/dev/disk/by-id`, che contengono modello e numero di 
 
 4. Da riga di comando:
 
-   ```console
-   root@desopve04:~# zpool status tank
+   ```bash title="root@desopve04"
+   zpool status tank
+   ```
+
+   ``` { .text .no-copy title="Output" }
      pool: tank
     state: ONLINE
    config:
@@ -119,7 +131,13 @@ L'installer usa i nomi in `/dev/disk/by-id`, che contengono modello e numero di 
    	    scsi-<seriale-disco-sdc>   ONLINE       0     0     0
 
    errors: No known data errors
-   root@desopve04:~# grep -A4 "zfspool: tank" /etc/pve/storage.cfg
+   ```
+
+   ```bash title="root@desopve04"
+   grep -A4 "zfspool: tank" /etc/pve/storage.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    zfspool: tank
    	pool tank
    	content rootdir,images
@@ -133,24 +151,30 @@ Questo passo **distrugge di proposito** una parte dei dati di un disco. Fallo so
 
 1. Crea un dataset, scrivi 1,5 GB di dati casuali e annota l'impronta del file:
 
-   ```console
-   root@desopve04:~# zfs create tank/dati
-   root@desopve04:~# dd if=/dev/urandom of=/tank/dati/archivio.bin bs=1M count=1500 status=none
-   root@desopve04:~# md5sum /tank/dati/archivio.bin
+   ```bash title="root@desopve04"
+   zfs create tank/dati
+   dd if=/dev/urandom of=/tank/dati/archivio.bin bs=1M count=1500 status=none
+   md5sum /tank/dati/archivio.bin
+   ```
+
+   ``` { .text .no-copy title="Output" }
    15bd171a50378dae9c3153c9c48bdb00  /tank/dati/archivio.bin
    ```
 
 2. Sovrascrivi con zeri 3 GB della partizione dati di `sdc`, partendo da 64 MiB per non toccare le etichette di ZFS all'inizio del disco:
 
-   ```console
-   root@desopve04:~# dd if=/dev/zero of=/dev/sdc1 bs=1M seek=64 count=3000 oflag=direct status=none
+   ```bash title="root@desopve04"
+   dd if=/dev/zero of=/dev/sdc1 bs=1M seek=64 count=3000 oflag=direct status=none
    ```
 
 3. Lancia uno scrub e attendi che finisca (`-w`):
 
-   ```console
-   root@desopve04:~# zpool scrub -w tank
-   root@desopve04:~# zpool status tank
+   ```bash title="root@desopve04"
+   zpool scrub -w tank
+   zpool status tank
+   ```
+
+   ``` { .text .no-copy title="Output" }
      pool: tank
     state: ONLINE
    status: One or more devices has experienced an unrecoverable error.  An
@@ -174,11 +198,20 @@ Questo passo **distrugge di proposito** una parte dei dati di un disco. Fallo so
 
 4. Il file è intatto. Azzera i contatori:
 
-   ```console
-   root@desopve04:~# md5sum /tank/dati/archivio.bin
+   ```bash title="root@desopve04"
+   md5sum /tank/dati/archivio.bin
+   ```
+
+   ``` { .text .no-copy title="Output" }
    15bd171a50378dae9c3153c9c48bdb00  /tank/dati/archivio.bin
-   root@desopve04:~# zpool clear tank
-   root@desopve04:~# zpool status -x tank
+   ```
+
+   ```bash title="root@desopve04"
+   zpool clear tank
+   zpool status -x tank
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pool 'tank' is healthy
    ```
 
@@ -188,23 +221,32 @@ Questo passo **distrugge di proposito** una parte dei dati di un disco. Fallo so
 
 Ora ricostruisci `tank` come RAIDZ1 su tre dischi. Prima elimini lo storage e il pool mirror:
 
-```console
-root@desopve04:~# pvesm remove tank
-root@desopve04:~# zpool destroy tank
+```bash title="root@desopve04"
+pvesm remove tank
+zpool destroy tank
 ```
 
 Per indicare i dischi, invece di `sdb`… (che possono cambiare a ogni avvio) usa `/dev/disk/by-path`, che identifica la porta del controller. È un'alternativa stabile a `by-id`, comoda quando si vuole sapere in quale slot sta un disco:
 
-```console
-root@desopve04:~# ls -l /dev/disk/by-path/ | grep -v part | awk '{print $9, $11}' | grep scsi
+```bash title="root@desopve04"
+ls -l /dev/disk/by-path/ | grep -v part | awk '{print $9, $11}' | grep scsi
+```
+
+``` { .text .no-copy title="Output" }
 pci-0000:02:00.0-scsi-0:0:0:0 ../../sda
 pci-0000:02:00.0-scsi-0:0:1:0 ../../sdb
 pci-0000:02:00.0-scsi-0:0:2:0 ../../sdc
 pci-0000:02:00.0-scsi-0:0:3:0 ../../sdd
 pci-0000:02:00.0-scsi-0:0:4:0 ../../sde
-root@desopve04:~# cd /dev/disk/by-path
-root@desopve04:/dev/disk/by-path# zpool create -o ashift=12 -O compression=lz4 -O atime=off tank raidz1 pci-0000:02:00.0-scsi-0:0:1:0 pci-0000:02:00.0-scsi-0:0:2:0 pci-0000:02:00.0-scsi-0:0:3:0
-root@desopve04:/dev/disk/by-path# zpool status tank
+```
+
+```bash title="root@desopve04"
+cd /dev/disk/by-path
+zpool create -o ashift=12 -O compression=lz4 -O atime=off tank raidz1 pci-0000:02:00.0-scsi-0:0:1:0 pci-0000:02:00.0-scsi-0:0:2:0 pci-0000:02:00.0-scsi-0:0:3:0
+zpool status tank
+```
+
+``` { .text .no-copy title="Output" }
   pool: tank
  state: ONLINE
 config:
@@ -217,10 +259,22 @@ config:
 	    pci-0000:02:00.0-scsi-0:0:3:0  ONLINE       0     0     0
 
 errors: No known data errors
-root@desopve04:/dev/disk/by-path# zpool list tank
+```
+
+```bash title="root@desopve04:/dev/disk/by-path"
+zpool list tank
+```
+
+``` { .text .no-copy title="Output" }
 NAME   SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
 tank  59.5G   856K  59.5G        -         -     0%     0%  1.00x    ONLINE  -
-root@desopve04:/dev/disk/by-path# zfs list tank
+```
+
+```bash title="root@desopve04:/dev/disk/by-path"
+zfs list tank
+```
+
+``` { .text .no-copy title="Output" }
 NAME   USED  AVAIL  REFER  MOUNTPOINT
 tank   512K  38.4G   128K  /tank
 ```
@@ -231,9 +285,12 @@ tank   512K  38.4G   128K  /tank
 
 Aggiungi lo storage, con l'opzione `sparse` come `local-zfs`:
 
-```console
-root@desopve04:~# pvesm add zfspool tank --pool tank --content images,rootdir --sparse 1 --nodes desopve04
-root@desopve04:~# pvesm status
+```bash title="root@desopve04"
+pvesm add zfspool tank --pool tank --content images,rootdir --sparse 1 --nodes desopve04
+pvesm status
+```
+
+``` { .text .no-copy title="Output" }
 Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
 local             dir     active        22203544         5768732        15281584   25.98%
 local-lvm     lvmthin     active        14217216               0        14217216    0.00%
@@ -244,9 +301,12 @@ tank          zfspool     active        40265280             543        40264736
 
 Crea tre dataset con compressione diversa e copia in ciascuno gli stessi file (documentazione e librerie Python, cioè testo e codice):
 
-```console
-root@desopve04:~# for c in off lz4 zstd; do zfs create -o compression=$c tank/comp-$c; cp -a /usr/share/doc /usr/lib/python3 /tank/comp-$c/; done
-root@desopve04:~# zfs list -o name,compression,used,logicalused,compressratio -r tank | grep -E "NAME|comp-"
+```bash title="root@desopve04"
+for c in off lz4 zstd; do zfs create -o compression=$c tank/comp-$c; cp -a /usr/share/doc /usr/lib/python3 /tank/comp-$c/; done
+zfs list -o name,compression,used,logicalused,compressratio -r tank | grep -E "NAME|comp-"
+```
+
+``` { .text .no-copy title="Output" }
 NAME            COMPRESS         USED  LUSED  RATIO
 tank/comp-lz4   lz4              111M   112M  1.63x
 tank/comp-off   off              157M   112M  1.00x
@@ -260,20 +320,41 @@ tank/comp-zstd  zstd             103M   112M  1.83x
 
 Alloca un disco per una VM (VMID di prova `990`) e crea un container sullo storage `tank`:
 
-```console
-root@desopve04:~# pvesm alloc tank 990 vm-990-disk-0 4G
+```bash title="root@desopve04"
+pvesm alloc tank 990 vm-990-disk-0 4G
+```
+
+``` { .text .no-copy title="Output" }
 successfully created 'tank:vm-990-disk-0'
-root@desopve04:~# pct create 941 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname lab10-ct --rootfs tank:4 --memory 512 --unprivileged 1 --features nesting=1 --ostype debian --net0 name=eth0,bridge=vmbr0,ip=172.27.199.141/24,gw=172.27.199.1
-root@desopve04:~# pvesm list tank
+```
+
+```bash title="root@desopve04"
+pct create 941 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname lab10-ct --rootfs tank:4 --memory 512 --unprivileged 1 --features nesting=1 --ostype debian --net0 name=eth0,bridge=vmbr0,ip=172.27.199.141/24,gw=172.27.199.1
+pvesm list tank
+```
+
+``` { .text .no-copy title="Output" }
 Volid                  Format  Type            Size VMID
 tank:subvol-941-disk-0 subvol  rootdir   4294967296 941
 tank:vm-990-disk-0     raw     images    4294967296 990
-root@desopve04:~# zfs list -t all -o name,type,volsize,refquota,used,mountpoint -r tank | grep -E "NAME|990|941"
+```
+
+```bash title="root@desopve04"
+zfs list -t all -o name,type,volsize,refquota,used,mountpoint -r tank | grep -E "NAME|990|941"
+```
+
+``` { .text .no-copy title="Output" }
 NAME                    TYPE        VOLSIZE  REFQUOTA   USED  MOUNTPOINT
 tank/subvol-941-disk-0  filesystem        -        4G   346M  /tank/subvol-941-disk-0
 tank/vm-990-disk-0      volume           4G         -  74.6K  -
-root@desopve04:~# pct start 941
-root@desopve04:~# pct exec 941 -- df -h /
+```
+
+```bash title="root@desopve04"
+pct start 941
+pct exec 941 -- df -h /
+```
+
+``` { .text .no-copy title="Output" }
 Filesystem              Size  Used Avail Use% Mounted on
 tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
 ```
@@ -285,14 +366,23 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
 
 1. Crea un dataset di prova, fai uno snapshot e cancella i file:
 
-   ```console
-   root@desopve04:~# zfs create tank/snapdemo; cp -a /usr/share/doc /tank/snapdemo/
-   root@desopve04:~# zfs snapshot tank/snapdemo@a
-   root@desopve04:~# rm -rf /tank/snapdemo/doc; sync
-   root@desopve04:~# zfs list -t snapshot -o name,used,refer tank/snapdemo
+   ```bash title="root@desopve04"
+   zfs create tank/snapdemo; cp -a /usr/share/doc /tank/snapdemo/
+   zfs snapshot tank/snapdemo@a
+   rm -rf /tank/snapdemo/doc; sync
+   zfs list -t snapshot -o name,used,refer tank/snapdemo
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME              USED  REFER
    tank/snapdemo@a  64.6M  64.7M
-   root@desopve04:~# zfs list -o space tank/snapdemo
+   ```
+
+   ```bash title="root@desopve04"
+   zfs list -o space tank/snapdemo
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME           AVAIL   USED  USEDSNAP  USEDDS  USEDREFRESERV  USEDCHILD
    tank/snapdemo  37.5G  64.7M     64.6M    128K             0B         0B
    ```
@@ -301,19 +391,37 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
 
 2. I file dello snapshot si leggono, in sola lettura, nella cartella nascosta `.zfs/snapshot`. Con `zfs rollback` il dataset torna esattamente com'era. Lo provi su `tank/comp-zstd`:
 
-   ```console
-   root@desopve04:~# zfs snapshot tank/comp-zstd@prima
-   root@desopve04:~# rm -rf /tank/comp-zstd/doc
-   root@desopve04:~# ls /tank/comp-zstd
+   ```bash title="root@desopve04"
+   zfs snapshot tank/comp-zstd@prima
+   rm -rf /tank/comp-zstd/doc
+   ls /tank/comp-zstd
+   ```
+
+   ``` { .text .no-copy title="Output" }
    python3
-   root@desopve04:~# ls /tank/comp-zstd/.zfs/snapshot/prima/
+   ```
+
+   ```bash title="root@desopve04"
+   ls /tank/comp-zstd/.zfs/snapshot/prima/
+   ```
+
+   ``` { .text .no-copy title="Output" }
    doc
    python3
-   root@desopve04:~# zfs rollback tank/comp-zstd@prima
-   root@desopve04:~# ls /tank/comp-zstd
+   ```
+
+   ```bash title="root@desopve04"
+   zfs rollback tank/comp-zstd@prima
+   ls /tank/comp-zstd
+   ```
+
+   ``` { .text .no-copy title="Output" }
    doc
    python3
-   root@desopve04:~# zfs destroy -r tank/snapdemo
+   ```
+
+   ```bash title="root@desopve04"
+   zfs destroy -r tank/snapdemo
    ```
 
    `zfs rollback` torna solo all'**ultimo** snapshot: per tornare a uno precedente bisogna distruggere quelli successivi (`-r`). Gli snapshot dei dischi di VM e container si gestiscono dall'interfaccia web, che usa proprio gli snapshot ZFS (lab 16).
@@ -324,23 +432,38 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
 
 1. **Copia completa e incrementale nello stesso pool:**
 
-   ```console
-   root@desopve04:~# zfs snapshot tank/comp-zstd@s1
-   root@desopve04:~# zfs send tank/comp-zstd@s1 | zfs receive tank/copia
-   root@desopve04:~# date > /tank/comp-zstd/nuovo.txt
-   root@desopve04:~# zfs snapshot tank/comp-zstd@s2
-   root@desopve04:~# zfs send -v -i @s1 tank/comp-zstd@s2 | zfs receive tank/copia
+   ```bash title="root@desopve04"
+   zfs snapshot tank/comp-zstd@s1
+   zfs send tank/comp-zstd@s1 | zfs receive tank/copia
+   date > /tank/comp-zstd/nuovo.txt
+   zfs snapshot tank/comp-zstd@s2
+   zfs send -v -i @s1 tank/comp-zstd@s2 | zfs receive tank/copia
+   ```
+
+   ``` { .text .no-copy title="Output" }
    send from tank/comp-zstd@s1 to tank/comp-zstd@s2 estimated size is 49.1K
    total estimated size is 49.1K
    TIME        SENT   SNAPSHOT tank/comp-zstd@s2
-   root@desopve04:~# zfs list -t snapshot -o name,used,refer -r tank/comp-zstd tank/copia
+   ```
+
+   ```bash title="root@desopve04"
+   zfs list -t snapshot -o name,used,refer -r tank/comp-zstd tank/copia
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME                   USED  REFER
    tank/comp-zstd@prima     0B   103M
    tank/comp-zstd@s1        0B   103M
    tank/comp-zstd@s2        0B   103M
    tank/copia@s1         95.9K   111M
    tank/copia@s2            0B   111M
-   root@desopve04:~# cat /tank/copia/nuovo.txt
+   ```
+
+   ```bash title="root@desopve04"
+   cat /tank/copia/nuovo.txt
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Mon Nov  9 02:07:58 PM CET 2026
    ```
 
@@ -348,16 +471,25 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
 
 2. **Verso un altro nodo, attraverso SSH.** `desopve04` non fa parte del cluster, quindi prima gli serve una chiave autorizzata su `desopve01`. `ssh-copy-id` chiede una volta la password di `root` di `desopve01`:
 
-   ```console
-   root@desopve04:~# ssh-copy-id -o StrictHostKeyChecking=accept-new root@desopve01.proxmox.community
+   ```bash title="root@desopve04"
+   ssh-copy-id -o StrictHostKeyChecking=accept-new root@desopve01.proxmox.community
+   ```
+
+   ``` { .text .no-copy title="Output" }
    /usr/bin/ssh-copy-id: INFO: Source of key(s) to be installed: "/root/.ssh/id_rsa.pub"
    /usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
    /usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
 
    Number of key(s) added: 1
    ...
-   root@desopve04:~# zfs send tank/comp-zstd@s2 | ssh root@desopve01.proxmox.community zfs receive rpool/lab10-copia
-   root@desopve04:~# ssh root@desopve01.proxmox.community zfs list -t all -o name,used,refer -r rpool/lab10-copia
+   ```
+
+   ```bash title="root@desopve04"
+   zfs send tank/comp-zstd@s2 | ssh root@desopve01.proxmox.community zfs receive rpool/lab10-copia
+   ssh root@desopve01.proxmox.community zfs list -t all -o name,used,refer -r rpool/lab10-copia
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME                   USED  REFER
    rpool/lab10-copia     93.5M  93.5M
    rpool/lab10-copia@s2     0B  93.5M
@@ -371,10 +503,19 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
 
 1. Il limite attuale è nel file creato dall'installazione e nel parametro del modulo:
 
-   ```console
-   root@desopve04:~# cat /etc/modprobe.d/zfs.conf
+   ```bash title="root@desopve04"
+   cat /etc/modprobe.d/zfs.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    options zfs zfs_arc_max=1676673024
-   root@desopve04:~# arc_summary -s arc | sed -n 7,12p
+   ```
+
+   ```bash title="root@desopve04"
+   arc_summary -s arc | sed -n 7,12p
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ARC status:
            Total memory size:                                      15.6 GiB
            Min target size:                                3.1 %  499.7 MiB
@@ -387,16 +528,25 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
 
 2. Porta il limite a 2 GiB a caldo, scrivendo nel parametro del modulo, e rendilo permanente in `zfs.conf`:
 
-   ```console
-   root@desopve04:~# echo $((2*1024*1024*1024)) > /sys/module/zfs/parameters/zfs_arc_max
-   root@desopve04:~# sed -i "s/^options zfs zfs_arc_max=.*/options zfs zfs_arc_max=2147483648/" /etc/modprobe.d/zfs.conf
-   root@desopve04:~# arc_summary -s arc | sed -n 8,12p
+   ```bash title="root@desopve04"
+   echo $((2*1024*1024*1024)) > /sys/module/zfs/parameters/zfs_arc_max
+   sed -i "s/^options zfs zfs_arc_max=.*/options zfs zfs_arc_max=2147483648/" /etc/modprobe.d/zfs.conf
+   arc_summary -s arc | sed -n 8,12p
+   ```
+
+   ``` { .text .no-copy title="Output" }
            Total memory size:                                      15.6 GiB
            Min target size:                                3.1 %  499.7 MiB
            Max target size:                               12.8 %    2.0 GiB
            Target size (adaptive):                        33.2 %    1.6 GiB
            Current size:                                  33.2 %  679.9 MiB
-   root@desopve04:~# arcstat 1 3
+   ```
+
+   ```bash title="root@desopve04"
+   arcstat 1 3
+   ```
+
+   ``` { .text .no-copy title="Output" }
        time  read  ddread  ddh%  dmread  dmh%  pread  ph%   size      c  avail
    14:08:38     0       0     0       0     0      0    0   680M   1.6G  12.2G
    14:08:39     0       0     0       0     0      0    0   680M   1.6G  12.2G
@@ -413,13 +563,22 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
 
 1. **Estrai a caldo** il disco nel vano `scsi-0:0:3:0` (`sdd`). Il disco sparisce dal sistema e ZFS se ne accorge subito:
 
-   ```console
-   root@desopve04:~# lsblk -d -o NAME,SIZE | grep sd
+   ```bash title="root@desopve04"
+   lsblk -d -o NAME,SIZE | grep sd
+   ```
+
+   ``` { .text .no-copy title="Output" }
    sda    50G
    sdb    20G
    sdc    20G
    sde    20G
-   root@desopve04:~# zpool status tank
+   ```
+
+   ```bash title="root@desopve04"
+   zpool status tank
+   ```
+
+   ``` { .text .no-copy title="Output" }
      pool: tank
     state: DEGRADED
    status: One or more devices have been removed.
@@ -437,7 +596,13 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
    	    pci-0000:02:00.0-scsi-0:0:3:0  REMOVED      0     0     0
 
    errors: No known data errors
-   root@desopve04:~# journalctl -u zfs-zed --since "-15 min" --no-hostname | tail -2
+   ```
+
+   ```bash title="root@desopve04"
+   journalctl -u zfs-zed --since "-15 min" --no-hostname | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Nov 09 14:09:18 zed[24608]: eid=246 class=statechange pool='tank' vdev=pci-0000:02:00.0-scsi-0:0:3:0-part1 vdev_state=REMOVED
    Nov 09 14:09:19 zed[24927]: eid=247 class=removed pool='tank' vdev=pci-0000:02:00.0-scsi-0:0:3:0-part1 vdev_state=REMOVED
    ```
@@ -446,8 +611,11 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
 
 2. Il pool è **DEGRADED** ma funziona: il container continua a leggere e scrivere.
 
-   ```console
-   root@desopve04:~# pct exec 941 -- sh -c "date > /root/durante-il-guasto.txt; sync; cat /root/durante-il-guasto.txt"
+   ```bash title="root@desopve04"
+   pct exec 941 -- sh -c "date > /root/durante-il-guasto.txt; sync; cat /root/durante-il-guasto.txt"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Mon Nov  9 13:10:55 UTC 2026
    ```
 
@@ -457,9 +625,12 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
 
 3. **Sostituisci** il disco perso con il disco libero `sde` (vano `scsi-0:0:4:0`). ZFS ricostruisce i dati mancanti dalla parità (**resilver**), copiando solo i blocchi in uso:
 
-   ```console
-   root@desopve04:~# zpool replace tank pci-0000:02:00.0-scsi-0:0:3:0 /dev/disk/by-path/pci-0000:02:00.0-scsi-0:0:4:0
-   root@desopve04:~# zpool status tank
+   ```bash title="root@desopve04"
+   zpool replace tank pci-0000:02:00.0-scsi-0:0:3:0 /dev/disk/by-path/pci-0000:02:00.0-scsi-0:0:4:0
+   zpool status tank
+   ```
+
+   ``` { .text .no-copy title="Output" }
      pool: tank
     state: DEGRADED
    status: One or more devices is currently being resilvered.  The pool will
@@ -480,13 +651,19 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
    	      pci-0000:02:00.0-scsi-0:0:4:0  ONLINE       0     0     0  (resilvering)
 
    errors: No known data errors
-   root@desopve04:~# zpool wait -t resilver tank
+   ```
+
+   ```bash title="root@desopve04"
+   zpool wait -t resilver tank
    ```
 
 4. Pochi secondi dopo la fine del resilver, ZFS stacca da solo il disco vecchio e il pool torna **ONLINE**:
 
-   ```console
-   root@desopve04:~# zpool status tank
+   ```bash title="root@desopve04"
+   zpool status tank
+   ```
+
+   ``` { .text .no-copy title="Output" }
      pool: tank
     state: ONLINE
      scan: resilvered 435M in 00:00:12 with 0 errors on Mon Nov  9 14:11:37 2026
@@ -500,10 +677,22 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
    	    pci-0000:02:00.0-scsi-0:0:4:0  ONLINE       0     0     0
 
    errors: No known data errors
-   root@desopve04:~# md5sum /tank/copia/nuovo.txt /tank/comp-zstd/nuovo.txt
+   ```
+
+   ```bash title="root@desopve04"
+   md5sum /tank/copia/nuovo.txt /tank/comp-zstd/nuovo.txt
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2b697b63aba1f00e8edd33f831903cf2  /tank/copia/nuovo.txt
    2b697b63aba1f00e8edd33f831903cf2  /tank/comp-zstd/nuovo.txt
-   root@desopve04:~# pct exec 941 -- cat /root/durante-il-guasto.txt
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 941 -- cat /root/durante-il-guasto.txt
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Mon Nov  9 13:10:55 UTC 2026
    ```
 
@@ -515,16 +704,25 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
 
 Inserisci il disco nuovo da 20 GB nel vano libero `scsi-0:0:5:0` (se il kernel non lo vede, ripeti la scansione dei bus del [Lab 09](09-lvm-and-lvm-thin.md#2-i-dischi-del-nodo)). Il kernel gli dà il primo nome libero, `sdd`: lo stesso del disco rimosso, ma è un altro disco. È il motivo per cui i pool si costruiscono con nomi stabili (`by-path` o `by-id`) e non con `sdX`.
 
-```console
-root@desopve04:~# ls -l /dev/disk/by-path/ | grep -v part | awk '{print $9, $11}' | grep scsi
+```bash title="root@desopve04"
+ls -l /dev/disk/by-path/ | grep -v part | awk '{print $9, $11}' | grep scsi
+```
+
+``` { .text .no-copy title="Output" }
 pci-0000:02:00.0-scsi-0:0:0:0 ../../sda
 pci-0000:02:00.0-scsi-0:0:1:0 ../../sdb
 pci-0000:02:00.0-scsi-0:0:2:0 ../../sdc
 pci-0000:02:00.0-scsi-0:0:4:0 ../../sde
 pci-0000:02:00.0-scsi-0:0:5:0 ../../sdd
-root@desopve04:~# zpool add tank spare /dev/disk/by-path/pci-0000:02:00.0-scsi-0:0:5:0
-root@desopve04:~# zpool set autoreplace=on tank
-root@desopve04:~# zpool status tank
+```
+
+```bash title="root@desopve04"
+zpool add tank spare /dev/disk/by-path/pci-0000:02:00.0-scsi-0:0:5:0
+zpool set autoreplace=on tank
+zpool status tank
+```
+
+``` { .text .no-copy title="Output" }
   pool: tank
  state: ONLINE
   scan: resilvered 435M in 00:00:12 with 0 errors on Mon Nov  9 14:11:37 2026
@@ -549,17 +747,38 @@ errors: No known data errors
 
 Elimina il container, il disco di prova e i dataset del lab, il dataset ricevuto su `desopve01` e la chiave di `desopve04` dal cluster. Il pool `tank` resta: servirà nel lab 19.
 
-```console
-root@desopve04:~# pct stop 941 && pct destroy 941 --purge 1
+```bash title="root@desopve04"
+pct stop 941 && pct destroy 941 --purge 1
+```
+
+``` { .text .no-copy title="Output" }
 purging CT 941 from related configurations..
-root@desopve04:~# pvesm free tank:vm-990-disk-0
+```
+
+```bash title="root@desopve04"
+pvesm free tank:vm-990-disk-0
+```
+
+``` { .text .no-copy title="Output" }
 Removed volume 'tank:vm-990-disk-0'
-root@desopve04:~# for d in comp-off comp-lz4 comp-zstd copia; do zfs destroy -r tank/$d; done
-root@desopve04:~# zfs list -r tank
+```
+
+```bash title="root@desopve04"
+for d in comp-off comp-lz4 comp-zstd copia; do zfs destroy -r tank/$d; done
+zfs list -r tank
+```
+
+``` { .text .no-copy title="Output" }
 NAME   USED  AVAIL  REFER  MOUNTPOINT
 tank   794K  38.4G   139K  /tank
-root@desopve04:~# ssh root@desopve01.proxmox.community 'zfs destroy -r rpool/lab10-copia; sed -i "/ root@desopve04$/d" /etc/pve/priv/authorized_keys'
-root@desopve04:~# ssh -o BatchMode=yes root@desopve01.proxmox.community true
+```
+
+```bash title="root@desopve04"
+ssh root@desopve01.proxmox.community 'zfs destroy -r rpool/lab10-copia; sed -i "/ root@desopve04$/d" /etc/pve/priv/authorized_keys'
+ssh -o BatchMode=yes root@desopve01.proxmox.community true
+```
+
+``` { .text .no-copy title="Output" }
 root@desopve01.proxmox.community: Permission denied (publickey,password).
 ```
 

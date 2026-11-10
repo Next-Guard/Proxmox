@@ -68,11 +68,20 @@ On each node, `nic1` is connected to the `172.32.199.0/24` network but has no ad
 
 4. On the other three nodes, do the same with `pvesh`: the first command stages the change, the second one applies it.
 
-   ```console
-   root@desopve02:~# pvesh set /nodes/desopve02/network/nic1 --type eth --cidr 172.32.199.22/24 --autostart 1
-   root@desopve02:~# pvesh set /nodes/desopve02/network
+   ```bash title="root@desopve02"
+   pvesh set /nodes/desopve02/network/nic1 --type eth --cidr 172.32.199.22/24 --autostart 1
+   pvesh set /nodes/desopve02/network
+   ```
+
+   ``` { .text .no-copy title="Output" }
    UPID:desopve02:00001497:0001C658:6AF1AFB3:srvreload:networking:root@pam:
-   root@desopve02:~# ip -br -4 addr show nic1
+   ```
+
+   ```bash title="root@desopve02"
+   ip -br -4 addr show nic1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nic1             UP             172.32.199.22/24
    ```
 
@@ -80,8 +89,11 @@ On each node, `nic1` is connected to the `172.32.199.0/24` network but has no ad
 
 5. Check that the nodes can reach each other on the second network:
 
-   ```console
-   root@desopve01:~# for n in 22 23 24; do ping -c1 -W1 172.32.199.$n | grep "bytes from"; done
+   ```bash title="root@desopve01"
+   for n in 22 23 24; do ping -c1 -W1 172.32.199.$n | grep "bytes from"; done
+   ```
+
+   ``` { .text .no-copy title="Output" }
    64 bytes from 172.32.199.22: icmp_seq=1 ttl=64 time=1.94 ms
    64 bytes from 172.32.199.23: icmp_seq=1 ttl=64 time=0.963 ms
    64 bytes from 172.32.199.24: icmp_seq=1 ttl=64 time=0.906 ms
@@ -139,9 +151,15 @@ On each node, `nic1` is connected to the `172.32.199.0/24` network but has no ad
 
 From the DC, connect over SSH to `desopve03` (with the key from lab 05 you do not need the password) and use `pvecm add`. The first argument is a node that is already part of the cluster; `--link0` and `--link1` are the **local** addresses of the joining node. The command asks for the `root` password of the specified node and, on the first connection, shows its certificate fingerprint: compare it with the one in the **Join Information** and answer `yes`.
 
-```console
-PS C:\Users\Administrator> ssh root@desopve03.proxmox.community
-root@desopve03:~# pvecm add desopve01.proxmox.community --link0 172.27.199.23 --link1 172.32.199.23
+```powershell title="PowerShell — desopve-dc01"
+ssh root@desopve03.proxmox.community
+```
+
+```bash title="root@desopve03"
+pvecm add desopve01.proxmox.community --link0 172.27.199.23 --link1 172.32.199.23
+```
+
+``` { .text .no-copy title="Output" }
 Please enter superuser (root) password for 'desopve01.proxmox.community': ********************
 Establishing API connection with host 'desopve01.proxmox.community'
 The authenticity of host 'desopve01.proxmox.community' can't be established.
@@ -177,8 +195,11 @@ successfully added node 'desopve03' to cluster.
 
 1. **`pvecm status`** is the first command to run when in doubt. Check `Quorate: Yes` and the ratio between **Total votes** and **Quorum**:
 
-   ```console
-   root@desopve01:~# pvecm status
+   ```bash title="root@desopve01"
+   pvecm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Cluster information
    -------------------
    Name:             deso-cluster
@@ -213,8 +234,11 @@ successfully added node 'desopve03' to cluster.
 
 2. **`pvecm nodes`** lists the nodes by name:
 
-   ```console
-   root@desopve01:~# pvecm nodes
+   ```bash title="root@desopve01"
+   pvecm nodes
+   ```
+
+   ``` { .text .no-copy title="Output" }
 
    Membership information
    ----------------------
@@ -226,8 +250,11 @@ successfully added node 'desopve03' to cluster.
 
 3. **`corosync-cfgtool -s`** shows the status of each link to each node:
 
-   ```console
-   root@desopve01:~# corosync-cfgtool -s
+   ```bash title="root@desopve01"
+   corosync-cfgtool -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Local node ID 1, transport knet
    LINK ID 0 udp
    	addr	= 172.27.199.21
@@ -245,8 +272,11 @@ successfully added node 'desopve03' to cluster.
 
 4. The Corosync configuration is in `/etc/pve/corosync.conf`: for each node one address per link (`ring0_addr`, `ring1_addr`), and in `totem` the cluster name, the `passive` link mode and encrypted authentication (`secauth`). Edit it only with great care, incrementing `config_version`: a mistake can stop the entire cluster.
 
-   ```console
-   root@desopve01:~# cat /etc/pve/corosync.conf
+   ```bash title="root@desopve01"
+   cat /etc/pve/corosync.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    logging {
      debug: off
      to_syslog: yes
@@ -299,12 +329,21 @@ successfully added node 'desopve03' to cluster.
 
 5. In `/etc/pve` each node has its own directory, and `.members` shows the pmxcfs view. The authorized SSH keys are now also a single shared file, with the `root` key of each node and the DC key:
 
-   ```console
-   root@desopve01:~# ls /etc/pve/nodes
+   ```bash title="root@desopve01"
+   ls /etc/pve/nodes
+   ```
+
+   ``` { .text .no-copy title="Output" }
    desopve01
    desopve02
    desopve03
-   root@desopve01:~# cat /etc/pve/.members
+   ```
+
+   ```bash title="root@desopve01"
+   cat /etc/pve/.members
+   ```
+
+   ``` { .text .no-copy title="Output" }
    {
    "nodename": "desopve01",
    "version": 9,
@@ -315,7 +354,13 @@ successfully added node 'desopve03' to cluster.
      "desopve03": { "id": 3, "online": 1, "ip": "172.27.199.23"}
      }
    }
-   root@desopve01:~# cut -d" " -f1,3 /etc/pve/priv/authorized_keys
+   ```
+
+   ```bash title="root@desopve01"
+   cut -d" " -f1,3 /etc/pve/priv/authorized_keys
+   ```
+
+   ``` { .text .no-copy title="Output" }
 
    ssh-rsa root@desopve01
    ssh-ed25519 administrator@proxmox.community
@@ -329,14 +374,17 @@ successfully added node 'desopve03' to cluster.
 
 Bring down `nic1` on `desopve03`, which loses the `172.32.199.0/24` network:
 
-```console
-root@desopve03:~# ip link set nic1 down
+```bash title="root@desopve03"
+ip link set nic1 down
 ```
 
 On `desopve01`, link 1 to node 3 shows as `disconnected`, but the cluster stays **Quorate** with three votes, because link 0 still works:
 
-```console
-root@desopve01:~# corosync-cfgtool -s
+```bash title="root@desopve01"
+corosync-cfgtool -s
+```
+
+``` { .text .no-copy title="Output" }
 Local node ID 1, transport knet
 LINK ID 0 udp
 	addr	= 172.27.199.21
@@ -350,10 +398,22 @@ LINK ID 1 udp
 		nodeid:          1:	localhost
 		nodeid:          2:	connected
 		nodeid:          3:	disconnected
-root@desopve01:~# pvecm status | grep -E "^Quorate|Total votes"
+```
+
+```bash title="root@desopve01"
+pvecm status | grep -E "^Quorate|Total votes"
+```
+
+``` { .text .no-copy title="Output" }
 Quorate:          Yes
 Total votes:      3
-root@desopve01:~# journalctl -u corosync --since "-30 sec" --no-hostname | tail -2
+```
+
+```bash title="root@desopve01"
+journalctl -u corosync --since "-30 sec" --no-hostname | tail -2
+```
+
+``` { .text .no-copy title="Output" }
 Nov 09 12:41:51 corosync[6048]:   [KNET  ] link: host: 3 link: 1 is down
 Nov 09 12:41:51 corosync[6048]:   [KNET  ] host: host: 3 (passive) best link: 0 (pri: 1)
 ```
@@ -364,29 +424,50 @@ Bring the card back up (`ip link set nic1 up`): after a few seconds the link is 
 
 Now take down **link 0**, the management network. Bring down `nic0` on `desopve03`, the port of the `vmbr0` bridge. An SSH session open on `172.27.199.23` would be cut off, so run the command from `desopve01` **by connecting to the address on the second network**. It is the first SSH connection to that address: `accept-new` saves its key without asking for confirmation.
 
-```console
-root@desopve01:~# ssh -o StrictHostKeyChecking=accept-new root@172.32.199.23 "ip link set nic0 down"
+```bash title="root@desopve01"
+ssh -o StrictHostKeyChecking=accept-new root@172.32.199.23 "ip link set nic0 down"
+```
+
+``` { .text .no-copy title="Output" }
 Warning: Permanently added '172.32.199.23' (ED25519) to the list of known hosts.
 ```
 
 `desopve03` no longer responds on the management network, but stays in the cluster: Corosync has switched to link 1 by itself.
 
-```console
-root@desopve01:~# ping -c1 -W1 172.27.199.23 | grep loss
+```bash title="root@desopve01"
+ping -c1 -W1 172.27.199.23 | grep loss
+```
+
+``` { .text .no-copy title="Output" }
 1 packets transmitted, 0 received, 100% packet loss, time 0ms
-root@desopve01:~# pvecm status | grep -E "^Quorate|Total votes"
+```
+
+```bash title="root@desopve01"
+pvecm status | grep -E "^Quorate|Total votes"
+```
+
+``` { .text .no-copy title="Output" }
 Quorate:          Yes
 Total votes:      3
-root@desopve01:~# journalctl -u corosync --since "-25 sec" --no-hostname | tail -2
+```
+
+```bash title="root@desopve01"
+journalctl -u corosync --since "-25 sec" --no-hostname | tail -2
+```
+
+``` { .text .no-copy title="Output" }
 Nov 09 12:44:52 corosync[6048]:   [KNET  ] link: host: 3 link: 0 is down
 Nov 09 12:44:52 corosync[6048]:   [KNET  ] host: host: 3 (passive) best link: 1 (pri: 1)
 ```
 
 Bring the card back up: Corosync returns to the preferred link, link 0.
 
-```console
-root@desopve01:~# ssh root@172.32.199.23 "ip link set nic0 up"
-root@desopve01:~# journalctl -u corosync --since "-12 sec" --no-hostname | tail -2
+```bash title="root@desopve01"
+ssh root@172.32.199.23 "ip link set nic0 up"
+journalctl -u corosync --since "-12 sec" --no-hostname | tail -2
+```
+
+``` { .text .no-copy title="Output" }
 Nov 09 12:45:05 corosync[6048]:   [KNET  ] host: host: 3 (passive) best link: 0 (pri: 1)
 Nov 09 12:45:05 corosync[6048]:   [KNET  ] pmtud: Global data MTU changed to: 1397
 ```
@@ -395,14 +476,17 @@ Nov 09 12:45:05 corosync[6048]:   [KNET  ] pmtud: Global data MTU changed to: 13
 
 Stop Corosync on `desopve03`, as if the node were isolated from both networks:
 
-```console
-root@desopve03:~# systemctl stop corosync
+```bash title="root@desopve03"
+systemctl stop corosync
 ```
 
 The other two nodes have 2 votes out of 3, that is, the quorum: the cluster keeps working.
 
-```console
-root@desopve01:~# pvecm status | sed -n "/Votequorum/,\$p"
+```bash title="root@desopve01"
+pvecm status | sed -n "/Votequorum/,\$p"
+```
+
+``` { .text .no-copy title="Output" }
 Votequorum information
 ----------------------
 Expected votes:   3
@@ -420,19 +504,31 @@ Membership information
 
 The isolated node, on the other hand, can no longer modify the shared configuration: `/etc/pve` is read-only.
 
-```console
-root@desopve03:~# touch /etc/pve/prova.txt
+```bash title="root@desopve03"
+touch /etc/pve/prova.txt
+```
+
+``` { .text .no-copy title="Output" }
 touch: cannot touch '/etc/pve/prova.txt': Permission denied
 ```
 
 Start Corosync again (`systemctl start corosync`): the node rejoins, you are back to three votes and `/etc/pve` is writable again.
 
-```console
-root@desopve03:~# systemctl start corosync
-root@desopve03:~# pvecm status | grep -E "^Quorate|Total votes"
+```bash title="root@desopve03"
+systemctl start corosync
+pvecm status | grep -E "^Quorate|Total votes"
+```
+
+``` { .text .no-copy title="Output" }
 Quorate:          Yes
 Total votes:      3
-root@desopve03:~# touch /etc/pve/prova.txt && echo scrittura-ok && rm /etc/pve/prova.txt
+```
+
+```bash title="root@desopve03"
+touch /etc/pve/prova.txt && echo scrittura-ok && rm /etc/pve/prova.txt
+```
+
+``` { .text .no-copy title="Output" }
 scrittura-ok
 ```
 

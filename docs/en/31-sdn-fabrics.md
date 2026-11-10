@@ -97,12 +97,15 @@ warning: vrf_evpnz: post-up cmd 'ip route del vrf vrf_evpnz unreachable default 
 
 2. The other two nodes from the command line:
 
-   ```console
-   root@desopve01:~# pvesh create /cluster/sdn/fabrics/node/fab1 --node_id desopve02 --protocol openfabric \
+   ```bash title="root@desopve01"
+   pvesh create /cluster/sdn/fabrics/node/fab1 --node_id desopve02 --protocol openfabric \
      --ip 10.80.80.2 --interfaces name=vmbr1.81 --interfaces name=vmbr1.83
-   root@desopve01:~# pvesh create /cluster/sdn/fabrics/node/fab1 --node_id desopve03 --protocol openfabric \
+   pvesh create /cluster/sdn/fabrics/node/fab1 --node_id desopve03 --protocol openfabric \
      --ip 10.80.80.3 --interfaces name=vmbr1.82 --interfaces name=vmbr1.83
-   root@desopve01:~# cat /etc/pve/sdn/fabrics.cfg
+   cat /etc/pve/sdn/fabrics.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    openfabric_fabric: fab1
    	ip_prefix 10.80.80.0/24
 
@@ -120,7 +123,10 @@ warning: vrf_evpnz: post-up cmd 'ip route del vrf vrf_evpnz unreachable default 
    	interfaces name=vmbr1.82
    	interfaces name=vmbr1.83
    	ip 10.80.80.3
-   root@desopve01:~# pvesh set /cluster/sdn
+   ```
+
+   ```bash title="root@desopve01"
+   pvesh set /cluster/sdn
    ```
 
 3. The fabric with the three nodes and their interfaces:
@@ -131,10 +137,19 @@ warning: vrf_evpnz: post-up cmd 'ip route del vrf vrf_evpnz unreachable default 
 
 1. The node address sits on a `dummy_fab1` interface, the fabric loopback, and the same `/32` appears on the point-to-point interfaces:
 
-   ```console
-   root@desopve01:~# ip -br -4 addr show dummy_fab1
+   ```bash title="root@desopve01"
+   ip -br -4 addr show dummy_fab1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    dummy_fab1       UNKNOWN        10.80.80.1/32
-   root@desopve01:~# ip -br -4 addr show vmbr1.81
+   ```
+
+   ```bash title="root@desopve01"
+   ip -br -4 addr show vmbr1.81
+   ```
+
+   ``` { .text .no-copy title="Output" }
    vmbr1.81@vmbr1   UP             10.80.80.1/32
    ```
 
@@ -171,8 +186,11 @@ warning: vrf_evpnz: post-up cmd 'ip route del vrf vrf_evpnz unreachable default 
 
 3. To act as a transit node, a node must forward packets. The SDN enables forwarding **only** on the fabric interfaces and leaves global forwarding off:
 
-   ```console
-   root@desopve02:~# sysctl -n net.ipv4.ip_forward net.ipv4.conf.vmbr1/81.forwarding net.ipv4.conf.vmbr1/83.forwarding
+   ```bash title="root@desopve02"
+   sysctl -n net.ipv4.ip_forward net.ipv4.conf.vmbr1/81.forwarding net.ipv4.conf.vmbr1/83.forwarding
+   ```
+
+   ``` { .text .no-copy title="Output" }
    0
    1
    1
@@ -182,8 +200,11 @@ warning: vrf_evpnz: post-up cmd 'ip route del vrf vrf_evpnz unreachable default 
 
 1. Each node sees its two neighbors. *Holdtime* is the time after which a silent neighbor is considered lost:
 
-   ```console
-   root@desopve01:~# vtysh -c "show openfabric neighbor"
+   ```bash title="root@desopve01"
+   vtysh -c "show openfabric neighbor"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Area fab1:
     System Id           Interface   L  State         Holdtime SNPA
     desopve02           vmbr1.81    2  Up            29       2020.2020.2020
@@ -192,8 +213,11 @@ warning: vrf_evpnz: post-up cmd 'ip route del vrf vrf_evpnz unreachable default 
 
 2. The database contains the description (LSP) of each of the three nodes; from it, each node computes the best paths:
 
-   ```console
-   root@desopve01:~# vtysh -c "show openfabric database"
+   ```bash title="root@desopve01"
+   vtysh -c "show openfabric database"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Area fab1:
    IS-IS Level-2 link-state database:
    LSP ID                  PduLen  SeqNumber   Chksum  Holdtime  ATT/P/OL
@@ -201,17 +225,32 @@ warning: vrf_evpnz: post-up cmd 'ip route del vrf vrf_evpnz unreachable default 
    desopve02.00-00           123   0x00000002  0x7c48    1172    0/0/0
    desopve03.00-00           123   0x00000002  0xdae2    1128    0/0/0
        3 LSPs
-   root@desopve01:~# ip route | grep 10.80.80
+   ```
+
+   ```bash title="root@desopve01"
+   ip route | grep 10.80.80
+   ```
+
+   ``` { .text .no-copy title="Output" }
    10.80.80.2 nhid 72 via 10.80.80.2 dev vmbr1.81 proto openfabric src 10.80.80.1 metric 20 onlink
    10.80.80.3 nhid 73 via 10.80.80.3 dev vmbr1.82 proto openfabric src 10.80.80.1 metric 20 onlink
    ```
 
 3. The node addresses are reached directly, in a single hop:
 
-   ```console
-   root@desopve01:~# ping -c3 -W1 -I 10.80.80.1 10.80.80.3
+   ```bash title="root@desopve01"
+   ping -c3 -W1 -I 10.80.80.1 10.80.80.3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2065ms
-   root@desopve01:~# traceroute -n -w1 -q1 -s 10.80.80.1 10.80.80.3
+   ```
+
+   ```bash title="root@desopve01"
+   traceroute -n -w1 -q1 -s 10.80.80.1 10.80.80.3
+   ```
+
+   ``` { .text .no-copy title="Output" }
     1  10.80.80.3  0.396 ms
    ```
 
@@ -221,11 +260,11 @@ For each test, a ping every 100 ms from `desopve01` (source 10.80.80.1) to `deso
 
 1. **One-sided failure, default timers.** Bring down `vmbr1.82` only on `desopve03`, while on `desopve01` it stays up:
 
-   ```console
-   root@desopve03:~# ip link set vmbr1.82 down
+   ```bash title="root@desopve03"
+   ip link set vmbr1.82 down
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    600 packets transmitted, 335 received, 44.1667% packet loss, time 61696ms
    ```
 
@@ -233,15 +272,24 @@ For each test, a ping every 100 ms from `desopve01` (source 10.80.80.1) to `deso
 
 2. **Tighter timers.** The holdtime is a multiple of the *hello interval*. Setting the hello to 1 second in the fabric configuration brings the holdtime down to 10 s:
 
-   ```console
-   root@desopve01:~# pvesh set /cluster/sdn/fabrics/fabric/fab1 --protocol openfabric --hello_interval 1
-   root@desopve01:~# pvesh set /cluster/sdn
-   root@desopve01:~# grep -A3 "^interface vmbr1.81" /etc/frr/frr.conf
+   ```bash title="root@desopve01"
+   pvesh set /cluster/sdn/fabrics/fabric/fab1 --protocol openfabric --hello_interval 1
+   pvesh set /cluster/sdn
+   grep -A3 "^interface vmbr1.81" /etc/frr/frr.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    interface vmbr1.81
     ip router openfabric fab1
     openfabric hello-interval 1
    exit
-   root@desopve01:~# vtysh -c "show openfabric neighbor" | grep Up
+   ```
+
+   ```bash title="root@desopve01"
+   vtysh -c "show openfabric neighbor" | grep Up
+   ```
+
+   ``` { .text .no-copy title="Output" }
     desopve02           vmbr1.81    2  Up            10       2020.2020.2020
     desopve03           vmbr1.82    2  Up            10       2020.2020.2020
    ```
@@ -256,14 +304,23 @@ For each test, a ping every 100 ms from `desopve01` (source 10.80.80.1) to `deso
 
 3. **Link cut on both sides**, as when a cable is really unplugged. Each node sees the interface go down and immediately recomputes the paths; after one second `desopve03` is reached through `desopve02`:
 
-   ```console
-   root@desopve01:~# ip link set vmbr1.82 down
-   root@desopve03:~# ip link set vmbr1.82 down
-   root@desopve01:~# ip route get 10.80.80.3
+   ```bash title="root@desopve01"
+   ip link set vmbr1.82 down
+   ```
+
+   ```bash title="root@desopve03"
+   ip link set vmbr1.82 down
+   ```
+
+   ```bash title="root@desopve01"
+   ip route get 10.80.80.3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    10.80.80.3 via 10.80.80.2 dev vmbr1.81 src 10.80.80.1 uid 0
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    400 packets transmitted, 384 received, 4% packet loss, time 40516ms
    ```
 
@@ -275,9 +332,9 @@ For each test, a ping every 100 ms from `desopve01` (source 10.80.80.1) to `deso
 
 1. The `vxz` zone of lab 29 switches from the peer list on VLAN 61 to the fabric:
 
-   ```console
-   root@desopve01:~# pvesh set /cluster/sdn/zones/vxz --fabric fab1 --delete peers
-   root@desopve01:~# pvesh set /cluster/sdn
+   ```bash title="root@desopve01"
+   pvesh set /cluster/sdn/zones/vxz --fabric fab1 --delete peers
+   pvesh set /cluster/sdn
    ```
 
    ![The VXLAN zone uses the fab1 fabric](../images/31/04-zona-vxlan-fabric.png)
@@ -295,10 +352,19 @@ For each test, a ping every 100 ms from `desopve01` (source 10.80.80.1) to `deso
    	mtu 1450
    ```
 
-   ```console
-   root@desopve01:~# pct exec 291 -- ping -c3 -W1 10.62.62.12
+   ```bash title="root@desopve01"
+   pct exec 291 -- ping -c3 -W1 10.62.62.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2056ms
-   root@desopve01:~# tcpdump -lnni vmbr1.82 -c2 udp port 4789
+   ```
+
+   ```bash title="root@desopve01"
+   tcpdump -lnni vmbr1.82 -c2 udp port 4789
+   ```
+
+   ``` { .text .no-copy title="Output" }
    22:02:00.587760 IP 10.80.80.1.47640 > 10.80.80.3.4789: VXLAN, flags [I] (0x08), vni 10062
    IP 10.62.62.11 > 10.62.62.12: ICMP echo request, id 382, seq 1, length 64
    22:02:00.588181 IP 10.80.80.3.48661 > 10.80.80.1.4789: VXLAN, flags [I] (0x08), vni 10062
@@ -307,24 +373,33 @@ For each test, a ping every 100 ms from `desopve01` (source 10.80.80.1) to `deso
 
 3. With the 01-03 link cut on both sides, the tunnel between the two containers goes through `desopve02` (visible on `vmbr1.81`) and the ping between the guests continues:
 
-   ```console
-   root@desopve01:~# tcpdump -lnni vmbr1.81 -c2 "udp port 4789 and host 10.80.80.3"
+   ```bash title="root@desopve01"
+   tcpdump -lnni vmbr1.81 -c2 "udp port 4789 and host 10.80.80.3"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    22:02:17.378878 IP 10.80.80.1.47640 > 10.80.80.3.4789: VXLAN, flags [I] (0x08), vni 10062
    IP 10.62.62.11 > 10.62.62.12: ICMP echo request, id 383, seq 75, length 64
    22:02:17.380197 IP 10.80.80.3.48661 > 10.80.80.1.4789: VXLAN, flags [I] (0x08), vni 10062
    IP 10.62.62.12 > 10.62.62.11: ICMP echo reply, id 383, seq 75, length 64
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    250 packets transmitted, 246 received, 1.6% packet loss, time 25188ms
    ```
 
    4 pings were lost, 0.4 seconds, without touching anything in the guests or in the zone. After the test, bring the link back up on both nodes and check that all the neighbors are up again:
 
-   ```console
-   root@desopve01:~# ip link set vmbr1.82 up
-   root@desopve03:~# ip link set vmbr1.82 up
-   root@desopve01:~# vtysh -c "show openfabric neighbor"
+   ```bash title="root@desopve01"
+   ip link set vmbr1.82 up
+   ```
+
+   ```bash title="root@desopve03"
+   ip link set vmbr1.82 up
+   ```
+
+   ```bash title="root@desopve01"
+   vtysh -c "show openfabric neighbor"
    ```
 
 4. The EVPN controller also has the **SDN Fabric** field. In this lab it stays on the VLAN 61 peer list, so the `evpnz` zone of lab 30 does not change.
@@ -335,16 +410,43 @@ With a physical full mesh, the Proxmox VE guide *Full Mesh Network for Ceph Serv
 
 ### 9. The rest of the network has not changed
 
-```console
-root@desopve01:~# ceph health
+```bash title="root@desopve01"
+ceph health
+```
+
+``` { .text .no-copy title="Output" }
 HEALTH_OK
-root@desopve01:~# pvecm status | grep Quorate:
+```
+
+```bash title="root@desopve01"
+pvecm status | grep Quorate:
+```
+
+``` { .text .no-copy title="Output" }
 Quorate:          Yes
-root@desopve01:~# pct exec 121 -- ping -c2 -W1 10.10.10.122
+```
+
+```bash title="root@desopve01"
+pct exec 121 -- ping -c2 -W1 10.10.10.122
+```
+
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1001ms
-root@desopve01:~# ping -c2 -W1 10.100.10.23
+```
+
+```bash title="root@desopve01"
+ping -c2 -W1 10.100.10.23
+```
+
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1004ms
-root@desopve03:~# pct exec 302 -- ping -c2 -W1 10.71.71.11
+```
+
+```bash title="root@desopve03"
+pct exec 302 -- ping -c2 -W1 10.71.71.11
+```
+
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1044ms
 ```
 

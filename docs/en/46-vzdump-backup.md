@@ -46,7 +46,7 @@
 pvesm status --content backup
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Name           Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
 cephfs       cephfs     active       100483072         7921664        92561408    7.88%
 local           dir     active        45995008         1143936        44851072    2.49%
@@ -64,7 +64,7 @@ We take three backups of VM 104 (`web01`, 8 GiB disk on Ceph, guest agent enable
 vzdump 104 --mode snapshot --storage nas-nfs --compress zstd --notes-template '{{guestname}} - prova modalità snapshot'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: backup mode: snapshot
 INFO: creating vzdump archive '/mnt/pve/nas-nfs/dump/vzdump-qemu-104-2026_11_10-04_28_17.vma.zst'
 INFO: issuing guest-agent 'fs-freeze' command
@@ -127,7 +127,7 @@ Container 101 (rootfs on `local-zfs`) in snapshot mode to `cephfs`:
 vzdump 101 --mode snapshot --storage cephfs --compress zstd
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: filesystem type on dumpdir is 'ceph' -using /var/tmp/vzdumptmp430726_101 for temporary files
 INFO: including mount point rootfs ('/') in backup
 INFO: backup mode: snapshot
@@ -148,7 +148,7 @@ qm set 100 --scsi1 rbd-vm:1,backup=0
 vzdump 100 --mode snapshot --storage cephfs --compress zstd
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: include disk 'scsi0' 'rbd-vm:vm-100-disk-0' 16G
 INFO: exclude disk 'scsi1' 'rbd-vm:vm-100-disk-1' (backup=no)
 INFO: archive file size: 5.53GB
@@ -167,7 +167,7 @@ In containers, **bind mounts** (node directories mounted into the CT) are always
 vzdump 141 --mode snapshot --storage cephfs --compress zstd
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: including mount point mp0 ('/data') in backup
 INFO: excluding bind mount point mp1 ('/condivisa') from backup (not a volume)
 INFO: excluding bind mount point mp2 ('/progetti') from backup (not a volume)
@@ -183,7 +183,7 @@ We back up VM 104 to the SMB share, with fleecing on Ceph:
 vzdump 104 --mode snapshot --storage nas-smb --compress zstd --fleecing enabled=1,storage=rbd-vm
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: starting new backup job: vzdump 104 --storage nas-smb --mode snapshot --fleecing '1,storage=rbd-vm' --compress zstd
 INFO: drive-scsi0: attaching fleecing image rbd-vm:vm-104-fleece-0 to QEMU
 INFO: archive file size: 354MB
@@ -209,7 +209,7 @@ We simulate a `keep-last=2` retention:
 pvesm prune-backups nas-nfs --vmid 104 --keep-last 2 --dry-run 1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 NOTE: this is only a preview and might not be what a subsequent
 prune call does if backups are removed/added in the meantime.
 
@@ -233,7 +233,7 @@ pvesm prune-backups nas-nfs --vmid 104 --keep-last 3
 pvesm list nas-nfs --vmid 104
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 vzdump-qemu-104-2026_11_10-04_28_17.vma.zst
 vzdump-qemu-104-2026_11_10-04_33_54.vma.zst
 vzdump-qemu-104-2026_11_10-04_34_21.vma.zst
@@ -311,7 +311,7 @@ time qmrestore $V 4104 --storage local-zfs --unique 1
 qm config 4104 | grep -E '^(name|scsi0|net0|agent)'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 new volume ID is 'local-zfs:vm-4104-cloudinit'
 new volume ID is 'local-zfs:vm-4104-disk-0'
 progress 100% (read 8589934592 bytes, duration 8 sec)
@@ -333,7 +333,7 @@ The original had its disk on Ceph; the restore placed it on local ZFS. **Do not 
 qmrestore $V 4105 --storage local-zfs --live-restore 1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 error before or during data restore, some or all disks were not completely restored. VM 4105 state is NOT cleaned up.
 live-restore is only compatible with backup images from a Proxmox Backup Server
 ```
@@ -347,7 +347,7 @@ time pct restore 4101 cephfs:backup/vzdump-lxc-101-2026_11_10-04_34_41.tar.zst -
 pct config 4101 | grep -E '^(hostname|rootfs|net0|unprivileged)'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 extracting archive '/mnt/pve/cephfs/dump/vzdump-lxc-101-2026_11_10-04_34_41.tar.zst'
 Total bytes read: 715776000 (683MiB, 31MiB/s)
 merging backed-up and given configuration..
@@ -377,7 +377,7 @@ To run actions before and after backups (stopping an application, copying the fi
 ls /usr/share/doc/pve-manager/examples/ | grep -i hook
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 vzdump-hook-script.pl
 ```
 

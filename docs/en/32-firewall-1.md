@@ -102,7 +102,7 @@ done
 cat /etc/pve/nodes/desopve02/host.fw
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 [OPTIONS]
 
 enable: 0
@@ -197,7 +197,7 @@ pct exec 101 -- bash -c 'apt-get -qq update; apt-get -y -qq install nginx curl
 pct exec 101 -- ss -ltn
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 LISTEN 0      511          0.0.0.0:80        0.0.0.0:*
 LISTEN 0      511             [::]:80           [::]:*
 LISTEN 0      4096               *:22              *:*
@@ -239,7 +239,7 @@ pvesh set /nodes/desopve02/lxc/101/firewall/options --enable 1 --log_level_in in
 cat /etc/pve/firewall/101.fw
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 [OPTIONS]
 
 enable: 1
@@ -268,7 +268,7 @@ ceph health; multipath -ll | grep -c "active ready"
 vtysh -c "show bgp summary" | grep ^desopve
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == desopve01
 Status: enabled/running
 regole host: 0
@@ -357,7 +357,7 @@ The compiled rules can be seen on the node:
 iptables -S veth101i0-OUT
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -N veth101i0-OUT
 -A veth101i0-OUT -j CONNMARK --set-xmark 0x65/0xffffffff
 -A veth101i0-OUT -p udp -m udp --sport 68 --dport 67 -g PVEFW-SET-ACCEPT-MARK
@@ -384,7 +384,7 @@ Which network it considers the "management" network:
 pve-firewall localnet
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 local hostname: desopve04
 local IP address: 172.27.199.24
 network auto detect: 172.27.199.0/24
@@ -398,7 +398,7 @@ pvesh set /cluster/firewall/options --enable 1
 iptables -S PVEFW-HOST-IN
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -A PVEFW-HOST-IN -i lo -j ACCEPT
 -A PVEFW-HOST-IN -m conntrack --ctstate INVALID -j DROP
 -A PVEFW-HOST-IN -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
@@ -433,7 +433,7 @@ pct exec 403 -- bash -c 'echo "== dal CT 403 (10.99.99.2) verso il nodo 10.99.99
   nc -zw2 172.27.199.20 53 && echo "dc tcp/53 ok" || echo "dc tcp/53 BLOCCATO"'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == dal DC (172.27.199.20)
 tcp/22 ok
 tcp/8006 ok
@@ -487,7 +487,7 @@ pvesh create /nodes/desopve04/firewall/rules --type in --action ACCEPT --macro S
   --source 10.99.99.0/28 --enable 1 --comment "SSH dalla subnet instradata (amministrazione del CT 403)"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ping dal DC ok
 CT403 tcp/22 ok
 ```

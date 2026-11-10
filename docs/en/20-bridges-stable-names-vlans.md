@@ -79,8 +79,11 @@ When the Proxmox VE **firewall** is enabled on the guest's network device, it in
 
    At boot, Linux sees the two new ports with names derived from their position on the PCI bus, and leaves them down:
 
-   ```console
-   root@desopve01:~# ip -br link | grep -E "ens|nic"
+   ```bash title="root@desopve01"
+   ip -br link | grep -E "ens|nic"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nic0             UP             <MAC> <BROADCAST,MULTICAST,UP,LOWER_UP>
    nic1             UP             <MAC> <BROADCAST,MULTICAST,UP,LOWER_UP>
    nic2             UP             <MAC> <BROADCAST,MULTICAST,UP,LOWER_UP>
@@ -94,8 +97,11 @@ When the Proxmox VE **firewall** is enabled on the guest's network device, it in
 
 2. Pin the names `nic3` and `nic4` (same command on the three nodes, with the names you see on yours):
 
-   ```console
-   root@desopve01:~# pve-network-interface-pinning generate --interface ens<N1> --target-name nic3
+   ```bash title="root@desopve01"
+   pve-network-interface-pinning generate --interface ens<N1> --target-name nic3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Name for link 'ens<N1>' (enp<B>s<S>f<F>, enx<MAC>) will change to 'nic3'
    Generating link files
    Successfully generated .link files in '/usr/local/lib/systemd/network/'
@@ -106,9 +112,21 @@ When the Proxmox VE **firewall** is enabled on the guest's network device, it in
    Successfully updated Proxmox VE configuration files.
 
    Please reboot to apply the changes to your configuration
-   root@desopve01:~# pve-network-interface-pinning generate --interface ens<N2> --target-name nic4
+   ```
+
+   ```bash title="root@desopve01"
+   pve-network-interface-pinning generate --interface ens<N2> --target-name nic4
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
-   root@desopve01:~# cat /usr/local/lib/systemd/network/50-pmx-nic3.link
+   ```
+
+   ```bash title="root@desopve01"
+   cat /usr/local/lib/systemd/network/50-pmx-nic3.link
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [Match]
    MACAddress=<NIC MAC address>
    Type=ether
@@ -121,10 +139,13 @@ When the Proxmox VE **firewall** is enabled on the guest's network device, it in
 
 3. The new name takes effect at the next reboot. The two ports, however, are not in use yet (they are down), so you can apply it right away, without another reboot: udev rereads the `.link` files and renames the interfaces.
 
-   ```console
-   root@desopve01:~# udevadm trigger -c add /sys/class/net/ens<N1> /sys/class/net/ens<N2>
-   root@desopve01:~# udevadm settle
-   root@desopve01:~# ip -br link | grep -E "nic3|nic4"
+   ```bash title="root@desopve01"
+   udevadm trigger -c add /sys/class/net/ens<N1> /sys/class/net/ens<N2>
+   udevadm settle
+   ip -br link | grep -E "nic3|nic4"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nic3             DOWN           <MAC> <BROADCAST,MULTICAST>
    nic4             DOWN           <MAC> <BROADCAST,MULTICAST>
    ```
@@ -133,15 +154,21 @@ When the Proxmox VE **firewall** is enabled on the guest's network device, it in
 
 4. The tool has prepared the lines for the new cards in `/etc/network/interfaces.new`. Apply them (this is what the **Apply Configuration** button does):
 
-   ```console
-   root@desopve01:~# diff -u /etc/network/interfaces /etc/network/interfaces.new | grep "^[+-]"
+   ```bash title="root@desopve01"
+   diff -u /etc/network/interfaces /etc/network/interfaces.new | grep "^[+-]"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    --- /etc/network/interfaces	2026-11-09 17:02:13.533049346 +0100
    +++ /etc/network/interfaces.new	2026-11-09 19:09:13.063801813 +0100
    +iface nic4 inet manual
    +
    +iface nic3 inet manual
    +
-   root@desopve01:~# mv /etc/network/interfaces.new /etc/network/interfaces && ifreload -a
+   ```
+
+   ```bash title="root@desopve01"
+   mv /etc/network/interfaces.new /etc/network/interfaces && ifreload -a
    ```
 
    Repeat steps 2-4 on `desopve02` and `desopve03`.
@@ -154,10 +181,19 @@ When the Proxmox VE **firewall** is enabled on the guest's network device, it in
 
    Before the change, the bridge does not filter VLANs:
 
-   ```console
-   root@desopve01:~# cat /sys/class/net/vmbr0/bridge/vlan_filtering
+   ```bash title="root@desopve01"
+   cat /sys/class/net/vmbr0/bridge/vlan_filtering
+   ```
+
+   ``` { .text .no-copy title="Output" }
    0
-   root@desopve01:~# bridge vlan show dev nic0
+   ```
+
+   ```bash title="root@desopve01"
+   bridge vlan show dev nic0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    port              vlan-id
    nic0              1 PVID Egress Untagged
    ```
@@ -174,15 +210,30 @@ When the Proxmox VE **firewall** is enabled on the guest's network device, it in
 
    ![Configuration applied](../images/20/04-applicata.png)
 
-   ```console
-   root@desopve01:~# cat /sys/class/net/vmbr0/bridge/vlan_filtering
+   ```bash title="root@desopve01"
+   cat /sys/class/net/vmbr0/bridge/vlan_filtering
+   ```
+
+   ``` { .text .no-copy title="Output" }
    1
-   root@desopve01:~# bridge vlan show dev nic0 | head -4
+   ```
+
+   ```bash title="root@desopve01"
+   bridge vlan show dev nic0 | head -4
+   ```
+
+   ``` { .text .no-copy title="Output" }
    port              vlan-id
    nic0              1 PVID Egress Untagged
                      2
                      3
-   root@desopve01:~# ifquery --check vmbr0
+   ```
+
+   ```bash title="root@desopve01"
+   ifquery --check vmbr0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    auto vmbr0
    iface vmbr0 inet static                                             [pass]
    	bridge-ports nic0 (veth121i0) (fwpr100p0)                   [pass]
@@ -238,10 +289,13 @@ source /etc/network/interfaces.d/*
 
 1. On `desopve02` make a copy of the file and add the two lines to the `vmbr0` block (with an editor, or with `sed` as shown here):
 
-   ```console
-   root@desopve02:~# cp /etc/network/interfaces /root/interfaces.bak-lab20
-   root@desopve02:~# sed -i "/^iface vmbr0 /,/^$/ s/^\tbridge-fd 0$/\tbridge-fd 0\n\tbridge-vlan-aware yes\n\tbridge-vids 2-4094/" /etc/network/interfaces
-   root@desopve02:~# sed -n "/auto vmbr0/,/^$/p" /etc/network/interfaces
+   ```bash title="root@desopve02"
+   cp /etc/network/interfaces /root/interfaces.bak-lab20
+   sed -i "/^iface vmbr0 /,/^$/ s/^\tbridge-fd 0$/\tbridge-fd 0\n\tbridge-vlan-aware yes\n\tbridge-vids 2-4094/" /etc/network/interfaces
+   sed -n "/auto vmbr0/,/^$/p" /etc/network/interfaces
+   ```
+
+   ``` { .text .no-copy title="Output" }
    auto vmbr0
    iface vmbr0 inet static
    	address 172.27.199.22/24
@@ -255,19 +309,37 @@ source /etc/network/interfaces.d/*
 
 2. Apply the change and immediately check that the node can still reach the gateway. If something goes wrong, the rollback plan is to put the copy back and run `ifreload -a` again from the node's console.
 
-   ```console
-   root@desopve02:~# ifreload -a && cat /sys/class/net/vmbr0/bridge/vlan_filtering
+   ```bash title="root@desopve02"
+   ifreload -a && cat /sys/class/net/vmbr0/bridge/vlan_filtering
+   ```
+
+   ``` { .text .no-copy title="Output" }
    1
-   root@desopve02:~# ping -c2 -W1 172.27.199.1 | tail -1
+   ```
+
+   ```bash title="root@desopve02"
+   ping -c2 -W1 172.27.199.1 | tail -1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    rtt min/avg/max/mdev = 0.460/1.174/1.889/0.714 ms
    ```
 
 3. Repeat on `desopve03`. At the end, check that the cluster and Ceph did not notice anything:
 
-   ```console
-   root@desopve01:~# pvecm status | grep Quorate
+   ```bash title="root@desopve01"
+   pvecm status | grep Quorate
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Quorate:          Yes
-   root@desopve01:~# ceph -s | grep health
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s | grep health
+   ```
+
+   ``` { .text .no-copy title="Output" }
        health: HEALTH_OK
    ```
 
@@ -277,9 +349,12 @@ source /etc/network/interfaces.d/*
 
 1. Download the Debian 13 template to CephFS, so that it is available on all nodes:
 
-   ```console
-   root@desopve01:~# pveam update
-   root@desopve01:~# pveam download cephfs debian-13-standard_13.6-1_amd64.tar.zst
+   ```bash title="root@desopve01"
+   pveam update
+   pveam download cephfs debian-13-standard_13.6-1_amd64.tar.zst
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    download of 'http://download.proxmox.com/images/system/debian-13-standard_13.6-1_amd64.tar.zst' to '/mnt/pve/cephfs/template/cache/debian-13-standard_13.6-1_amd64.tar.zst' finished
    ```
@@ -288,13 +363,13 @@ source /etc/network/interfaces.d/*
 
 2. Create one container per node: CT 121 on `desopve01`, 122 on `desopve02`, 123 on `desopve03`. For now they are on the management network, so they can install the test tools (`ping`, `tcpdump`, `iperf3`) through the proxy:
 
-   ```console
-   root@desopve01:~# pct create 121 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
+   ```bash title="root@desopve01"
+   pct create 121 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
        --hostname vlan-ct1 --unprivileged 1 --cores 1 --memory 512 --swap 0 \
        --rootfs rbd-vm:4 --net0 name=eth0,bridge=vmbr0,ip=172.27.199.121/24,gw=172.27.199.1 \
        --nameserver 172.27.199.20 --searchdomain proxmox.community --features nesting=1 \
        --password '<lab-password>' --start 1
-   root@desopve01:~# pct exec 121 -- bash -c 'echo "Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";" > /etc/apt/apt.conf.d/90proxy
+   pct exec 121 -- bash -c 'echo "Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";" > /etc/apt/apt.conf.d/90proxy
        apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install -y iperf3 tcpdump iputils-ping'
    ```
 
@@ -312,17 +387,23 @@ source /etc/network/interfaces.d/*
 
 4. Configure the other two from the command line, again while they are running. CT 123 goes on **VLAN 20**, but with an address in the **same subnet** as the other two:
 
-   ```console
-   root@desopve02:~# pct set 122 -net0 name=eth0,bridge=vmbr0,tag=10,ip=10.10.10.122/24
-   root@desopve03:~# pct set 123 -net0 name=eth0,bridge=vmbr0,tag=20,ip=10.10.10.123/24
+   ```bash title="root@desopve02"
+   pct set 122 -net0 name=eth0,bridge=vmbr0,tag=10,ip=10.10.10.122/24
+   ```
+
+   ```bash title="root@desopve03"
+   pct set 123 -net0 name=eth0,bridge=vmbr0,tag=20,ip=10.10.10.123/24
    ```
 
 ### 5. Tests: same VLAN, different VLANs
 
 1. **Same VLAN, different nodes.** CT 121 (on `desopve01`) reaches CT 122 (on `desopve02`): the frame leaves `nic0` with tag 10, crosses the network and enters `vmbr0` on the other node.
 
-   ```console
-   root@desopve01:~# pct exec 121 -- ping -c3 -W1 10.10.10.122
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c3 -W1 10.10.10.122
+   ```
+
+   ``` { .text .no-copy title="Output" }
    PING 10.10.10.122 (10.10.10.122) 56(84) bytes of data.
    64 bytes from 10.10.10.122: icmp_seq=1 ttl=64 time=1.53 ms
    64 bytes from 10.10.10.122: icmp_seq=2 ttl=64 time=0.631 ms
@@ -334,8 +415,11 @@ source /etc/network/interfaces.d/*
 
 2. **The tag on the wire.** A capture on the node's `nic0` while the ping is running shows the 802.1Q header with VLAN 10:
 
-   ```console
-   root@desopve01:~# tcpdump -i nic0 -e -nn -c 4 "vlan 10 and icmp"
+   ```bash title="root@desopve01"
+   tcpdump -i nic0 -e -nn -c 4 "vlan 10 and icmp"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    19:18:43.123268 <MAC> > <MAC>, ethertype 802.1Q (0x8100), length 102: vlan 10, p 0, ethertype IPv4 (0x0800), 10.10.10.121 > 10.10.10.122: ICMP echo request, id 538, seq 1, length 64
    19:18:43.123781 <MAC> > <MAC>, ethertype 802.1Q (0x8100), length 102: vlan 10, p 0, ethertype IPv4 (0x0800), 10.10.10.122 > 10.10.10.121: ICMP echo reply, id 538, seq 1, length 64
    ...
@@ -344,11 +428,20 @@ source /etc/network/interfaces.d/*
 
    Inside the container, on the other hand, the frames are untagged: it is the bridge that adds and removes the tag. The bridge's VLAN table confirms it: the port of CT 121 is an *access* port of VLAN 10 (PVID, egress untagged), while the port of VM 100, which has no tag, is in VLAN 1 untagged **and** in all VLANs 2-4094 tagged:
 
-   ```console
-   root@desopve01:~# bridge -compressvlans vlan show dev veth121i0
+   ```bash title="root@desopve01"
+   bridge -compressvlans vlan show dev veth121i0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    port              vlan-id
    veth121i0         10 PVID Egress Untagged
-   root@desopve01:~# bridge -compressvlans vlan show dev tap100i0
+   ```
+
+   ```bash title="root@desopve01"
+   bridge -compressvlans vlan show dev tap100i0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    port              vlan-id
    tap100i0          1 PVID Egress Untagged
                      2-4094
@@ -358,8 +451,11 @@ source /etc/network/interfaces.d/*
 
 3. **Different VLANs, same subnet.** CT 123 is in VLAN 20 with an address in the same subnet: it does not answer, because the ARP requests from VLAN 10 never reach VLAN 20.
 
-   ```console
-   root@desopve01:~# pct exec 121 -- ping -c3 -W1 10.10.10.123
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c3 -W1 10.10.10.123
+   ```
+
+   ``` { .text .no-copy title="Output" }
    PING 10.10.10.123 (10.10.10.123) 56(84) bytes of data.
 
    --- 10.10.10.123 ping statistics ---
@@ -368,20 +464,35 @@ source /etc/network/interfaces.d/*
 
 4. **Changing VLAN on the fly.** Move CT 123 to VLAN 10: it communicates immediately, without any restart.
 
-   ```console
-   root@desopve03:~# pct set 123 -net0 name=eth0,bridge=vmbr0,tag=10,ip=10.10.10.123/24
-   root@desopve03:~# pct exec 123 -- ping -c2 -W1 10.10.10.121 | tail -2
+   ```bash title="root@desopve03"
+   pct set 123 -net0 name=eth0,bridge=vmbr0,tag=10,ip=10.10.10.123/24
+   pct exec 123 -- ping -c2 -W1 10.10.10.121 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1002ms
    rtt min/avg/max/mdev = 0.431/1.181/1.931/0.750 ms
    ```
 
 5. **Each VLAN gets its own subnet.** Put CT 123 back in VLAN 20 with a subnet of its own, `10.20.20.0/24`. Now CT 121 does not even know how to reach it: it has no route to that network.
 
-   ```console
-   root@desopve03:~# pct set 123 -net0 name=eth0,bridge=vmbr0,tag=20,ip=10.20.20.123/24
-   root@desopve01:~# pct exec 121 -- ping -c1 -W1 10.20.20.123
+   ```bash title="root@desopve03"
+   pct set 123 -net0 name=eth0,bridge=vmbr0,tag=20,ip=10.20.20.123/24
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c1 -W1 10.20.20.123
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ping: connect: Network is unreachable
-   root@desopve01:~# pct exec 121 -- ip route
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- ip route
+   ```
+
+   ``` { .text .no-copy title="Output" }
    10.10.10.0/24 dev eth0 proto kernel scope link src 10.10.10.121
    ```
 
@@ -401,11 +512,20 @@ VMs work the same way. Add a second network device on VLAN 10 to VM 100:
 
    With the firewall enabled, the `tap100i1` port is attached to the firewall bridge: that is why `tap100i1` appears in VLAN 1, while tag 10 is on the `fwpr100p1` port of `vmbr0`.
 
-   ```console
-   root@desopve01:~# qm config 100 | grep ^net
+   ```bash title="root@desopve01"
+   qm config 100 | grep ^net
+   ```
+
+   ``` { .text .no-copy title="Output" }
    net0: virtio=<MAC>,bridge=vmbr0,firewall=1
    net1: virtio=<MAC>,bridge=vmbr0,firewall=1,tag=10
-   root@desopve01:~# bridge vlan show | grep -E "100i1|100p1"
+   ```
+
+   ```bash title="root@desopve01"
+   bridge vlan show | grep -E "100i1|100p1"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    tap100i1          1 PVID Egress Untagged
    fwbr100i1         1 PVID Egress Untagged
    fwpr100p1         10 PVID Egress Untagged
@@ -414,8 +534,11 @@ VMs work the same way. Add a second network device on VLAN 10 to VM 100:
 
 3. Remove it: from the GUI with **Remove** on the `net1` row, or from the CLI.
 
-   ```console
-   root@desopve01:~# qm set 100 --delete net1
+   ```bash title="root@desopve01"
+   qm set 100 --delete net1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    update VM 100: -delete net1
    ```
 

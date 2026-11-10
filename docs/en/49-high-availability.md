@@ -72,7 +72,7 @@ grep -i watchdog /etc/default/pve-ha-manager
 ha-manager status
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 softdog                12288  2
 ● watchdog-mux.service - Proxmox VE watchdog multiplexer
      Loaded: loaded (/usr/lib/systemd/system/watchdog-mux.service; static)
@@ -98,7 +98,7 @@ fencing standby (CRM watchdog standby)
    ha-manager status
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    quorum OK
    master desopve01 (active, Tue Nov 10 06:18:26 2026)
    fencing armed (CRM watchdog active)
@@ -121,7 +121,7 @@ Groups can no longer be created:
 ha-manager groupadd prova --nodes desopve01
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 cannot create group: ha groups have been migrated to rules
 ```
 
@@ -139,7 +139,7 @@ cannot create group: ha groups have been migrated to rules
    ha-manager rules add resource-affinity web-separati --resources vm:104,vm:105,vm:106 --affinity negative
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    create ha rule failed: 400 Rule 'web-separati' is invalid.
    resources: resources are in node affinity rules with multiple priorities
    ```
@@ -154,7 +154,7 @@ cannot create group: ha groups have been migrated to rules
    ha-manager rules config
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    ┌─────────┬────────┬───────────────────────┬───────────────────┬──────────────────────┬────────────────────────────────────────┐
    │ enabled │ state  │ rule                  │ type              │ resources            │ comment                                │
    ╞═════════╪════════╪═══════════════════════╪═══════════════════╪══════════════════════╪════════════════════════════════════════╡
@@ -192,7 +192,7 @@ pve-ha-crm[1679]: switching scheduler mode from 'basic' to 'dynamic'
    ha-manager crm-command node-maintenance enable desopve03
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    --- +11 s
    lrm desopve03 (maintenance mode, watchdog active, Tue Nov 10 06:27:45 2026)
    service vm:106 (desopve03, started)
@@ -214,7 +214,7 @@ pve-ha-crm[1679]: switching scheduler mode from 'basic' to 'dynamic'
    ha-manager rules set resource-affinity web-separati --resources vm:104,vm:105
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    06:29:46 pve-ha-crm[1679]: migrate service 'vm:106' to node 'desopve02' (running)
    06:30:06 pve-ha-crm[1679]: service 'vm:106': state changed from 'migrate' to 'started'  (node = desopve02)
    ```
@@ -225,7 +225,7 @@ pve-ha-crm[1679]: switching scheduler mode from 'basic' to 'dynamic'
    ha-manager crm-command node-maintenance disable desopve03
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    06:30:46 pve-ha-crm[1679]: node 'desopve03': state changed from 'maintenance' => 'online'
    06:30:46 pve-ha-crm[1679]: moving service 'vm:106' back to 'desopve03', node came back from maintenance.
    06:31:06 pve-ha-crm[1679]: service 'vm:106': state changed from 'migrate' to 'started'  (node = desopve03)
@@ -267,7 +267,7 @@ ha-manager crm-command disarm-ha freeze
 ha-manager status
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 quorum OK
 master desopve01 (active, Tue Nov 10 06:33:47 2026) - disarmed, resource mode: freeze - dynamic load CRS (load imbalance: 35.9%)
 fencing disarmed, resource mode: freeze (CRM watchdog released)
@@ -280,7 +280,7 @@ service vm:105 (desopve02, freeze)
 service vm:106 (desopve03, freeze)
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 pve-ha-lrm[3086]: HA disarm requested, releasing agent lock and watchdog
 pve-ha-lrm[3086]: watchdog closed (disabled)
 ```
@@ -296,7 +296,7 @@ Arm it again with a command (or the **Arm HA** button):
 ha-manager crm-command arm-ha
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 fencing armed (CRM watchdog active)
 lrm desopve01 (active, watchdog active, Tue Nov 10 06:34:51 2026)
 ```
@@ -370,7 +370,7 @@ lrm desopve01 (active, watchdog active, Tue Nov 10 06:34:51 2026)
    ha-manager crm-command migrate vm:106 desopve03
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    +7 s service vm:106 (desopve02, migrate)
    +38 s service vm:106 (desopve03, starting)
    +50 s service vm:106 (desopve03, started)

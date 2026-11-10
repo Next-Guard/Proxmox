@@ -44,7 +44,7 @@ for n in json.load(sys.stdin): print(n["node"], n["status"], "%.1f %%" % (n["cpu
 pvesh usage /nodes/{node}/qemu/{vmid}/clone
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -r-c-        aplinfo
 Dr---        apt
 Dr---        capabilities
@@ -55,13 +55,13 @@ Dr---        disks
 -rw--        dns
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 desopve01 online 19.0 %
 desopve02 online 7.8 %
 desopve03 online 9.3 %
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 USAGE: pvesh create /nodes/{node}/qemu/{vmid}/clone --newid <integer> [OPTIONS]
 ```
 
@@ -94,7 +94,7 @@ dpkg -i /tmp/tofu.deb
 ssh-keygen -t ed25519 -N "" -C automazione@proxmox.community -f /root/.ssh/id_ed25519
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ansible [core 2.19.11]
 ansible 12.0.0+dfsg-0+deb13u1
 python3-proxmoxer 2.2.0-1
@@ -112,7 +112,7 @@ pct exec 154 -- curl -s -o /dev/null -w "%{http_code} verify=%{ssl_verify_result
   https://desopve01.proxmox.community:8006/api2/json/version
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 401 verify=0
 ```
 
@@ -164,7 +164,7 @@ I permessi effettivi del token sul pool:
 pveum user token permissions automazione@pve ansible --path /pool/automazione
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 │ /pool/automazione │ Pool.Audit (*)          │
 │                   │ VM.Allocate (*)         │
 │                   │ VM.Audit (*)            │
@@ -187,7 +187,7 @@ curl -s -b "PVEAuthCookie=$TICKET" -X POST -d "poolid=prova-api" $API/pools
 curl -s -b "PVEAuthCookie=$TICKET" -H "CSRFPreventionToken: $CSRF" -X POST -d "poolid=prova-api" $API/pools
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == 1. ticket
 ticket: PVE:root@pam:6AF2D114::k… (valido 2 ore)
 CSRFPreventionToken: 6AF2D114:AOl…
@@ -210,7 +210,7 @@ curl -s -H "$H" $API/nodes/desopve01/qemu/100/config
 curl -s -H "$H" -X POST -d "poolid=prova-token" $API/pools
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == 4. API token
 9000 debian13-cloud desopve01 template=1
 GET config della VM 100 con il token: HTTP 403
@@ -291,7 +291,7 @@ Poi, nel CT 154:
 cd /root/ansible && time ansible-playbook crea-vm.yml
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 TASK [Linked clone del template debian13-cloud] ********************************
 changed: [localhost]
 TASK [Cloud-init, CPU e RAM] ***************************************************
@@ -311,7 +311,7 @@ In 38 secondi la VM è clonata, configurata e raggiungibile. Cloud-init ha appli
 ssh labuser@172.27.199.155 "hostname; ip -4 -br a show scope global; cloud-init status"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ans01
 eth0             UP             172.27.199.155/24
 status: done
@@ -399,7 +399,7 @@ tofu plan
 tofu apply -auto-approve
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 - Installing bpg/proxmox v0.121.0...
 - Installed bpg/proxmox v0.121.0 (signed, key ID 0B3405B36193A495)
 OpenTofu has been successfully initialized!
@@ -438,7 +438,7 @@ tofu destroy -auto-approve
 ansible-playbook /root/ansible/elimina-vm.yml
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 proxmox_virtual_environment_vm.tofu01: Destroying... [id=156]
 proxmox_virtual_environment_vm.tofu01: Destruction complete after 5s
 Destroy complete! Resources: 1 destroyed.
@@ -453,7 +453,7 @@ Il pool è di nuovo vuoto:
 pvesh get /pools/automazione --output-format json
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {"comment":"VM create dalle automazioni (lab 52)","members":[],"poolid":"automazione"}
 ```
 

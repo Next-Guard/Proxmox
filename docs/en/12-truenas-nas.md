@@ -154,15 +154,36 @@ Proxmox VE will access the SMB share with a dedicated user, not with the NAS adm
 
 From a cluster node, check that the NAS answers to its name, that reverse DNS is correct and that its clock matches the nodes':
 
-```console
-root@desopve01:~# host desonas.proxmox.community
+```bash title="root@desopve01"
+host desonas.proxmox.community
+```
+
+``` { .text .no-copy title="Output" }
 desonas.proxmox.community has address 172.27.199.10
-root@desopve01:~# host 172.27.199.10
+```
+
+```bash title="root@desopve01"
+host 172.27.199.10
+```
+
+``` { .text .no-copy title="Output" }
 10.199.27.172.in-addr.arpa domain name pointer desonas.proxmox.community.
-root@desopve01:~# ping -c2 -W1 desonas.proxmox.community | tail -2
+```
+
+```bash title="root@desopve01"
+ping -c2 -W1 desonas.proxmox.community | tail -2
+```
+
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1002ms
 rtt min/avg/max/mdev = 0.503/1.300/2.097/0.797 ms
-root@desopve01:~# curl -skI https://desonas.proxmox.community/ui/ | grep -i "^date"; date -u
+```
+
+```bash title="root@desopve01"
+curl -skI https://desonas.proxmox.community/ui/ | grep -i "^date"; date -u
+```
+
+``` { .text .no-copy title="Output" }
 date: Mon, 09 Nov 2026 14:04:49 GMT
 Mon Nov  9 02:04:49 PM UTC 2026
 ```

@@ -103,9 +103,12 @@ Lo zvol è **thick** (riserva subito i 40 GiB): lo spazio libero visto dagli sto
 
 Su **tutti e tre i nodi** riduci il tempo dopo cui un percorso perso viene considerato guasto (il valore predefinito è 120 secondi), prima del primo collegamento:
 
-```console
-root@desopve01:~# sed -i 's/^node.session.timeo.replacement_timeout = 120/node.session.timeo.replacement_timeout = 15/' /etc/iscsi/iscsid.conf
-root@desopve01:~# pvesm scan iscsi 172.27.199.10
+```bash title="root@desopve01"
+sed -i 's/^node.session.timeo.replacement_timeout = 120/node.session.timeo.replacement_timeout = 15/' /etc/iscsi/iscsid.conf
+pvesm scan iscsi 172.27.199.10
+```
+
+``` { .text .no-copy title="Output" }
 iqn.2005-10.org.freenas.ctl:pve 172.27.199.10:3260,172.32.199.10:3260
 ```
 
@@ -119,14 +122,29 @@ Il target annuncia entrambi i portal. Aggiungi lo storage iSCSI:
 
 4. **Add**. Proxmox VE si collega al target da ogni nodo, su **tutti** i portal annunciati:
 
-```console
-root@desopve01:~# iscsiadm -m session
+```bash title="root@desopve01"
+iscsiadm -m session
+```
+
+``` { .text .no-copy title="Output" }
 tcp: [1] 172.27.199.10:3260,1 iqn.2005-10.org.freenas.ctl:pve (non-flash)
 tcp: [2] 172.32.199.10:3260,1 iqn.2005-10.org.freenas.ctl:pve (non-flash)
-root@desopve01:~# lsblk -o NAME,SIZE,TRAN,VENDOR,MODEL | grep iscsi
+```
+
+```bash title="root@desopve01"
+lsblk -o NAME,SIZE,TRAN,VENDOR,MODEL | grep iscsi
+```
+
+``` { .text .no-copy title="Output" }
 sde      40G iscsi  TrueNAS  iSCSI Disk
 sdf      40G iscsi  TrueNAS  iSCSI Disk
-root@desopve01:~# iscsiadm -m session -P3 | grep -E 'Current Portal|Attached scsi disk'
+```
+
+```bash title="root@desopve01"
+iscsiadm -m session -P3 | grep -E 'Current Portal|Attached scsi disk'
+```
+
+``` { .text .no-copy title="Output" }
 	Current Portal: 172.27.199.10:3260,1
 			Attached scsi disk sde		State: running
 	Current Portal: 172.32.199.10:3260,1
@@ -141,11 +159,20 @@ In questo laboratorio `vmbr0` e `nic1` sono collegate allo stesso switch, nella 
 
 > **Come si riconosce.** Il problema compare di solito dopo un'interruzione di una delle due schede, per esempio di `nic1`. Le risposte del NAS arrivano dalla scheda sbagliata, la sessione del secondo percorso cade ogni 10 secondi e l'I/O della VM può restare fermo a lungo (in questo laboratorio è successo, con pause fino a 85 secondi). Nel log compaiono errori di connessione ripetuti, e su `vmbr0` passa traffico del portal `172.32.199.10`, che dovrebbe arrivare solo su `nic1`. Un esempio da `desopve02`:
 >
-> ```console
-> root@desopve02:~# dmesg -T | grep "conn error" | tail -2
+> ```bash title="root@desopve02"
+> dmesg -T | grep "conn error" | tail -2
+> ```
+>
+> ``` { .text .no-copy title="Output" }
 > [Mon Nov  9 16:28:15 2026]  connection2:0: detected conn error (1022)
 > [Mon Nov  9 16:28:25 2026]  connection2:0: detected conn error (1022)
-> root@desopve02:~# tcpdump -ni vmbr0 -c 2 host 172.32.199.10
+> ```
+>
+> ```bash title="root@desopve02"
+> tcpdump -ni vmbr0 -c 2 host 172.32.199.10
+> ```
+>
+> ``` { .text .no-copy title="Output" }
 > 16:28:46.780034 IP 172.32.199.10.3260 > 172.32.199.22.36180: Flags [S.], seq 2256764707, ack 4002835344, win 65160, options [mss 1460,sackOK,TS val 675916009 ecr 343433178,nop,wscale 7], length 0
 > 16:28:46.781033 IP 172.32.199.10.3260 > 172.32.199.22.36180: Flags [.], ack 49, win 509, options [nop,nop,TS val 675916010 ecr 343433179], length 0
 > ```
@@ -154,18 +181,21 @@ Conviene quindi prevenirlo subito, prima di configurare multipath.
 
 La soluzione, su **tutti** i nodi con più schede sulla stessa rete: ogni scheda risponde solo per i propri indirizzi (`arp_ignore=1`) e annuncia sempre l'indirizzo giusto (`arp_announce=2`).
 
-```console
-root@desopve01:~# printf 'net.ipv4.conf.all.arp_ignore = 1\nnet.ipv4.conf.all.arp_announce = 2\n' > /etc/sysctl.d/90-arp-multihomed.conf
-root@desopve01:~# sysctl -p /etc/sysctl.d/90-arp-multihomed.conf
+```bash title="root@desopve01"
+printf 'net.ipv4.conf.all.arp_ignore = 1\nnet.ipv4.conf.all.arp_announce = 2\n' > /etc/sysctl.d/90-arp-multihomed.conf
+sysctl -p /etc/sysctl.d/90-arp-multihomed.conf
+```
+
+``` { .text .no-copy title="Output" }
 net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.all.arp_announce = 2
 ```
 
 Se il NAS ha già imparato l'associazione sbagliata, correggila con un annuncio ARP dalla scheda giusta:
 
-```console
-root@desopve02:~# apt install iputils-arping
-root@desopve02:~# arping -c 3 -U -I nic1 -s 172.32.199.22 172.32.199.22
+```bash title="root@desopve02"
+apt install iputils-arping
+arping -c 3 -U -I nic1 -s 172.32.199.22 172.32.199.22
 ```
 
 Nelle reti di produzione la rete dello storage è separata (switch o VLAN dedicati) e il problema non si presenta.
@@ -176,9 +206,12 @@ Su **tutti e tre i nodi**:
 
 1. Installa il pacchetto e leggi il WWID del LUN:
 
-   ```console
-   root@desopve01:~# apt install multipath-tools
-   root@desopve01:~# /lib/udev/scsi_id -g -u -d /dev/sde
+   ```bash title="root@desopve01"
+   apt install multipath-tools
+   /lib/udev/scsi_id -g -u -d /dev/sde
+   ```
+
+   ``` { .text .no-copy title="Output" }
    36589cfc000000580bcccfa017f51b957
    ```
 
@@ -210,10 +243,13 @@ Su **tutti e tre i nodi**:
 
 3. Registra il WWID (le versioni recenti di multipath-tools creano il dispositivo solo per i WWID noti), poi ricarica:
 
-   ```console
-   root@desopve01:~# multipath -a 36589cfc000000580bcccfa017f51b957
-   root@desopve01:~# systemctl restart multipathd; multipath -r
-   root@desopve01:~# multipath -ll
+   ```bash title="root@desopve01"
+   multipath -a 36589cfc000000580bcccfa017f51b957
+   systemctl restart multipathd; multipath -r
+   multipath -ll
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nas-lun0 (36589cfc000000580bcccfa017f51b957) dm-0 TrueNAS,iSCSI Disk
    size=40G features='1 queue_if_no_path' hwhandler='0' wp=rw
    `-+- policy='round-robin 0' prio=1 status=active
@@ -227,12 +263,27 @@ Su **tutti e tre i nodi**:
 
 Crea il gruppo di volumi **una sola volta**, da un nodo, sul dispositivo multipath (mai su `sde` o `sdf`):
 
-```console
-root@desopve01:~# pvcreate /dev/mapper/nas-lun0
+```bash title="root@desopve01"
+pvcreate /dev/mapper/nas-lun0
+```
+
+``` { .text .no-copy title="Output" }
   Physical volume "/dev/mapper/nas-lun0" successfully created.
-root@desopve01:~# vgcreate vg_nas /dev/mapper/nas-lun0
+```
+
+```bash title="root@desopve01"
+vgcreate vg_nas /dev/mapper/nas-lun0
+```
+
+``` { .text .no-copy title="Output" }
   Volume group "vg_nas" successfully created
-root@desopve02:~# pvs
+```
+
+```bash title="root@desopve02"
+pvs
+```
+
+``` { .text .no-copy title="Output" }
   PV                   VG     Fmt  Attr PSize  PFree
   /dev/mapper/nas-lun0 vg_nas lvm2 a--  39.99g 39.99g
 ```
@@ -249,8 +300,11 @@ Gli altri nodi vedono subito il gruppo, sempre attraverso il dispositivo multipa
 
 ![Gli storage del cluster](../images/15/06-pve-storage.png)
 
-```console
-root@desopve01:~# grep -A5 "lvm: nas-lvm" /etc/pve/storage.cfg
+```bash title="root@desopve01"
+grep -A5 "lvm: nas-lvm" /etc/pve/storage.cfg
+```
+
+``` { .text .no-copy title="Output" }
 lvm: nas-lvm
 	vgname vg_nas
 	content images,rootdir
@@ -262,15 +316,30 @@ lvm: nas-lvm
 
 Sposta a caldo il disco della VM 100 su `nas-lvm` (diventa un LV `raw`) e migra la VM:
 
-```console
-root@desopve01:~# qm disk move 100 scsi0 nas-lvm --delete 1
+```bash title="root@desopve01"
+qm disk move 100 scsi0 nas-lvm --delete 1
+```
+
+``` { .text .no-copy title="Output" }
 mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 1m 20s, ready
 mirror-scsi0: Completed successfully.
 removing source volume 'local-zfs:vm-100-disk-0' after successful copy
-root@desopve01:~# lvs vg_nas
+```
+
+```bash title="root@desopve01"
+lvs vg_nas
+```
+
+``` { .text .no-copy title="Output" }
   LV            VG     Attr       LSize  Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
   vm-100-disk-0 vg_nas -wi-ao---- 16.00g
-root@desopve01:~# qm migrate 100 desopve02 --online
+```
+
+```bash title="root@desopve01"
+qm migrate 100 desopve02 --online
+```
+
+``` { .text .no-copy title="Output" }
 2026-11-09 16:22:48 starting migration of VM 100 to node 'desopve02' (172.27.199.22)
 2026-11-09 16:22:54 migration completed, transferred 274.2 MiB VM-state
 2026-11-09 16:22:58 migration finished successfully (duration 00:00:10)
@@ -290,24 +359,36 @@ Il disco non si sposta: il nodo di arrivo attiva lo stesso LV. Si copia solo la 
 
 1. Nella VM 100, ora su `desopve02`, avvia un «battito» che ogni secondo scrive l'ora con i centesimi e la forza sul disco:
 
-   ```console
-   labuser@debian01:~$ nohup sh -c 'while true; do date +%T.%N | cut -c1-12 >> $HOME/battito.log; sync; sleep 1; done' >/dev/null 2>&1 &
+   ```bash title="labuser@debian01"
+   nohup sh -c 'while true; do date +%T.%N | cut -c1-12 >> $HOME/battito.log; sync; sleep 1; done' >/dev/null 2>&1 &
    ```
 
 2. Su `desopve02` stacca la scheda del secondo percorso, come per un cavo staccato:
 
-   ```console
-   root@desopve02:~# date +%T.%N | cut -c1-12; ip link set nic1 down
+   ```bash title="root@desopve02"
+   date +%T.%N | cut -c1-12; ip link set nic1 down
+   ```
+
+   ``` { .text .no-copy title="Output" }
    16:32:14.282
    ```
 
 3. Dopo circa 15 secondi il percorso risulta guasto e l'I/O continua sul primo:
 
-   ```console
-   root@desopve02:~# multipath -ll nas-lun0 | tail -2
+   ```bash title="root@desopve02"
+   multipath -ll nas-lun0 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
      |- 33:0:0:0 sde 8:64 active ready  running
      `- 35:0:0:0 sdg 8:96 failed faulty offline
-   root@desopve02:~# dmesg -T | grep -E 'conn error|recovery timed|Failing path'
+   ```
+
+   ```bash title="root@desopve02"
+   dmesg -T | grep -E 'conn error|recovery timed|Failing path'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [Mon Nov  9 16:32:24 2026]  connection3:0: detected conn error (1022)
    [Mon Nov  9 16:32:29 2026]  session3: session recovery timed out after 5 secs
    [Mon Nov  9 16:32:29 2026] device-mapper: multipath: 252:0: Failing path 8:96.
@@ -318,12 +399,27 @@ Il disco non si sposta: il nodo di arrivo attiva lo stesso LV. Si copia solo la 
 
 4. Riattiva la scheda: il percorso torna da solo.
 
-   ```console
-   root@desopve02:~# date +%T.%N | cut -c1-12; ip link set nic1 up
+   ```bash title="root@desopve02"
+   date +%T.%N | cut -c1-12; ip link set nic1 up
+   ```
+
+   ``` { .text .no-copy title="Output" }
    16:32:49.332
-   root@desopve02:~# dmesg -T | grep Reinstating
+   ```
+
+   ```bash title="root@desopve02"
+   dmesg -T | grep Reinstating
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [Mon Nov  9 16:32:58 2026] device-mapper: multipath: 252:0: Reinstating path 8:96.
-   root@desopve02:~# multipath -ll nas-lun0 | tail -2
+   ```
+
+   ```bash title="root@desopve02"
+   multipath -ll nas-lun0 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
      |- 33:0:0:0 sde 8:64 active ready running
      `- 35:0:0:0 sdg 8:96 active ready running
    ```
@@ -332,8 +428,11 @@ Il disco non si sposta: il nodo di arrivo attiva lo stesso LV. Si copia solo la 
 
 5. Nella VM cerca le pause del battito più lunghe di 1,5 secondi:
 
-   ```console
-   labuser@debian01:~$ awk -F: '{s=$1*3600+$2*60+$3; if (NR>1 && s-p>1.5) printf "pausa di %.1f s, da %s a %s\n", s-p, q, $0; p=s; q=$0}' $HOME/battito.log
+   ```bash title="labuser@debian01"
+   awk -F: '{s=$1*3600+$2*60+$3; if (NR>1 && s-p>1.5) printf "pausa di %.1f s, da %s a %s\n", s-p, q, $0; p=s; q=$0}' $HOME/battito.log
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pausa di 15.3 s, da 16:32:09.700 a 16:32:25.034
    pausa di 1.8 s, da 16:32:40.597 a 16:32:42.416
    pausa di 1.6 s, da 16:32:44.484 a 16:32:46.123
@@ -349,18 +448,27 @@ Su `desopve02` è caduto anche il link 1 di Corosync (lab 06), che usa la stessa
 
 Ferma il battito:
 
-```console
-labuser@debian01:~$ pkill -f "^sh -c while true"; rm -f $HOME/battito.log
+```bash title="labuser@debian01"
+pkill -f "^sh -c while true"; rm -f $HOME/battito.log
 ```
 
 ### Pulizia
 
 Riporta la VM su `desopve01` e il disco sullo storage locale. Gli storage `nas-iscsi` e `nas-lvm` restano configurati per i lab successivi.
 
-```console
-root@desopve02:~# qm migrate 100 desopve01 --online
+```bash title="root@desopve02"
+qm migrate 100 desopve01 --online
+```
+
+``` { .text .no-copy title="Output" }
 2026-11-09 16:34:07 migration finished successfully (duration 00:00:10)
-root@desopve01:~# qm disk move 100 scsi0 local-zfs --delete 1
+```
+
+```bash title="root@desopve01"
+qm disk move 100 scsi0 local-zfs --delete 1
+```
+
+``` { .text .no-copy title="Output" }
 mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 2m 30s, ready
 removing source volume 'nas-lvm:vm-100-disk-0' after successful copy
 ```

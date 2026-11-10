@@ -99,7 +99,7 @@ Nel guest serve un terminale di login sulla seriale:
 sudo systemctl enable serial-getty@ttyS0.service
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Created symlink '/etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service' → '/usr/lib/systemd/system/serial-getty@.service'.
 ```
 
@@ -133,7 +133,7 @@ qm agent 100 ping            # nessun output e codice di uscita 0 se l'agent ris
 qm guest cmd 100 get-osinfo
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {
    "id" : "debian",
    "kernel-release" : "6.12.116+deb13-amd64",
@@ -163,7 +163,7 @@ Un comando eseguito nel guest, con l'output restituito al nodo:
 qm guest exec 100 -- uname -r
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {
    "exitcode" : 0,
    "exited" : 1,
@@ -203,7 +203,7 @@ qm guest cmd 100 fsfreeze-thaw
 date +%T; dd if=/dev/zero of=~/prova bs=1M count=10 && sync; date +%T
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 nodo: 00:53:50 freeze
 1
 frozen
@@ -235,7 +235,7 @@ Nel journal del guest, dopo il riavvio, si vede chi ha chiesto lo spegnimento:
 qm guest exec 100 -- journalctl -b -1 --no-pager -g "guest-shutdown|System is powering down"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Nov 10 00:54:35 debian01 qemu-ga[586]: info: guest-shutdown called, mode: (null)
 Nov 10 00:54:35 debian01 systemd-logind[596]: System is powering down (hypervisor initiated shutdown).
 ```
@@ -281,7 +281,7 @@ qm set 380 --protection 1
 qm destroy 380
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 can't remove VM 380 - protection mode enabled
 ```
 
@@ -315,7 +315,7 @@ pvesh get /cluster/backup/7da86c4c-424f-44c6-98bf-08d52b3a8af1 --output-format j
   | python3 -c 'import json,sys; print("job vmid:", json.load(sys.stdin)["vmid"])'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 job vmid: 380
 ```
 
@@ -329,7 +329,7 @@ La VM nuova **eredita senza avviso** il job della vecchia: con un job attivo ver
 echo "--- dopo la rimozione con purge"; cat /etc/pve/jobs.cfg; echo "(fine jobs.cfg)"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 --- dopo la rimozione con purge
 (fine jobs.cfg)
 ```

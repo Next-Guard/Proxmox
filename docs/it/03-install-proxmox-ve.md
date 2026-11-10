@@ -137,17 +137,29 @@ Collegati a ogni nodo in SSH come `root` (o dalla console) e controlla quanto se
 
 **Nome e versione:**
 
-```console
-root@desopve01:~# hostname -f
+```bash title="root@desopve01"
+hostname -f
+```
+
+``` { .text .no-copy title="Output" }
 desopve01.proxmox.community
-root@desopve01:~# pveversion
+```
+
+```bash title="root@desopve01"
+pveversion
+```
+
+``` { .text .no-copy title="Output" }
 pve-manager/9.2.2/b9984c6d90a4bd80 (running kernel: 7.0.2-6-pve)
 ```
 
 **Pool ZFS del sistema** (`-L` mostra i nomi dei dischi invece degli identificativi lunghi):
 
-```console
-root@desopve01:~# zpool status -L rpool
+```bash title="root@desopve01"
+zpool status -L rpool
+```
+
+``` { .text .no-copy title="Output" }
   pool: rpool
  state: ONLINE
 config:
@@ -159,7 +171,13 @@ config:
 	    sdb3    ONLINE       0     0     0
 
 errors: No known data errors
-root@desopve01:~# zfs list
+```
+
+```bash title="root@desopve01"
+zfs list
+```
+
+``` { .text .no-copy title="Output" }
 NAME               USED  AVAIL  REFER  MOUNTPOINT
 rpool             2.00G  45.5G    96K  /rpool
 rpool/ROOT        2.00G  45.5G    96K  /rpool/ROOT
@@ -172,8 +190,11 @@ rpool/var-lib-vz    96K  45.5G    96K  /var/lib/vz
 
 **Avvio da entrambi i dischi.** Con ZFS RAID1 l'installer crea una partizione di avvio EFI su **ogni** disco e le tiene allineate con `proxmox-boot-tool`: il nodo si avvia anche se si guasta il primo disco.
 
-```console
-root@desopve01:~# proxmox-boot-tool status
+```bash title="root@desopve01"
+proxmox-boot-tool status
+```
+
+``` { .text .no-copy title="Output" }
 Re-executing '/usr/sbin/proxmox-boot-tool' in new private mount namespace..
 System currently booted with uefi
 F98D-1B42 is configured with: uefi (versions: 7.0.2-6-pve)
@@ -182,8 +203,11 @@ F990-B56D is configured with: uefi (versions: 7.0.2-6-pve)
 
 **Storage creati dall'installer:**
 
-```console
-root@desopve01:~# pvesm status
+```bash title="root@desopve01"
+pvesm status
+```
+
+``` { .text .no-copy title="Output" }
 Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
 local             dir     active        47723008             128        47722880    0.00%
 local-zfs     zfspool     active        47723048              96        47722952    0.00%
@@ -191,12 +215,21 @@ local-zfs     zfspool     active        47723048              96        47722952
 
 Su `desopve04` (ext4) gli storage sono `local` e `local-lvm`, cioè il thin pool `data` del gruppo LVM `pve`:
 
-```console
-root@desopve04:~# pvesm status
+```bash title="root@desopve04"
+pvesm status
+```
+
+``` { .text .no-copy title="Output" }
 Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
 local             dir     active        22203544         4193740        16856576   18.89%
 local-lvm     lvmthin     active        14217216               0        14217216    0.00%
-root@desopve04:~# lvs
+```
+
+```bash title="root@desopve04"
+lvs
+```
+
+``` { .text .no-copy title="Output" }
   LV   VG  Attr       LSize   Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
   data pve twi-a-tz-- <13.56g             0.00   1.58
   root pve -wi-ao----  21.68g
@@ -207,11 +240,20 @@ Nota la differenza: su ZFS lo spazio è condiviso tra sistema e VM, mentre con L
 
 **Rete.** L'indirizzo di gestione non è sulla scheda fisica ma sul bridge `vmbr0`, a cui è collegata `nic0`: le VM collegate a `vmbr0` escono sulla stessa rete del nodo.
 
-```console
-root@desopve01:~# ip -br -4 addr
+```bash title="root@desopve01"
+ip -br -4 addr
+```
+
+``` { .text .no-copy title="Output" }
 lo               UNKNOWN        127.0.0.1/8
 vmbr0            UP             172.27.199.21/24
-root@desopve01:~# cat /etc/network/interfaces
+```
+
+```bash title="root@desopve01"
+cat /etc/network/interfaces
+```
+
+``` { .text .no-copy title="Output" }
 auto lo
 iface lo inet loopback
 
@@ -231,7 +273,13 @@ iface nic2 inet manual
 
 
 source /etc/network/interfaces.d/*
-root@desopve01:~# ls /usr/local/lib/systemd/network/
+```
+
+```bash title="root@desopve01"
+ls /usr/local/lib/systemd/network/
+```
+
+``` { .text .no-copy title="Output" }
 50-pmx-nic0.link  50-pmx-nic1.link  50-pmx-nic2.link
 ```
 
@@ -239,10 +287,19 @@ I tre file `.link` legano i nomi `nic0`…`nic2` all'indirizzo MAC delle schede.
 
 **Estensioni di virtualizzazione.** Il nodo deve vedere le estensioni di virtualizzazione del processore e il dispositivo `/dev/kvm`, altrimenti non potrà avviare VM:
 
-```console
-root@desopve01:~# grep -c -E 'vmx|svm' /proc/cpuinfo
+```bash title="root@desopve01"
+grep -c -E 'vmx|svm' /proc/cpuinfo
+```
+
+``` { .text .no-copy title="Output" }
 8
-root@desopve01:~# ls -la /dev/kvm
+```
+
+```bash title="root@desopve01"
+ls -la /dev/kvm
+```
+
+``` { .text .no-copy title="Output" }
 crw-rw---- 1 root kvm 10, 232 Nov  9 10:33 /dev/kvm
 ```
 
@@ -252,13 +309,22 @@ Un risultato `0` indica che VT-x/AMD-V è disattivato nel firmware (BIOS/UEFI) d
 
 Può capitare se nell'installer torni indietro e cambi il nome dopo averlo già confermato. Correggi `/etc/hosts` **prima** di creare il cluster e rigenera il certificato dell'interfaccia web:
 
-```console
-root@desopve01:~# sed -i 's/vecchio-dominio/proxmox.community/g' /etc/hosts /etc/resolv.conf /etc/postfix/main.cf
-root@desopve01:~# pvecm updatecerts --force
+```bash title="root@desopve01"
+sed -i 's/vecchio-dominio/proxmox.community/g' /etc/hosts /etc/resolv.conf /etc/postfix/main.cf
+pvecm updatecerts --force
+```
+
+``` { .text .no-copy title="Output" }
 (re)generate node files
 generate new node certificate
-root@desopve01:~# systemctl restart pveproxy
-root@desopve01:~# openssl x509 -in /etc/pve/local/pve-ssl.pem -noout -ext subjectAltName
+```
+
+```bash title="root@desopve01"
+systemctl restart pveproxy
+openssl x509 -in /etc/pve/local/pve-ssl.pem -noout -ext subjectAltName
+```
+
+``` { .text .no-copy title="Output" }
 X509v3 Subject Alternative Name:
     IP Address:127.0.0.1, IP Address:0:0:0:0:0:0:0:1, DNS:localhost, IP Address:172.27.199.21, DNS:desopve01, DNS:desopve01.proxmox.community
 ```

@@ -122,12 +122,21 @@ Sugli altri nodi (`desopve02`, `desopve03` e `desopve04`) esegui gli stessi pass
 
 1. Guarda i repository presenti e disattiva quelli enterprise aggiungendo `Enabled: no`:
 
-   ```console
-   root@desopve02:~# ls /etc/apt/sources.list.d/
+   ```bash title="root@desopve02"
+   ls /etc/apt/sources.list.d/
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ceph.sources  debian.sources  pve-enterprise.sources
-   root@desopve02:~# echo 'Enabled: no' >> /etc/apt/sources.list.d/pve-enterprise.sources
-   root@desopve02:~# echo 'Enabled: no' >> /etc/apt/sources.list.d/ceph.sources
-   root@desopve02:~# cat /etc/apt/sources.list.d/pve-enterprise.sources
+   ```
+
+   ```bash title="root@desopve02"
+   echo 'Enabled: no' >> /etc/apt/sources.list.d/pve-enterprise.sources
+   echo 'Enabled: no' >> /etc/apt/sources.list.d/ceph.sources
+   cat /etc/apt/sources.list.d/pve-enterprise.sources
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Types: deb
    URIs: https://enterprise.proxmox.com/debian/pve
    Suites: trixie
@@ -138,8 +147,8 @@ Sugli altri nodi (`desopve02`, `desopve03` e `desopve04`) esegui gli stessi pass
 
 2. Crea il repository no-subscription:
 
-   ```console
-   root@desopve02:~# cat > /etc/apt/sources.list.d/proxmox.sources <<'EOF'
+   ```bash title="root@desopve02"
+   cat > /etc/apt/sources.list.d/proxmox.sources <<'EOF'
    Types: deb
    URIs: http://download.proxmox.com/debian/pve
    Suites: trixie
@@ -150,14 +159,29 @@ Sugli altri nodi (`desopve02`, `desopve03` e `desopve04`) esegui gli stessi pass
 
 3. Imposta il proxy del datacenter con `pvesh`, il client da riga di comando dell'API (lab 05), e lancia `pveupdate`, che scrive la configurazione del proxy per `apt` e aggiorna la lista dei pacchetti:
 
-   ```console
-   root@desopve02:~# pvesh set /cluster/options --http_proxy http://proxy.proxmox.community:3128
-   root@desopve02:~# cat /etc/pve/datacenter.cfg
+   ```bash title="root@desopve02"
+   pvesh set /cluster/options --http_proxy http://proxy.proxmox.community:3128
+   cat /etc/pve/datacenter.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    http_proxy: http://proxy.proxmox.community:3128
    keyboard: it
-   root@desopve02:~# pveupdate
+   ```
+
+   ```bash title="root@desopve02"
+   pveupdate
+   ```
+
+   ``` { .text .no-copy title="Output" }
    error reading cached package status in '/var/lib/pve-manager/pkgupdates' - can't open '/var/lib/pve-manager/pkgupdates' - No such file or directory
-   root@desopve02:~# cat /etc/apt/apt.conf.d/76pveproxy
+   ```
+
+   ```bash title="root@desopve02"
+   cat /etc/apt/apt.conf.d/76pveproxy
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Acquire::http::Proxy "http://proxy.proxmox.community:3128";
    ```
 
@@ -165,33 +189,54 @@ Sugli altri nodi (`desopve02`, `desopve03` e `desopve04`) esegui gli stessi pass
 
 4. Aggiorna. Con `apt` usa sempre **`full-upgrade`** (o `dist-upgrade`), mai il semplice `upgrade`: un aggiornamento di Proxmox VE può dover installare pacchetti nuovi, come un kernel, che `upgrade` lascerebbe indietro.
 
-   ```console
-   root@desopve02:~# apt update
+   ```bash title="root@desopve02"
+   apt update
+   ```
+
+   ``` { .text .no-copy title="Output" }
    …
    212 packages can be upgraded. Run 'apt list --upgradable' to see them.
-   root@desopve02:~# apt full-upgrade
+   ```
+
+   ```bash title="root@desopve02"
+   apt full-upgrade
+   ```
+
+   ``` { .text .no-copy title="Output" }
    …
    Summary:
      Upgrading: 212, Installing: 2, Removing: 0, Not Upgrading: 0
      Download size: 666 MB
      Space needed: 1,217 MB / 48.8 GB available
    …
-   root@desopve02:~# systemctl reboot
+   ```
+
+   ```bash title="root@desopve02"
+   systemctl reboot
    ```
 
 ### 6. Sincronizzare l'ora
 
 Proxmox VE usa **chrony**. Dopo l'installazione punta ai server pubblici `2.debian.pool.ntp.org`, che dal laboratorio non sono raggiungibili: `chronyc sources` non mostra nessuna fonte. Su **ogni** nodo sostituisci il pool con il server NTP del laboratorio:
 
-```console
-root@desopve02:~# sed -i 's/^pool 2.debian.pool.ntp.org iburst/#pool 2.debian.pool.ntp.org iburst/' /etc/chrony/chrony.conf
-root@desopve02:~# echo 'server ntp.proxmox.community iburst' > /etc/chrony/sources.d/lab.sources
-root@desopve02:~# systemctl restart chrony
-root@desopve02:~# chronyc sources
+```bash title="root@desopve02"
+sed -i 's/^pool 2.debian.pool.ntp.org iburst/#pool 2.debian.pool.ntp.org iburst/' /etc/chrony/chrony.conf
+echo 'server ntp.proxmox.community iburst' > /etc/chrony/sources.d/lab.sources
+systemctl restart chrony
+chronyc sources
+```
+
+``` { .text .no-copy title="Output" }
 MS Name/IP address         Stratum Poll Reach LastRx Last sample
 ===============================================================================
 ^* netsvc.proxmox.community      3   6    17     6  +5191ns[  -60us] +/-   23ms
-root@desopve02:~# timedatectl | grep -E 'synchronized|NTP service'
+```
+
+```bash title="root@desopve02"
+timedatectl | grep -E 'synchronized|NTP service'
+```
+
+``` { .text .no-copy title="Output" }
 System clock synchronized: yes
               NTP service: active
 ```
@@ -208,18 +253,39 @@ L'asterisco (`^*`) indica la fonte scelta da chrony. `sources.d` è la directory
 
 Su tutti e quattro i nodi:
 
-```console
-root@desopve01:~# pveversion
+```bash title="root@desopve01"
+pveversion
+```
+
+``` { .text .no-copy title="Output" }
 pve-manager/9.2.26/41a0e2e09b9e6f9d (running kernel: 7.0.14-28-pve)
-root@desopve01:~# pveversion -v | head -4
+```
+
+```bash title="root@desopve01"
+pveversion -v | head -4
+```
+
+``` { .text .no-copy title="Output" }
 proxmox-ve: 9.2.0 (running kernel: 7.0.14-28-pve)
 pve-manager: 9.2.26 (running version: 9.2.26/41a0e2e09b9e6f9d)
 proxmox-kernel-helper: 9.2.1
 proxmox-kernel-7.0: 7.0.14-28
-root@desopve02:~# apt update
+```
+
+```bash title="root@desopve02"
+apt update
+```
+
+``` { .text .no-copy title="Output" }
 …
 All packages are up to date.
-root@desopve02:~# cat /etc/apt/sources.list.d/ceph.sources
+```
+
+```bash title="root@desopve02"
+cat /etc/apt/sources.list.d/ceph.sources
+```
+
+``` { .text .no-copy title="Output" }
 Types: deb
 URIs: https://enterprise.proxmox.com/debian/ceph-squid
 Suites: trixie

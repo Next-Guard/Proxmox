@@ -94,25 +94,43 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
 
 1. Sul nodo `desopve01` scarica l'immagine raw di CHR nella cartella `import` dello storage `local` e decomprimila:
 
-   ```console
-   root@desopve01:~# cd /var/lib/vz/import
-   root@desopve01:/var/lib/vz/import# export https_proxy=http://proxy.proxmox.community:3128
-   root@desopve01:/var/lib/vz/import# curl -s https://download.mikrotik.com/routeros/NEWESTa7.stable
+   ```bash title="root@desopve01"
+   cd /var/lib/vz/import
+   export https_proxy=http://proxy.proxmox.community:3128
+   curl -s https://download.mikrotik.com/routeros/NEWESTa7.stable
+   ```
+
+   ``` { .text .no-copy title="Output" }
    7.25.1 1793623193
-   root@desopve01:/var/lib/vz/import# curl -s -O https://download.mikrotik.com/routeros/7.25.1/chr-7.25.1.img.zip
-   root@desopve01:/var/lib/vz/import# unzip chr-7.25.1.img.zip
+   ```
+
+   ```bash title="root@desopve01:/var/lib/vz/import"
+   curl -s -O https://download.mikrotik.com/routeros/7.25.1/chr-7.25.1.img.zip
+   unzip chr-7.25.1.img.zip
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Archive:  chr-7.25.1.img.zip
      inflating: chr-7.25.1.img
    ```
 
 2. Proxmox VE riconosce nello storage di import solo le estensioni dei formati che conosce (`.raw`, `.qcow2`, `.vmdk`, `.ova`). Un file `.img` non compare: va rinominato in `.raw`, che è lo stesso formato:
 
-   ```console
-   root@desopve01:/var/lib/vz/import# pvesm list local --content import
+   ```bash title="root@desopve01:/var/lib/vz/import"
+   pvesm list local --content import
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Volid                                           Format  Type           Size VMID
    local:import/debian-13-genericcloud-amd64.qcow2 qcow2   import    341180416
-   root@desopve01:/var/lib/vz/import# mv chr-7.25.1.img chr-7.25.1.raw && rm chr-7.25.1.img.zip
-   root@desopve01:/var/lib/vz/import# pvesm list local --content import
+   ```
+
+   ```bash title="root@desopve01:/var/lib/vz/import"
+   mv chr-7.25.1.img chr-7.25.1.raw && rm chr-7.25.1.img.zip
+   pvesm list local --content import
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Volid                                           Format  Type           Size VMID
    local:import/debian-13-genericcloud-amd64.qcow2 qcow2   import    341180416
    local:import/chr-7.25.1.raw                     raw     import    134217728
@@ -138,18 +156,27 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
 
 1. Aggiungi la seconda scheda su `vmbr1` con le sole VLAN 10 e 20, togli il lettore CD inutile e fai partire il router con il nodo:
 
-   ```console
-   root@desopve01:~# qm set 261 --net1 virtio,bridge=vmbr1,trunks='10;20' --boot order=scsi0 --delete ide2 --onboot 1
+   ```bash title="root@desopve01"
+   qm set 261 --net1 virtio,bridge=vmbr1,trunks='10;20' --boot order=scsi0 --delete ide2 --onboot 1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    update VM 261: -boot order=scsi0 -delete ide2 -net1 virtio,bridge=vmbr1,trunks=10;20 -onboot 1
-   root@desopve01:~# qm start 261
+   ```
+
+   ```bash title="root@desopve01"
+   qm start 261
    ```
 
    ![Hardware della VM router01](../images/26/03-hardware.png)
 
 2. Con la VM accesa, il filtro VLAN del bridge mostra cosa entra nella porta della seconda scheda (`tap261i1`): le VLAN 10 e 20 con il tag, più la PVID 1 senza tag che il bridge assegna di default:
 
-   ```console
-   root@desopve01:~# bridge vlan show dev tap261i1
+   ```bash title="root@desopve01"
+   bridge vlan show dev tap261i1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    port              vlan-id  
    tap261i1          1 PVID Egress Untagged
                      10
@@ -173,14 +200,17 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
 
 2. Dal DC registra il nome del router nel DNS (record A e PTR):
 
-   ```powershell
-   PS C:\> Add-DnsServerResourceRecordA -ZoneName proxmox.community -Name router01 -IPv4Address 172.27.199.26 -CreatePtr
+   ```powershell title="PowerShell — desopve-dc01"
+   Add-DnsServerResourceRecordA -ZoneName proxmox.community -Name router01 -IPv4Address 172.27.199.26 -CreatePtr
    ```
 
 3. Da qui in poi si lavora via SSH (`ssh admin@router01.proxmox.community`). Le schede compaiono nell'ordine delle schede della VM: `ether1` è `net0` (`vmbr0`), `ether2` è `net1` (il trunk). I MAC coincidono con quelli di Proxmox:
 
-   ```console
-   [admin@router01] > /interface ethernet print
+   ```text title="RouterOS — router01"
+   /interface ethernet print
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Flags: R - RUNNING
    Columns: NAME, MTU, MAC-ADDRESS, ARP
    #   NAME     MTU  MAC-ADDRESS        ARP    
@@ -208,8 +238,11 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
 
 2. Verifica:
 
-   ```console
-   [admin@router01] > /interface print where type~"ether|vlan"
+   ```text title="RouterOS — router01"
+   /interface print where type~"ether|vlan"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Flags: R - RUNNING
    Columns: NAME, TYPE, ACTUAL-MTU, MAC-ADDRESS
    #   NAME    TYPE   ACTUAL-MTU  MAC-ADDRESS      
@@ -219,7 +252,13 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
    2 R vlan10  vlan         1500  BC:24:11:23:9B:72
    ;;; VLAN 20 sul trunk
    3 R vlan20  vlan         1500  BC:24:11:23:9B:72
-   [admin@router01] > /ip address print
+   ```
+
+   ```text title="RouterOS — router01"
+   /ip address print
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Columns: ADDRESS, NETWORK, INTERFACE, VRF
    # ADDRESS           NETWORK       INTERFACE  VRF 
    0 172.27.199.26/24  172.27.199.0  ether1     main
@@ -242,13 +281,22 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
 
 2. Verifica:
 
-   ```console
-   [admin@router01] > /ip dhcp-server print
+   ```text title="RouterOS — router01"
+   /ip dhcp-server print
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Columns: NAME, INTERFACE, ADDRESS-POOL, LEASE-TIME
    # NAME         INTERFACE  ADDRESS-POOL  LEASE-TIME
    0 dhcp-vlan10  vlan10     pool-vlan10   1h        
    1 dhcp-vlan20  vlan20     pool-vlan20   1h        
-   [admin@router01] > /ip dhcp-server network print
+   ```
+
+   ```text title="RouterOS — router01"
+   /ip dhcp-server network print
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Columns: ADDRESS, GATEWAY, DNS-SERVER, DOMAIN
    # ADDRESS        GATEWAY     DNS-SERVER     DOMAIN           
    0 10.10.10.0/24  10.10.10.1  172.27.199.20  proxmox.community
@@ -287,19 +335,31 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
 
 2. Dopo il riavvio del container, il router gli assegna il primo indirizzo libero del pool, partendo dall'alto, insieme al gateway e al DNS:
 
-   ```console
-   root@desopve01:~# pct reboot 121
-   root@desopve01:~# pct exec 121 -- ip route
+   ```bash title="root@desopve01"
+   pct reboot 121
+   pct exec 121 -- ip route
+   ```
+
+   ``` { .text .no-copy title="Output" }
    default via 10.10.10.1 dev eth0 
    10.10.10.0/24 dev eth0 proto kernel scope link src 10.10.10.199 
-   root@desopve01:~# pct exec 121 -- cat /etc/resolv.conf
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- cat /etc/resolv.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    domain proxmox.community
    search proxmox.community
    nameserver 172.27.199.20
    ```
 
-   ```console
-   [admin@router01] > /ip dhcp-server lease print
+   ```text title="RouterOS — router01"
+   /ip dhcp-server lease print
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Flags: D - DYNAMIC
    Columns: ADDRESS, MAC-ADDRESS, HOST-NAME, SERVER, STATUS, LAST-SEEN
    #   ADDRESS       MAC-ADDRESS        HOST-NAME  SERVER       STATUS  LAST-SEEN
@@ -316,16 +376,22 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
 
 4. **CT 123** passa al DHCP da riga di comando; **CT 122** resta con l'indirizzo statico, ma con il gateway del router. Nel `pct set` ripeti il MAC attuale (`hwaddr`), altrimenti Proxmox ne genera uno nuovo:
 
-   ```console
-   root@desopve03:~# pct set 123 -net0 name=eth0,bridge=vmbr1,hwaddr=<MAC del CT 123>,ip=dhcp,tag=20,type=veth
-   root@desopve03:~# pct reboot 123
-   root@desopve02:~# pct set 122 -net0 name=eth0,bridge=vmbr1,hwaddr=<MAC del CT 122>,ip=10.10.10.122/24,gw=10.10.10.1,tag=10,type=veth
+   ```bash title="root@desopve03"
+   pct set 123 -net0 name=eth0,bridge=vmbr1,hwaddr=<MAC del CT 123>,ip=dhcp,tag=20,type=veth
+   pct reboot 123
+   ```
+
+   ```bash title="root@desopve02"
+   pct set 122 -net0 name=eth0,bridge=vmbr1,hwaddr=<MAC del CT 122>,ip=10.10.10.122/24,gw=10.10.10.1,tag=10,type=veth
    ```
 
    Dopo il riavvio di CT 121 e CT 123:
 
-   ```console
-   [admin@router01] > /ip dhcp-server lease print
+   ```text title="RouterOS — router01"
+   /ip dhcp-server lease print
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Columns: ADDRESS, MAC-ADDRESS, HOST-NAME, SERVER, STATUS, LAST-SEEN
    # ADDRESS       MAC-ADDRESS        HOST-NAME  SERVER       STATUS  LAST-SEEN
    ;;; vlan-ct1 (CT 121)
@@ -340,8 +406,11 @@ Il guest agent di CHR comunica a Proxmox VE gli indirizzi del router, che compai
 
 ![Gli indirizzi del router nel Summary, letti dal guest agent](../images/26/06-summary-agent.png)
 
-```console
-root@desopve01:~# qm guest cmd 261 network-get-interfaces | python3 -c "import sys,json; [print(i['name'], [a['ip-address'] for a in i.get('ip-addresses',[]) if a['ip-address-type']=='ipv4']) for i in json.load(sys.stdin)]"
+```bash title="root@desopve01"
+qm guest cmd 261 network-get-interfaces | python3 -c "import sys,json; [print(i['name'], [a['ip-address'] for a in i.get('ip-addresses',[]) if a['ip-address-type']=='ipv4']) for i in json.load(sys.stdin)]"
+```
+
+``` { .text .no-copy title="Output" }
 ether1 ['172.27.199.26']
 ether2 []
 vlan10 ['10.10.10.1']
@@ -352,27 +421,48 @@ vlan20 ['10.20.20.1']
 
 1. **Routing tra VLAN:** CT 121 (VLAN 10) raggiunge CT 123 (VLAN 20). Con TTL 1 il primo salto risponde: è il router.
 
-   ```console
-   root@desopve01:~# pct exec 121 -- ping -c3 -W1 10.20.20.123
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c3 -W1 10.20.20.123
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2002ms
    rtt min/avg/max/mdev = 0.897/1.231/1.568/0.273 ms
-   root@desopve01:~# pct exec 121 -- ping -c1 -t1 -W1 10.20.20.123
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c1 -t1 -W1 10.20.20.123
+   ```
+
+   ``` { .text .no-copy title="Output" }
    From 10.10.10.1 icmp_seq=1 Time to live exceeded
    ```
 
 2. **Firewall:** dalla VLAN 20 la VLAN 10 non si raggiunge, mentre la rete del laboratorio sì:
 
-   ```console
-   root@desopve03:~# pct exec 123 -- ping -c3 -W1 10.10.10.121
+   ```bash title="root@desopve03"
+   pct exec 123 -- ping -c3 -W1 10.10.10.121
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 0 received, 100% packet loss, time 2030ms
-   root@desopve03:~# pct exec 123 -- ping -c3 -W1 172.27.199.20
+   ```
+
+   ```bash title="root@desopve03"
+   pct exec 123 -- ping -c3 -W1 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2003ms
    ```
 
    I contatori delle regole mostrano dove è finito il traffico: i 3 ping verso la VLAN 10 sono stati scartati dall'ultima regola.
 
-   ```console
-   [admin@router01] > /ip firewall filter print stats where chain=forward
+   ```text title="RouterOS — router01"
+   /ip firewall filter print stats where chain=forward
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Columns: CHAIN, ACTION, BYTES, PACKETS
     # CHAIN    ACTION   BYTES  PACKETS
    ;;; forward: risposte
@@ -389,16 +479,22 @@ vlan20 ['10.20.20.1']
 
 3. **NAT:** sulla rete del laboratorio il traffico del container arriva con l'indirizzo del router:
 
-   ```console
-   root@desopve01:~# tcpdump -lni vmbr0 -c4 icmp and host 172.27.199.20
+   ```bash title="root@desopve01"
+   tcpdump -lni vmbr0 -c4 icmp and host 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    20:40:10.925277 IP 172.27.199.26 > 172.27.199.20: ICMP echo request, id 301, seq 1, length 64
    20:40:10.925907 IP 172.27.199.20 > 172.27.199.26: ICMP echo reply, id 301, seq 1, length 64
    ```
 
 4. **Proxy:** dal CT 123 `apt` arriva al proxy passando dal router:
 
-   ```console
-   root@desopve03:~# pct exec 123 -- apt-get update
+   ```bash title="root@desopve03"
+   pct exec 123 -- apt-get update
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    Fetched 43.4 kB in 0s (158 kB/s)
    Reading package lists...
@@ -406,15 +502,33 @@ vlan20 ['10.20.20.1']
 
 5. **La licenza free si vede:** `iperf3` dalla VLAN 10 alla VLAN 20, attraverso il router, contro lo stesso test dentro la VLAN 10, senza router:
 
-   ```console
-   [admin@router01] > /system license print
+   ```text title="RouterOS — router01"
+   /system license print
+   ```
+
+   ``` { .text .no-copy title="Output" }
      system-id: <id-del-router>
          level: free
-   root@desopve03:~# pct exec 123 -- iperf3 -s -D
-   root@desopve01:~# pct exec 121 -- iperf3 -c 10.20.20.123 -t 8 -f m
+   ```
+
+   ```bash title="root@desopve03"
+   pct exec 123 -- iperf3 -s -D
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- iperf3 -c 10.20.20.123 -t 8 -f m
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [  5]   0.00-8.00   sec  4.50 MBytes  4.72 Mbits/sec    3            sender
    [  5]   0.00-15.61  sec  2.00 MBytes  1.07 Mbits/sec                  receiver
-   root@desopve01:~# pct exec 121 -- iperf3 -c 10.10.10.122 -t 5 -f m
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- iperf3 -c 10.10.10.122 -t 5 -f m
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [  5]   0.00-5.00   sec  3.13 GBytes  5371 Mbits/sec  221            sender
    [  5]   0.00-5.00   sec  3.13 GBytes  5367 Mbits/sec                  receiver
    ```
@@ -423,14 +537,32 @@ vlan20 ['10.20.20.1']
 
 6. **Router spento:** con il router fermo, la stessa VLAN funziona ancora (è un bridge), il routing no:
 
-   ```console
-   root@desopve01:~# qm shutdown 261 --timeout 60 && qm status 261
+   ```bash title="root@desopve01"
+   qm shutdown 261 --timeout 60 && qm status 261
+   ```
+
+   ``` { .text .no-copy title="Output" }
    status: stopped
-   root@desopve01:~# pct exec 121 -- ping -c3 -W1 10.10.10.122
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c3 -W1 10.10.10.122
+   ```
+
+   ``` { .text .no-copy title="Output" }
    64 bytes from 10.10.10.122: icmp_seq=3 ttl=64 time=0.714 ms
-   root@desopve01:~# pct exec 121 -- ping -c3 -W1 10.20.20.123
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c3 -W1 10.20.20.123
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 0 received, 100% packet loss, time 2039ms
-   root@desopve01:~# qm start 261
+   ```
+
+   ```bash title="root@desopve01"
+   qm start 261
    ```
 
    Dal comando di avvio al primo ping riuscito tra le VLAN passano circa 28 secondi: il tempo di avvio di RouterOS. Un router virtuale è un *single point of failure*: in produzione si raddoppia (VRRP) o lo si protegge con l'alta disponibilità di Proxmox VE (lab 49).

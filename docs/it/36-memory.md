@@ -84,7 +84,7 @@ Si chiede al pallone di portare la VM a 1,5 GiB e si legge `actual` ogni 2 secon
 printf "balloon 1536\nquit\n" | qm monitor 360
 ```
 
-```text
+``` { .text .no-copy title="Output" }
  2s actual=2886
  4s actual=2886
  6s actual=2886
@@ -95,7 +95,7 @@ printf "balloon 1536\nquit\n" | qm monitor 360
 16s actual=3072
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Mem:            2793         333        1905           0         703        2459      ← nel guest, dopo 5 s
 ```
 
@@ -119,7 +119,7 @@ K=/sys/kernel/mm/ksm
 echo 1000 > $K/pages_to_scan; echo 20 > $K/sleep_millisecs; echo 1 > $K/run
 ```
 
-```text
+``` { .text .no-copy title="Output" }
  30s  pages_shared=82740   pages_sharing=98328   risparmio=384 MiB
  60s  pages_shared=165975  pages_sharing=378346  risparmio=1477 MiB
  90s  pages_shared=166168  pages_sharing=379811  risparmio=1483 MiB
@@ -159,7 +159,7 @@ qm set 362 --numa 1 --hugepages 2 --balloon 0
 qm start 362
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 HugePages_Total:    1600         ← prima dell'avvio
 HugePages_Free:     1600
   -object 'memory-backend-file,id=ram-node0,size=3072M,mem-path=/run/hugepages/kvm/2048kB,share=on,prealloc=yes' \
@@ -179,7 +179,7 @@ echo 3 > $H/nr_hugepages
 qm set 362 --hugepages 1024 && qm start 362
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 1G richieste 3, allocate 3, libere 3
   -object 'memory-backend-file,id=ram-node0,size=3072M,mem-path=/run/hugepages/kvm/1048576kB,share=on,prealloc=yes' \
 1G libere dopo l'avvio: 0
@@ -204,7 +204,7 @@ Il nodo ha un solo nodo NUMA:
 numactl -H | grep -E "available|size"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 available: 1 nodes (0)
 node 0 size: 15991 MB
 ```
@@ -218,7 +218,7 @@ qm set 361 --sockets 2 --cores 1 --numa 1 \
 qm reboot 361
 ```
 
-```text
+``` { .text .no-copy title="Output" }
   -smp '2,sockets=2,cores=1,maxcpus=2' \
   -object 'memory-backend-ram,id=ram-node0,size=1536M,host-nodes=0,policy=bind' \
   -numa 'node,nodeid=0,cpus=0,memdev=ram-node0' \

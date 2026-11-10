@@ -67,7 +67,7 @@ Dalla CLI di un nodo, l'elenco dei ruoli (in GUI: **Datacenter → Permissions �
 pveum role list --noborder 1 | awk '{print $1, $NF}'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 roleid special
 Administrator 1
 NoAccess 1
@@ -123,7 +123,7 @@ p = json.load(sys.stdin); print(p["comment"])
 for m in p["members"]: print(m["type"], m.get("vmid", ""), m.get("name", m.get("storage")), m["node"])'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Server web del laboratorio
 qemu 104 web01 desopve01
 qemu 105 web02 desopve02
@@ -148,7 +148,7 @@ pveum acl modify /pool/web --groups pve-operators-proxmox.community --roles Oper
 pveum acl list
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ┌───────────┬──────────────────┬───────┬─────────────────────────────────┬───────────┐
 │ path      │ roleid           │ type  │ ugid                            │ propagate │
 ╞═══════════╪══════════════════╪═══════╪═════════════════════════════════╪═══════════╡
@@ -183,7 +183,7 @@ pveum user permissions laura.bianchi@proxmox.community --path /vms/104
 pveum user permissions laura.bianchi@proxmox.community --path /vms/100
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ┌──────────┬──────────────────────────────┐
 │ ACL path │ Permissions                  │
 ╞══════════╪══════════════════════════════╡
@@ -243,7 +243,7 @@ api POST /nodes/desopve01/qemu/104/status/reboot
 api POST /nodes/desopve01/qemu/100/status/reboot
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {"data":"UPID:desopve01:000727C6:004946EC:6AF286BF:qmreboot:104:laura.bianchi@proxmox.community:"}
 HTTP 200
 {"data":null,"message":"Permission check failed (/vms/100, VM.PowerMgmt)\n"}
@@ -260,7 +260,7 @@ Laura ha `VM.Config.Network` sulle VM del pool (ruolo `OperatoreRete`). Proviamo
 api PUT /nodes/desopve01/qemu/104/config --data-urlencode "net1=virtio,bridge=vmbr1,tag=10"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {"message":"Permission check failed (/sdn/zones/localnetwork/vmbr1/10, SDN.Use)\n","data":null}
 HTTP 403
 ```
@@ -278,7 +278,7 @@ api PUT /nodes/desopve01/qemu/104/config --data-urlencode "net1=virtio,bridge=vm
 qm config 104 | grep ^net
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {"data":null}
 HTTP 200
 net0: virtio=BC:24:11:DD:33:12,bridge=vmbr0
@@ -302,7 +302,7 @@ HTTP 400
 qm pending 104 | grep -i net
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 cur net0: virtio=BC:24:11:DD:33:12,bridge=vmbr0
 del net1: virtio=BC:24:11:6E:FA:D0,bridge=vmbr1,tag=10
 ```
@@ -321,7 +321,7 @@ pveum acl modify /vms --users stagista@pve --roles PVEAuditor --propagate 1
 pveum user permissions stagista@pve --path /vms/104
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ┌──────────┬─────────────┐
 │ ACL path │ Permissions │
 ╞══════════╪═════════════╡
@@ -375,7 +375,7 @@ t operatore@pam '<password-lab>' 172.27.199.21
 t operatore@pam '<password-lab>' 172.27.199.22
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 operatore@pam su 172.27.199.21: HTTP 401
 operatore@pam su 172.27.199.21: HTTP 200
 operatore@pam su 172.27.199.22: HTTP 401
@@ -417,7 +417,7 @@ pveum user token permissions automazione@pve ci --path /vms/104
 pveum user token permissions automazione@pve ci --path /vms/100
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ┌──────────┬──────────────────────────────┐
 │ ACL path │ Permissions                  │
 ╞══════════╪══════════════════════════════╡
@@ -448,7 +448,7 @@ curl -sk -H "$H" -X POST $N1/nodes/desopve01/qemu/104/status/reboot -w '\nHTTP %
 curl -sk -H "$H" -X POST $N1/nodes/desopve02/qemu/105/status/reboot -w '\nHTTP %{http_code}\n'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 [104, 105, 106]
 {"data":"UPID:desopve01:00072DA3:00496ABE:6AF2871B:qmreboot:104:automazione@pve!ci:"}
 HTTP 200
@@ -469,7 +469,7 @@ pveum user token remove automazione@pve ci
 curl -sk -H "$H" "$N1/version" -w '\nHTTP %{http_code}\n'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 user config - ignore invalid acl token 'automazione@pve!ci'
 user config - ignore invalid acl token 'automazione@pve!ci'
 
@@ -492,7 +492,7 @@ pveum user token remove automazione@pve ci
 grep -c 'automazione@pve!ci' /etc/pve/user.cfg
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 0
 ```
 

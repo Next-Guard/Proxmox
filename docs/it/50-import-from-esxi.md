@@ -104,7 +104,7 @@ esxi: esxi8
 pvesm status | grep esxi8
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 esxi8                esxi     active               0               0               0    0.00%
 ```
 
@@ -135,7 +135,7 @@ vim-cmd vmsvc/power.shutdown 3
 vim-cmd vmsvc/power.getstate 3
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Powered off
 ```
 
@@ -181,7 +181,7 @@ ip -br a
 lspci | grep -iE "ethernet|scsi"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ens18            UP             172.27.199.31/24 fd27:199::20c:29ff:feb1:c4fa/64 fe80::20c:29ff:feb1:c4fa/64
 00:12.0 Ethernet controller: Red Hat, Inc. Virtio network device
 01:01.0 SCSI storage controller: Red Hat, Inc. Virtio SCSI
@@ -204,7 +204,7 @@ ens18            UP             172.27.199.31/24 fd27:199::20c:29ff:feb1:c4fa/64
   qm guest cmd 501 get-osinfo | grep pretty-name
   ```
 
-  ```text
+  ``` { .text .no-copy title="Output" }
   agent-ok
      "pretty-name" : "Ubuntu 24.04.5 LTS",
   ```
@@ -215,7 +215,7 @@ ens18            UP             172.27.199.31/24 fd27:199::20c:29ff:feb1:c4fa/64
   rbd du rbd-vm/vm-501-disk-0
   ```
 
-  ```text
+  ``` { .text .no-copy title="Output" }
   vm-501-disk-0       20 GiB  2.5 GiB
   ```
 
@@ -228,7 +228,7 @@ vim-cmd vmsvc/snapshot.create 4 prima-della-migrazione "snapshot di prova" 0 0
 ls /vmfs/volumes/datastore1/win-src01/ | grep vmdk
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 win-src01-000001-sesparse.vmdk
 win-src01-000001.vmdk
 win-src01-flat.vmdk
@@ -291,7 +291,7 @@ Il wizard non mostra avvisi e come sorgente usa il disco **delta** `win-src01-00
    "virtio-win-guest-tools: exit code " + $p.ExitCode
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    virtio-win-guest-tools: exit code 0
 
    Name           Status  StartType
@@ -310,7 +310,7 @@ Il wizard non mostra avvisi e come sorgente usa il disco **delta** `win-src01-00
    Start-Process msiexec.exe -ArgumentList "/x",$t.PSChildName,"/qn","/norestart","/l*v","C:\vmt.log" -Wait
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    VMware Tools 12.4.0.23259341
    msiexec /x: exit code 1603
    CustomAction VM_LogStart returned actual error code 1603
@@ -328,7 +328,7 @@ Il wizard non mostra avvisi e come sorgente usa il disco **delta** `win-src01-00
    Set-Service VGAuthService -StartupType Disabled
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    Name          Status  StartType
    VGAuthService Stopped Disabled
    VMTools       Stopped Disabled

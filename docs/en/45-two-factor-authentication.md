@@ -51,7 +51,7 @@ In the lab, the code comes from `oathtool`, which performs the same calculation 
 oathtool --totp -b <segreto-base32>
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 268992
 ```
 
@@ -84,7 +84,7 @@ pvesh set /cluster/options --webauthn "rp=Proxmox Community Lab,origin=https://p
 grep webauthn /etc/pve/datacenter.cfg
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 webauthn: rp=Proxmox Community Lab,origin=https://proxmox.community:8006,id=proxmox.community,allow-subdomains=1
 ```
 
@@ -142,7 +142,7 @@ N=https://172.27.199.21:8006/api2/json
 curl -sk --data-urlencode "username=stagista@pve" --data-urlencode "password=<lab-password>" $N/access/ticket
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {"data":{"NeedTFA":1,"username":"stagista@pve","ticket":"PVE:!tfa!{\"totp\"%3Atrue}:6AF2F3BC::…","CSRFPreventionToken":"…"}}
 ```
 
@@ -157,7 +157,7 @@ curl -sk -o /dev/null -w 'HTTP %{http_code}\n' --data-urlencode "username=stagis
   --data-urlencode "password=totp:$(oathtool --totp -b <segreto-base32>)" $N/access/ticket
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 tentativo 1: {"message":"authentication failure\n","data":null} HTTP 401
 …
 tentativo 10: {"message":"authentication failure\n","data":null} HTTP 401
@@ -170,7 +170,7 @@ Even the right code is rejected: after 8 failed attempts, the user's TOTP is **l
 pvesh get /access/users --full 1 --output-format json | python3 -c 'import sys,json; [print(u["userid"], {k:u[k] for k in u if "lock" in k}) for u in json.load(sys.stdin) if u["userid"]=="stagista@pve"]'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 stagista@pve {'totp-locked': 1}
 ```
 
@@ -194,7 +194,7 @@ curl -sk -w ' HTTP %{http_code}\n' -H 'Authorization: PVEAPIToken=stagista@pve!l
   | python3 -c 'import sys,json; t=sys.stdin.read(); j,c=t.rsplit(" HTTP ",1); print(sorted(m["vmid"] for m in json.loads(j)["data"]["members"] if "vmid" in m), "HTTP"+c.strip())'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 [104, 105, 106] HTTP200
 ```
 
@@ -209,7 +209,7 @@ pvesh create /access/tfa/root@pam --type totp --description 'Prova TOTP su root'
   --totp 'otpauth://totp/root?secret=<segreto>' --value <codice>
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {"id":"a3071529-f096-4fdb-9680-da3a11afa22e"}
 ```
 
@@ -239,7 +239,7 @@ pveum realm modify proxmox.community --tfa type=oath
 pveum realm list --noborder 1 | grep proxmox
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 proxmox.community ad   Active Directory del laboratorio (LDAPS) oath
 ```
 
@@ -255,7 +255,7 @@ With realm TFA, the user's key is set in the user's *Key IDs* field (`pveum user
 pveum user modify mario.rossi@proxmox.community --keys v2-<segreto-32-caratteri>
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 400 Parameter verification failed.
 keys: value does not match the regex pattern
 ```
@@ -280,7 +280,7 @@ done
 pvesh get /access/tfa/stagista@pve --output-format json
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 []
 ```
 
@@ -294,7 +294,7 @@ pvesh delete /access/tfa/mario.rossi@proxmox.community/<id>
 pvesh get /access/tfa --output-format json
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 [{"entries":[{"created":1794281054,"description":"<old userconfig key 0>","id":"dee874ef-ef5f-45fa-9468-165f95517c49","type":"totp"}],"userid":"mario.rossi@proxmox.community"}]
 []
 ```

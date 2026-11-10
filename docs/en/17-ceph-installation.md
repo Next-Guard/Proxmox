@@ -77,11 +77,14 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 3. On the other two nodes do the same from the command line, through the Proxmox API: the result is identical to the one you get from the GUI.
 
-   ```console
-   root@desopve02:~# pvesh create /nodes/desopve02/network --iface nic2.50 --type vlan --cidr 10.50.10.22/24 --autostart 1
-   root@desopve02:~# pvesh create /nodes/desopve02/network --iface nic2.51 --type vlan --cidr 10.51.10.22/24 --autostart 1
-   root@desopve02:~# pvesh set /nodes/desopve02/network
-   root@desopve02:~# ip -br a | grep nic2
+   ```bash title="root@desopve02"
+   pvesh create /nodes/desopve02/network --iface nic2.50 --type vlan --cidr 10.50.10.22/24 --autostart 1
+   pvesh create /nodes/desopve02/network --iface nic2.51 --type vlan --cidr 10.51.10.22/24 --autostart 1
+   pvesh set /nodes/desopve02/network
+   ip -br a | grep nic2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nic2             UP
    nic2.50@nic2     UP             10.50.10.22/24
    nic2.51@nic2     UP             10.51.10.22/24
@@ -91,19 +94,31 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 4. Check that tagged packets pass between the nodes and that the VLANs are isolated from the rest of the network:
 
-   ```console
-   root@desopve01:~# ping -c2 -W1 10.50.10.22 | tail -2
+   ```bash title="root@desopve01"
+   ping -c2 -W1 10.50.10.22 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1002ms
    rtt min/avg/max/mdev = 0.658/0.992/1.326/0.334 ms
-   root@desopve01:~# ping -c2 -W1 10.51.10.23 | tail -2
+   ```
+
+   ```bash title="root@desopve01"
+   ping -c2 -W1 10.51.10.23 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1001ms
    rtt min/avg/max/mdev = 0.269/0.560/0.852/0.291 ms
    ```
 
    The two VLANs have no gateway: Ceph traffic never leaves the dedicated network. A test from the DC confirms it: the DC sits on the management network and cannot reach VLAN 50, because no router routes it:
 
-   ```console
-   PS C:\Users\Administrator> (Test-NetConnection 10.50.10.21 -WarningAction SilentlyContinue).PingSucceeded
+   ```powershell title="PowerShell — desopve-dc01"
+   (Test-NetConnection 10.50.10.21 -WarningAction SilentlyContinue).PingSucceeded
+   ```
+
+   ``` { .text .no-copy title="Output" }
    False
    ```
 
@@ -131,8 +146,11 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
    ![Installation and configuration completed](../images/17/06-success.png)
 
-   ```console
-   root@desopve01:~# cat /etc/pve/ceph.conf
+   ```bash title="root@desopve01"
+   cat /etc/pve/ceph.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [global]
    	auth_client_required = cephx
    	auth_cluster_required = cephx
@@ -154,11 +172,20 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 6. On the other two nodes install the packages from the command line, confirming with **Y**:
 
-   ```console
-   root@desopve02:~# pveceph install --repository no-subscription --version tentacle
+   ```bash title="root@desopve02"
+   pveceph install --repository no-subscription --version tentacle
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    reloading API to load new Ceph RADOS library...
-   root@desopve02:~# ceph --version
+   ```
+
+   ```bash title="root@desopve02"
+   ceph --version
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ceph version 20.2.5 (18a25ea6153a998538b0b02f656cd62b4cadaca4) tentacle (stable)
    ```
 
@@ -172,11 +199,20 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 2. For `desopve03` use the command line:
 
-   ```console
-   root@desopve03:~# pveceph mon create
+   ```bash title="root@desopve03"
+   pveceph mon create
+   ```
+
+   ``` { .text .no-copy title="Output" }
    monmaptool: writing epoch 1 to /tmp/monmap (2 monitors)
    ...
-   root@desopve03:~# pveceph mgr create
+   ```
+
+   ```bash title="root@desopve03"
+   pveceph mgr create
+   ```
+
+   ``` { .text .no-copy title="Output" }
    starting service 'ceph-mgr@desopve03.service'
    ```
 
@@ -184,8 +220,11 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
    ![Monitors and managers](../images/17/08-monitors-managers.png)
 
-   ```console
-   root@desopve01:~# ceph mon stat
+   ```bash title="root@desopve01"
+   ceph mon stat
+   ```
+
+   ``` { .text .no-copy title="Output" }
    e3: 3 mons at {desopve01=[v2:10.50.10.21:3300/0,v1:10.50.10.21:6789/0],desopve02=[v2:10.50.10.22:3300/0,v1:10.50.10.22:6789/0],desopve03=[v2:10.50.10.23:3300/0,v1:10.50.10.23:6789/0]} removed_ranks: {} disallowed_leaders: {}, election epoch 12, leader 0 desopve01, quorum 0,1,2 desopve01,desopve03,desopve02
    ```
 
@@ -201,22 +240,34 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 2. Create the other five OSDs from the command line, two per node:
 
-   ```console
-   root@desopve01:~# pveceph osd create /dev/sdd
+   ```bash title="root@desopve01"
+   pveceph osd create /dev/sdd
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    --> ceph-volume lvm create successful for: /dev/sdd
-   root@desopve02:~# pveceph osd create /dev/sdc
-   root@desopve02:~# pveceph osd create /dev/sdd
-   root@desopve03:~# pveceph osd create /dev/sdc
-   root@desopve03:~# pveceph osd create /dev/sdd
+   ```
+
+   ```bash title="root@desopve02"
+   pveceph osd create /dev/sdc
+   pveceph osd create /dev/sdd
+   ```
+
+   ```bash title="root@desopve03"
+   pveceph osd create /dev/sdc
+   pveceph osd create /dev/sdd
    ```
 
    Every command ends with the same `ceph-volume lvm create successful` line.
 
    Each OSD is an LVM volume that `ceph-volume` creates on the whole disk, with BlueStore as its format:
 
-   ```console
-   root@desopve01:~# ceph-volume lvm list /dev/sdc | grep -E "osd id|objectstore|block device"
+   ```bash title="root@desopve01"
+   ceph-volume lvm list /dev/sdc | grep -E "osd id|objectstore|block device"
+   ```
+
+   ``` { .text .no-copy title="Output" }
          block device              /dev/ceph-92836807-f4fd-4193-a256-dc9f557c2df7/osd-block-eff89a0e-fa94-462d-ad23-49e431295708
          objectstore               bluestore
          osd id                    0
@@ -226,8 +277,11 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
    ![OSD tree](../images/17/10-osd-tree.png)
 
-   ```console
-   root@desopve01:~# ceph osd tree
+   ```bash title="root@desopve01"
+   ceph osd tree
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ID  CLASS  WEIGHT   TYPE NAME           STATUS  REWEIGHT  PRI-AFF
    -1         0.35156  root default
    -3         0.11719      host desopve01
@@ -252,8 +306,11 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
    **Add as Storage** also creates the Proxmox storage `rbd-vm`, available on all nodes for VM and container disks:
 
-   ```console
-   root@desopve01:~# grep -A3 "rbd: rbd-vm" /etc/pve/storage.cfg
+   ```bash title="root@desopve01"
+   grep -A3 "rbd: rbd-vm" /etc/pve/storage.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    rbd: rbd-vm
    	content rootdir,images
    	krbd 0
@@ -264,8 +321,11 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 2. The pool starts with 128 PGs; the autoscaler sees an empty pool and immediately reduces them to 32. The autoscaler status below was captured after step 6, when the pool already contains the disk of VM 100:
 
-   ```console
-   root@desopve01:~# ceph osd pool autoscale-status
+   ```bash title="root@desopve01"
+   ceph osd pool autoscale-status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    POOL               SIZE  TARGET SIZE  RATE  RAW CAPACITY   RATIO  FINAL RATIO  TARGET RATIO  EFFECTIVE RATIO  BIAS  PG_NUM  NEW PG_NUM  AUTOSCALE  BULK
    .mgr             966.6k                3.0        359.9G  0.0000       0.0050                                  1.0       1              on         False
    rbd-vm            6561M                3.0        359.9G  0.0534       0.1600                                  1.0      32              on         False
@@ -278,8 +338,11 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
    ![Configuration and CRUSH map](../images/17/13-ceph-configuration.png)
 
-   ```console
-   root@desopve01:~# ceph osd crush rule dump replicated_rule | grep -A2 chooseleaf
+   ```bash title="root@desopve01"
+   ceph osd crush rule dump replicated_rule | grep -A2 chooseleaf
+   ```
+
+   ``` { .text .no-copy title="Output" }
                "op": "chooseleaf_firstn",
                "num": 0,
                "type": "host"
@@ -293,17 +356,32 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 1. Live-move the disk of VM 100 from `local-zfs` to the RBD pool (as in lab 08):
 
-   ```console
-   root@desopve01:~# time qm disk move 100 scsi0 rbd-vm --delete 1
+   ```bash title="root@desopve01"
+   time qm disk move 100 scsi0 rbd-vm --delete 1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    mirror-scsi0: Completed successfully.
    mirror-scsi0: mirror-job finished
    removing source volume 'local-zfs:vm-100-disk-0' after successful copy
 
    real	3m55.737s
-   root@desopve01:~# rbd -p rbd-vm ls -l
+   ```
+
+   ```bash title="root@desopve01"
+   rbd -p rbd-vm ls -l
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME           SIZE    PARENT  FMT  PROT  LOCK
    vm-100-disk-0  16 GiB            2        excl
-   root@desopve01:~# rbd info rbd-vm/vm-100-disk-0 | grep -E "size|order|features"
+   ```
+
+   ```bash title="root@desopve01"
+   rbd info rbd-vm/vm-100-disk-0 | grep -E "size|order|features"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    	size 16 GiB in 4096 objects
    	order 22 (4 MiB objects)
    	features: layering, exclusive-lock, object-map, fast-diff, deep-flatten
@@ -328,8 +406,11 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
 
 3. Move the VM back to `desopve01`:
 
-   ```console
-   root@desopve02:~# qm migrate 100 desopve01 --online
+   ```bash title="root@desopve02"
+   qm migrate 100 desopve01 --online
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    2026-11-09 17:25:55 migration finished successfully (duration 00:00:14)
    ```
@@ -340,10 +421,19 @@ RBD provides block devices for VMs and containers. For **files** (ISOs, template
 
 1. Create two metadata servers, one active and one standby:
 
-   ```console
-   root@desopve01:~# pveceph mds create
+   ```bash title="root@desopve01"
+   pveceph mds create
+   ```
+
+   ``` { .text .no-copy title="Output" }
    starting service 'ceph-mds@desopve01.service'
-   root@desopve02:~# pveceph mds create
+   ```
+
+   ```bash title="root@desopve02"
+   pveceph mds create
+   ```
+
+   ``` { .text .no-copy title="Output" }
    starting service 'ceph-mds@desopve02.service'
    ```
 
@@ -357,8 +447,11 @@ RBD provides block devices for VMs and containers. For **files** (ISOs, template
 
 3. Check it and try copying the Debian ISO to it:
 
-   ```console
-   root@desopve01:~# ceph fs status
+   ```bash title="root@desopve01"
+   ceph fs status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    cephfs - 3 clients
    ======
    RANK  STATE      MDS        ACTIVITY     DNS    INOS   DIRS   CAPS
@@ -368,13 +461,25 @@ RBD provides block devices for VMs and containers. For **files** (ISOs, template
      cephfs_data      data       0    105G
    STANDBY MDS
     desopve01
-   root@desopve01:~# grep -A4 "cephfs: cephfs" /etc/pve/storage.cfg
+   ```
+
+   ```bash title="root@desopve01"
+   grep -A4 "cephfs: cephfs" /etc/pve/storage.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    cephfs: cephfs
    	path /mnt/pve/cephfs
    	content iso,vztmpl,backup
    	fs-name cephfs
-   root@desopve01:~# cp /mnt/pve/nas-smb/template/iso/debian-13.7.0-amd64-netinst.iso /mnt/pve/cephfs/template/iso/
-   root@desopve01:~# pvesm list cephfs
+   ```
+
+   ```bash title="root@desopve01"
+   cp /mnt/pve/nas-smb/template/iso/debian-13.7.0-amd64-netinst.iso /mnt/pve/cephfs/template/iso/
+   pvesm list cephfs
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Volid                                      Format  Type           Size VMID
    cephfs:iso/debian-13.7.0-amd64-netinst.iso iso     iso       792723456
    ```
@@ -385,8 +490,11 @@ RBD provides block devices for VMs and containers. For **files** (ISOs, template
 
 1. **Overall status:**
 
-   ```console
-   root@desopve01:~# ceph -s
+   ```bash title="root@desopve01"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
      cluster:
        id:     cfd9bc4d-a092-487e-9c25-2a042c84bbbf
        health: HEALTH_OK
@@ -409,8 +517,11 @@ RBD provides block devices for VMs and containers. For **files** (ISOs, template
 
 2. **How much space there really is:**
 
-   ```console
-   root@desopve01:~# ceph df
+   ```bash title="root@desopve01"
+   ceph df
+   ```
+
+   ``` { .text .no-copy title="Output" }
    --- RAW STORAGE ---
    CLASS     SIZE    AVAIL    USED  RAW USED  %RAW USED
    hdd    360 GiB  340 GiB  20 GiB    20 GiB       5.48
@@ -430,8 +541,11 @@ RBD provides block devices for VMs and containers. For **files** (ISOs, template
 
 3. **Distribution across the OSDs:**
 
-   ```console
-   root@desopve01:~# ceph osd df
+   ```bash title="root@desopve01"
+   ceph osd df
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ID  CLASS  WEIGHT   REWEIGHT  SIZE     RAW USE  DATA     OMAP     META     AVAIL    %USE  VAR   PGS  STATUS
     0    hdd  0.05859   1.00000   60 GiB  2.5 GiB  2.5 GiB  289 KiB   61 MiB   57 GiB  4.19  0.77   94      up
     1    hdd  0.05859   1.00000   60 GiB  4.1 GiB  4.0 GiB  287 KiB   96 MiB   56 GiB  6.76  1.23   88      up

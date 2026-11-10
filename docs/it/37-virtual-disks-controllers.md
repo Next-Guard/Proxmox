@@ -75,7 +75,7 @@ qm set 370 --scsi1 local-lvm:4,iothread=1 --virtio1 local-lvm:4,iothread=1 --sat
 qm start 370
 ```
 
-```text
+``` { .text .no-copy title="Output" }
   WARNING: Sum of all thin volume sizes (36.00 GiB) exceeds the size of thin pool pve/data and the amount of free space in volume group (<6.13 GiB).
 scsi1: local-lvm:vm-370-disk-1,iothread=1,size=4G
 virtio1: local-lvm:vm-370-disk-3,iothread=1,size=4G
@@ -204,8 +204,11 @@ write 1M QD8                 IOPS=    2386  MB/s= 2386.9  lat media=   3172 us  
 
 Il monitor conferma che con `unsafe` i flush vengono scartati:
 
-```text
-qm> info block -n
+```text title="qm monitor"
+info block -n
+```
+
+``` { .text .no-copy title="Output" }
     Cache mode:       writeback
     Cache mode:       writeback, ignore flushes
     Cache mode:       writeback, ignore flushes
@@ -218,7 +221,7 @@ dd if=/dev/urandom of=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 bs=1M
 grep ^Dirty: /proc/meminfo                                                                                         # sul nodo
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == cache=writeback
 1073741824 bytes (1.1 GB, 1.0 GiB) copied, 6.10631 s, 176 MB/s
   nodo subito dopo: Dirty: 1456 kB
@@ -264,7 +267,7 @@ qm set 370 --scsi1 local-lvm:vm-370-disk-1,iothread=1,aio=native,cache=writeback
 qm start 370
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 kvm: -blockdev {...,"file":{"aio":"native","cache":{"direct":false,"no-flush":false},...,"driver":"host_device","filename":"/dev/pve/vm-370-disk-1",...}: aio=native was specified, but it requires cache.direct=on, which was not specified.
 start failed: QEMU exited with code 1
 ```
@@ -303,7 +306,7 @@ Il guest dichiara di aver liberato 2,9 GiB, ma il nodo non riceve niente: QEMU s
 qm set 370 --scsi1 local-lvm:vm-370-disk-1,iothread=1,discard=on,ssd=1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 sdb rotational=0
 /mnt/t: 3.9 GiB (4142604288 bytes) trimmed
  vm-370-disk-1 3.46           ← il volume restituisce 1,9 GiB al pool
@@ -334,7 +337,7 @@ I limiti si applicano **a caldo**, senza riavviare la VM:
 qm set 370 --scsi1 local-lvm:vm-370-disk-1,iothread=1,discard=on,ssd=1,mbps_wr=20,iops_rd=500
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == senza limiti
 write 1M QD8                 IOPS=     723  MB/s=  724.0  lat media=  10849 us  p99=  67633 us
 randread 4k QD32             IOPS=   27229  MB/s=  106.4  lat media=   1148 us  p99=   3031 us

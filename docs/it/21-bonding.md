@@ -109,8 +109,11 @@ flowchart LR
 
    Lo stato del bond si legge in `/proc/net/bonding/bond0`:
 
-   ```console
-   root@desopve01:~# cat /proc/net/bonding/bond0
+   ```bash title="root@desopve01"
+   cat /proc/net/bonding/bond0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Ethernet Channel Bonding Driver: v7.0.14-28-pve
 
    Bonding Mode: fault-tolerance (active-backup)
@@ -143,12 +146,21 @@ flowchart LR
 
 Su `desopve02` e `desopve03` aggiungi gli stessi due blocchi a `/etc/network/interfaces`, prima della riga `source /etc/network/interfaces.d/*`, dopo averne fatto una copia (`cp /etc/network/interfaces /root/interfaces.bak-lab21`). Poi applica e controlla:
 
-```console
-root@desopve02:~# ifreload -a
-root@desopve02:~# grep -E "Currently Active|MII Status" /proc/net/bonding/bond0 | head -2
+```bash title="root@desopve02"
+ifreload -a
+grep -E "Currently Active|MII Status" /proc/net/bonding/bond0 | head -2
+```
+
+``` { .text .no-copy title="Output" }
 Currently Active Slave: nic3
 MII Status: up
-root@desopve02:~# cat /sys/class/net/vmbr1/bridge/vlan_filtering
+```
+
+```bash title="root@desopve02"
+cat /sys/class/net/vmbr1/bridge/vlan_filtering
+```
+
+``` { .text .no-copy title="Output" }
 1
 ```
 
@@ -158,14 +170,32 @@ Ripeti su `desopve03` e verifica che cluster e Ceph non abbiano subito interruzi
 
 Sposta i tre container su `vmbr1`, con le stesse VLAN e gli stessi indirizzi. Si fa a caldo:
 
-```console
-root@desopve01:~# pct set 121 -net0 name=eth0,bridge=vmbr1,tag=10,ip=10.10.10.121/24
-root@desopve02:~# pct set 122 -net0 name=eth0,bridge=vmbr1,tag=10,ip=10.10.10.122/24
-root@desopve03:~# pct set 123 -net0 name=eth0,bridge=vmbr1,tag=20,ip=10.20.20.123/24
-root@desopve01:~# pct exec 121 -- ping -c2 -W1 10.10.10.122 | tail -2
+```bash title="root@desopve01"
+pct set 121 -net0 name=eth0,bridge=vmbr1,tag=10,ip=10.10.10.121/24
+```
+
+```bash title="root@desopve02"
+pct set 122 -net0 name=eth0,bridge=vmbr1,tag=10,ip=10.10.10.122/24
+```
+
+```bash title="root@desopve03"
+pct set 123 -net0 name=eth0,bridge=vmbr1,tag=20,ip=10.20.20.123/24
+```
+
+```bash title="root@desopve01"
+pct exec 121 -- ping -c2 -W1 10.10.10.122 | tail -2
+```
+
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1001ms
 rtt min/avg/max/mdev = 0.927/1.380/1.834/0.453 ms
-root@desopve01:~# bridge vlan show dev veth121i0
+```
+
+```bash title="root@desopve01"
+bridge vlan show dev veth121i0
+```
+
+``` { .text .no-copy title="Output" }
 port              vlan-id
 veth121i0         10 PVID Egress Untagged
 ```
@@ -176,25 +206,43 @@ Dalla GUI è lo stesso campo **Bridge** della scheda di rete del container (o de
 
 Il CT 121 manda cinque ping al secondo al CT 122. Nel frattempo, su `desopve01`, si stacca il link attivo `nic3` e, dopo 13 secondi, lo si ricollega. Stacca il cavo di `nic3`, oppure simula il guasto con `ip link set nic3 down`.
 
-```console
-root@desopve01:~# pct exec 121 -- bash -c "ping -D -i 0.2 -c 150 -W 1 10.10.10.122 > /root/ab.log" &
-root@desopve01:~# ip link set nic3 down
-root@desopve01:~# grep -E "Currently Active|Link Failure" /proc/net/bonding/bond0
+```bash title="root@desopve01"
+pct exec 121 -- bash -c "ping -D -i 0.2 -c 150 -W 1 10.10.10.122 > /root/ab.log" &
+ip link set nic3 down
+grep -E "Currently Active|Link Failure" /proc/net/bonding/bond0
+```
+
+``` { .text .no-copy title="Output" }
 Currently Active Slave: nic4
 Link Failure Count: 1
 Link Failure Count: 0
-root@desopve01:~# ip link set nic3 up
-root@desopve01:~# grep "Currently Active" /proc/net/bonding/bond0
+```
+
+```bash title="root@desopve01"
+ip link set nic3 up
+grep "Currently Active" /proc/net/bonding/bond0
+```
+
+``` { .text .no-copy title="Output" }
 Currently Active Slave: nic3
-root@desopve01:~# pct exec 121 -- tail -2 /root/ab.log
+```
+
+```bash title="root@desopve01"
+pct exec 121 -- tail -2 /root/ab.log
+```
+
+``` { .text .no-copy title="Output" }
 150 packets transmitted, 150 received, 0% packet loss, time 31030ms
 rtt min/avg/max/mdev = 0.395/0.868/10.409/0.806 ms
 ```
 
 Nessun pacchetto perso, né al guasto né al ritorno su `nic3` (il *primary*): il ritardo massimo è stato di circa 10 ms. Il kernel registra ogni passaggio:
 
-```console
-root@desopve01:~# journalctl -k | grep bond0 | tail -4
+```bash title="root@desopve01"
+journalctl -k | grep bond0 | tail -4
+```
+
+``` { .text .no-copy title="Output" }
 Nov 09 19:26:44 desopve01 kernel: bond0: (slave nic3): link status definitely down, disabling slave
 Nov 09 19:26:44 desopve01 kernel: bond0: (slave nic4): making interface the new active one
 Nov 09 19:26:57 desopve01 kernel: bond0: (slave nic3): link status definitely up, 10000 Mbps full duplex
@@ -207,8 +255,11 @@ Quando il link attivo cambia, lo switch deve reimparare su quale porta si trovan
 
 Con `iperf3` misuri la banda tra il CT 121 e il CT 122 (server sul 122 con `iperf3 -s -D`):
 
-```console
-root@desopve01:~# pct exec 121 -- iperf3 -c 10.10.10.122 -t 10 -f g | tail -4
+```bash title="root@desopve01"
+pct exec 121 -- iperf3 -c 10.10.10.122 -t 10 -f g | tail -4
+```
+
+``` { .text .no-copy title="Output" }
 [  5]   0.00-10.00  sec  6.54 GBytes  5.62 Gbits/sec  191            sender
 [  5]   0.00-10.00  sec  6.54 GBytes  5.61 Gbits/sec                  receiver
 ```
@@ -219,18 +270,27 @@ In *active-backup* lavora un solo link alla volta: la banda è quella di una sch
 
 1. Su `desopve01` e `desopve02` cambia la modalità: in `bond0` sostituisci `bond-mode active-backup` con `bond-mode balance-alb` e togli la riga `bond-primary`, così nessuna scheda è preferita. `ifreload -a` applica il cambio a caldo.
 
-   ```console
-   root@desopve01:~# ifreload -a; grep "Bonding Mode" /proc/net/bonding/bond0
+   ```bash title="root@desopve01"
+   ifreload -a; grep "Bonding Mode" /proc/net/bonding/bond0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Bonding Mode: adaptive load balancing
    ```
 
 2. Quattro flussi paralleli verso lo stesso container, misurando i byte trasmessi da ciascuna scheda. Leggi i contatori prima e dopo il test, e fai la differenza:
 
-   ```console
-   root@desopve01:~# cat /sys/class/net/nic3/statistics/tx_bytes /sys/class/net/nic4/statistics/tx_bytes
-   root@desopve01:~# pct exec 121 -- iperf3 -c 10.10.10.122 -t 10 -P 4 -f g | grep "SUM.*receiver"
+   ```bash title="root@desopve01"
+   cat /sys/class/net/nic3/statistics/tx_bytes /sys/class/net/nic4/statistics/tx_bytes
+   pct exec 121 -- iperf3 -c 10.10.10.122 -t 10 -P 4 -f g | grep "SUM.*receiver"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [SUM]   0.00-10.00  sec  6.66 GBytes  5.72 Gbits/sec                  receiver
-   root@desopve01:~# cat /sys/class/net/nic3/statistics/tx_bytes /sys/class/net/nic4/statistics/tx_bytes
+   ```
+
+   ```bash title="root@desopve01"
+   cat /sys/class/net/nic3/statistics/tx_bytes /sys/class/net/nic4/statistics/tx_bytes
    ```
 
    | Scheda | Byte trasmessi durante il test |
@@ -242,16 +302,25 @@ In *active-backup* lavora un solo link alla volta: la banda è quella di una sch
 
 3. Guasto di `nic3` con il ping in corso:
 
-   ```console
-   root@desopve01:~# pct exec 121 -- bash -c "ping -D -i 0.2 -c 100 -W 1 10.10.10.122 > /root/alb.log" &
-   root@desopve01:~# ip link set nic3 down
-   root@desopve01:~# grep -E "Slave Interface|MII Status" /proc/net/bonding/bond0 | tail -4
+   ```bash title="root@desopve01"
+   pct exec 121 -- bash -c "ping -D -i 0.2 -c 100 -W 1 10.10.10.122 > /root/alb.log" &
+   ip link set nic3 down
+   grep -E "Slave Interface|MII Status" /proc/net/bonding/bond0 | tail -4
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Slave Interface: nic3
    MII Status: down
    Slave Interface: nic4
    MII Status: up
-   root@desopve01:~# ip link set nic3 up
-   root@desopve01:~# pct exec 121 -- tail -2 /root/alb.log
+   ```
+
+   ```bash title="root@desopve01"
+   ip link set nic3 up
+   pct exec 121 -- tail -2 /root/alb.log
+   ```
+
+   ``` { .text .no-copy title="Output" }
    100 packets transmitted, 99 received, 1% packet loss, time 20559ms
    ```
 
@@ -275,8 +344,11 @@ LACP è la modalità standard nei datacenter: le schede del nodo e le porte dell
 
 2. Applica (`ifreload -a`) e osserva lo stato:
 
-   ```console
-   root@desopve01:~# grep -E "Mode|Hash|LACP|Aggregator ID|Number of ports|Partner Mac|Slave Interface" /proc/net/bonding/bond0
+   ```bash title="root@desopve01"
+   grep -E "Mode|Hash|LACP|Aggregator ID|Number of ports|Partner Mac|Slave Interface" /proc/net/bonding/bond0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Bonding Mode: IEEE 802.3ad Dynamic link aggregation
    Transmit Hash Policy: layer3+4 (1)
    LACP active: on
@@ -295,13 +367,22 @@ LACP è la modalità standard nei datacenter: le schede del nodo e le porte dell
 
 3. Il traffico passa, e alla caduta di `nic3` il bond attiva l'altro aggregatore:
 
-   ```console
-   root@desopve01:~# pct exec 121 -- ping -c4 -W1 10.10.10.122 | tail -2
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c4 -W1 10.10.10.122 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    4 packets transmitted, 4 received, 0% packet loss, time 3064ms
    rtt min/avg/max/mdev = 0.475/0.594/0.718/0.091 ms
-   root@desopve01:~# pct exec 121 -- bash -c "ping -D -i 0.2 -c 75 -W 1 10.10.10.122 > /root/lacp.log" &
-   root@desopve01:~# ip link set nic3 down; sleep 3; ip link set nic3 up
-   root@desopve01:~# pct exec 121 -- tail -2 /root/lacp.log
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 121 -- bash -c "ping -D -i 0.2 -c 75 -W 1 10.10.10.122 > /root/lacp.log" &
+   ip link set nic3 down; sleep 3; ip link set nic3 up
+   pct exec 121 -- tail -2 /root/lacp.log
+   ```
+
+   ``` { .text .no-copy title="Output" }
    75 packets transmitted, 75 received, 0% packet loss, time 15335ms
    ```
 
@@ -315,22 +396,40 @@ I *jumbo frame* (MTU 9000) riducono il carico della CPU per il traffico storage 
 
 Prova temporanea (con `ip link`, quindi non persistente) tra il CT 121 su `desopve01` e il CT 122 su `desopve02`. Su ogni nodo alza l'MTU del bond (che la applica anche a `nic3` e `nic4`), del lato nodo della scheda del container (`veth121i0`, `veth122i0`) e della scheda nel container. Il bridge `vmbr1` non va toccato: per i frame che lo attraversano conta l'MTU delle porte.
 
-```console
-root@desopve01:~# ip link set bond0 mtu 9000; ip link set veth121i0 mtu 9000
-root@desopve01:~# pct exec 121 -- ip link set eth0 mtu 9000
-root@desopve02:~# ip link set bond0 mtu 9000; ip link set veth122i0 mtu 9000
-root@desopve02:~# pct exec 122 -- ip link set eth0 mtu 9000
-root@desopve01:~# pct exec 121 -- ping -M do -s 1472 -c 3 -W 1 10.10.10.122 | tail -2
+```bash title="root@desopve01"
+ip link set bond0 mtu 9000; ip link set veth121i0 mtu 9000
+pct exec 121 -- ip link set eth0 mtu 9000
+```
+
+```bash title="root@desopve02"
+ip link set bond0 mtu 9000; ip link set veth122i0 mtu 9000
+pct exec 122 -- ip link set eth0 mtu 9000
+```
+
+```bash title="root@desopve01"
+pct exec 121 -- ping -M do -s 1472 -c 3 -W 1 10.10.10.122 | tail -2
+```
+
+``` { .text .no-copy title="Output" }
 3 packets transmitted, 3 received, 0% packet loss, time 2036ms
 rtt min/avg/max/mdev = 0.480/0.799/1.392/0.419 ms
-root@desopve01:~# pct exec 121 -- ping -M do -s 8972 -c 3 -W 1 10.10.10.122 | tail -2
+```
+
+```bash title="root@desopve01"
+pct exec 121 -- ping -M do -s 8972 -c 3 -W 1 10.10.10.122 | tail -2
+```
+
+``` { .text .no-copy title="Output" }
 3 packets transmitted, 0 received, 100% packet loss, time 2081ms
 ```
 
 `-M do` vieta la frammentazione, e `-s 8972` più 28 byte di intestazioni fa un pacchetto da 9000 byte: non passa, mentre quello da 1500 sì. Per capire dove sta il limite, prova dimensioni crescenti:
 
-```console
-root@desopve01:~# for s in 4000 8000 8910 8912; do r=$(pct exec 121 -- ping -M do -s $s -c 2 -W 1 10.10.10.122 | grep -o "[0-9]* received"); echo "$s: $r"; done
+```bash title="root@desopve01"
+for s in 4000 8000 8910 8912; do r=$(pct exec 121 -- ping -M do -s $s -c 2 -W 1 10.10.10.122 | grep -o "[0-9]* received"); echo "$s: $r"; done
+```
+
+``` { .text .no-copy title="Output" }
 4000: 2 received
 8000: 2 received
 8910: 2 received
@@ -339,9 +438,12 @@ root@desopve01:~# for s in 4000 8000 8910 8912; do r=$(pct exec 121 -- ping -M d
 
 Lo switch del laboratorio accetta pacchetti fino a 8938 byte (8910 di dati ICMP più 28 di intestazioni), ma non arriva a 9000: con l'MTU 9000 sui nodi, i pacchetti più grandi verrebbero persi in silenzio. Per usare i jumbo frame bisognerebbe scegliere un'MTU comune che passi su tutto il percorso, cioè qui al massimo 8938. In questo laboratorio restiamo a 1500. Riporta tutto com'era:
 
-```console
-root@desopve01:~# pct exec 121 -- ip link set eth0 mtu 1500; ip link set veth121i0 mtu 1500; ip link set bond0 mtu 1500
-root@desopve02:~# pct exec 122 -- ip link set eth0 mtu 1500; ip link set veth122i0 mtu 1500; ip link set bond0 mtu 1500
+```bash title="root@desopve01"
+pct exec 121 -- ip link set eth0 mtu 1500; ip link set veth121i0 mtu 1500; ip link set bond0 mtu 1500
+```
+
+```bash title="root@desopve02"
+pct exec 122 -- ip link set eth0 mtu 1500; ip link set veth122i0 mtu 1500; ip link set bond0 mtu 1500
 ```
 
 In produzione l'MTU si imposta nel file di rete (`mtu 9000` sulle schede, sul bond e sul bridge) solo dopo aver verificato lo switch, e si controlla sempre con `ping -M do`.

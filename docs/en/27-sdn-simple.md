@@ -58,15 +58,30 @@ The `dnsmasq` package must be installed on all nodes, with its default service d
 
 On `desopve01`, `desopve02` and `desopve03`:
 
-```console
-root@desopve01:~# apt-get install -y dnsmasq
+```bash title="root@desopve01"
+apt-get install -y dnsmasq
+```
+
+``` { .text .no-copy title="Output" }
 ...
 Setting up dnsmasq-base (2.91-1+deb13u2) ...
 Setting up dns-root-data (2025080400~deb13u1) ...
 Setting up dnsmasq (2.91-1+deb13u2) ...
-root@desopve01:~# systemctl disable --now dnsmasq
+```
+
+```bash title="root@desopve01"
+systemctl disable --now dnsmasq
+```
+
+``` { .text .no-copy title="Output" }
 Removed '/etc/systemd/system/multi-user.target.wants/dnsmasq.service'.
-root@desopve01:~# systemctl is-enabled dnsmasq; systemctl is-active dnsmasq
+```
+
+```bash title="root@desopve01"
+systemctl is-enabled dnsmasq; systemctl is-active dnsmasq
+```
+
+``` { .text .no-copy title="Output" }
 disabled
 inactive
 ```
@@ -95,8 +110,11 @@ inactive
 
 3. The result in the cluster files:
 
-   ```console
-   root@desopve01:~# cat /etc/pve/sdn/zones.cfg /etc/pve/sdn/vnets.cfg /etc/pve/sdn/subnets.cfg
+   ```bash title="root@desopve01"
+   cat /etc/pve/sdn/zones.cfg /etc/pve/sdn/vnets.cfg /etc/pve/sdn/subnets.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    simple: simple1
    	dhcp dnsmasq
    	ipam pve
@@ -119,8 +137,11 @@ inactive
 
 The `localnetwork` zone, always present, represents the bridges already configured on the nodes (`vmbr0`, `vmbr1`).
 
-```console
-root@desopve01:~# for n in desopve01 desopve02 desopve03; do echo "$n $(pvesh get /nodes/$n/sdn/zones --output-format json | python3 -c 'import sys,json; print([(z["zone"], z["status"]) for z in json.load(sys.stdin)])')"; done
+```bash title="root@desopve01"
+for n in desopve01 desopve02 desopve03; do echo "$n $(pvesh get /nodes/$n/sdn/zones --output-format json | python3 -c 'import sys,json; print([(z["zone"], z["status"]) for z in json.load(sys.stdin)])')"; done
+```
+
+``` { .text .no-copy title="Output" }
 desopve01 [('simple1', 'available')]
 desopve02 [('simple1', 'available')]
 desopve03 [('simple1', 'available')]
@@ -130,8 +151,11 @@ desopve03 [('simple1', 'available')]
 
 1. The bridge, with the gateway, IP forwarding and the SNAT rule to the node's address. This is what we wrote by hand in lab 24:
 
-   ```console
-   root@desopve01:~# cat /etc/network/interfaces.d/sdn
+   ```bash title="root@desopve01"
+   cat /etc/network/interfaces.d/sdn
+   ```
+
+   ``` { .text .no-copy title="Output" }
    #version:1
 
    auto vnsimp1
@@ -145,7 +169,13 @@ desopve03 [('simple1', 'available')]
    	bridge_stp off
    	bridge_fd 0
    	ip-forward on
-   root@desopve01:~# iptables -t nat -S | grep 10.60.60
+   ```
+
+   ```bash title="root@desopve01"
+   iptables -t nat -S | grep 10.60.60
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -A POSTROUTING -s 10.60.60.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.21
    ```
 
@@ -153,16 +183,37 @@ desopve03 [('simple1', 'available')]
 
 2. The `dnsmasq` instance for the zone. The range is `static`: only the MACs registered in the `ethers` file get an answer.
 
-   ```console
-   root@desopve01:~# systemctl is-active dnsmasq@simple1
+   ```bash title="root@desopve01"
+   systemctl is-active dnsmasq@simple1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    active
-   root@desopve01:~# ls /etc/dnsmasq.d/simple1/
+   ```
+
+   ```bash title="root@desopve01"
+   ls /etc/dnsmasq.d/simple1/
+   ```
+
+   ``` { .text .no-copy title="Output" }
    00-default.conf  10-vnsimp1.conf
-   root@desopve01:~# cat /etc/dnsmasq.d/simple1/10-vnsimp1.conf
+   ```
+
+   ```bash title="root@desopve01"
+   cat /etc/dnsmasq.d/simple1/10-vnsimp1.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    dhcp-range=set:simple1-10.60.60.0-24,10.60.60.0,static,255.255.255.0,infinite
    dhcp-option=tag:simple1-10.60.60.0-24,option:router,10.60.60.1
    interface=vnsimp1
-   root@desopve01:~# grep -E "hostsfile|ignore=tag" /etc/dnsmasq.d/simple1/00-default.conf
+   ```
+
+   ```bash title="root@desopve01"
+   grep -E "hostsfile|ignore=tag" /etc/dnsmasq.d/simple1/00-default.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    dhcp-hostsfile=/etc/dnsmasq.d/simple1/ethers
    dhcp-ignore=tag:!known
    ```
@@ -171,15 +222,18 @@ desopve03 [('simple1', 'available')]
 
 1. One container on `desopve01` and one on `desopve02`, with the network interface on `vnsimp1` using DHCP:
 
-   ```console
-   root@desopve01:~# pct create 271 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname simple-ct1 \
+   ```bash title="root@desopve01"
+   pct create 271 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname simple-ct1 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnsimp1,ip=dhcp --password
-   root@desopve01:~# pct start 271
-   root@desopve02:~# pct create 272 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname simple-ct2 \
+   pct start 271
+   ```
+
+   ```bash title="root@desopve02"
+   pct create 272 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname simple-ct2 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnsimp1,ip=dhcp --password
-   root@desopve02:~# pct start 272
+   pct start 272
    ```
 
    In the GUI the VNet appears among the selectable bridges:
@@ -188,13 +242,28 @@ desopve03 [('simple1', 'available')]
 
 2. The containers receive the first and second addresses of the range, with the node as their gateway:
 
-   ```console
-   root@desopve01:~# pct exec 271 -- ip -4 -brief addr show eth0
+   ```bash title="root@desopve01"
+   pct exec 271 -- ip -4 -brief addr show eth0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    eth0@if72        UP             10.60.60.100/24 
-   root@desopve01:~# pct exec 271 -- ip route
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 271 -- ip route
+   ```
+
+   ``` { .text .no-copy title="Output" }
    default via 10.60.60.1 dev eth0 
    10.60.60.0/24 dev eth0 proto kernel scope link src 10.60.60.100 
-   root@desopve02:~# pct exec 272 -- ip -4 -brief addr show eth0
+   ```
+
+   ```bash title="root@desopve02"
+   pct exec 272 -- ip -4 -brief addr show eth0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    eth0@if28        UP             10.60.60.101/24 
    ```
 
@@ -206,12 +275,21 @@ desopve03 [('simple1', 'available')]
 
 The same from the command line. The `ethers` file of each node contains only the guests running on that node:
 
-```console
-root@desopve01:~# pvesh get /cluster/sdn/ipams/pve/status --output-format json | python3 -c "import sys,json; [print(e.get('ip'), e.get('mac',''), e.get('vmid',''), e.get('hostname',''), 'gateway' if e.get('gateway') else '') for e in json.load(sys.stdin)]"
+```bash title="root@desopve01"
+pvesh get /cluster/sdn/ipams/pve/status --output-format json | python3 -c "import sys,json; [print(e.get('ip'), e.get('mac',''), e.get('vmid',''), e.get('hostname',''), 'gateway' if e.get('gateway') else '') for e in json.load(sys.stdin)]"
+```
+
+``` { .text .no-copy title="Output" }
 10.60.60.1    gateway
 10.60.60.100 BC:24:11:64:2E:99 271 simple-ct1 
 10.60.60.101 BC:24:11:2F:15:79 272 simple-ct2 
-root@desopve01:~# cat /etc/dnsmasq.d/simple1/ethers
+```
+
+```bash title="root@desopve01"
+cat /etc/dnsmasq.d/simple1/ethers
+```
+
+``` { .text .no-copy title="Output" }
 BC:24:11:64:2E:99,10.60.60.100
 ```
 
@@ -219,52 +297,103 @@ BC:24:11:64:2E:99,10.60.60.100
 
 1. **Gateway, DNS and SNAT.** The container reaches the gateway and the DC; the DNS server is the gateway itself, that is, `dnsmasq`:
 
-   ```console
-   root@desopve01:~# pct exec 271 -- ping -c2 -W1 10.60.60.1
+   ```bash title="root@desopve01"
+   pct exec 271 -- ping -c2 -W1 10.60.60.1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1026ms
-   root@desopve01:~# pct exec 271 -- grep nameserver /etc/resolv.conf
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 271 -- grep nameserver /etc/resolv.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nameserver 10.60.60.1
-   root@desopve01:~# pct exec 271 -- ping -c3 -W1 172.27.199.20
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 271 -- ping -c3 -W1 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2047ms
    ```
 
    On the management network the traffic goes out with the node's address:
 
-   ```console
-   root@desopve01:~# tcpdump -lni vmbr0 -c2 icmp and host 172.27.199.20
+   ```bash title="root@desopve01"
+   tcpdump -lni vmbr0 -c2 icmp and host 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    20:54:22.383353 IP 172.27.199.21 > 172.27.199.20: ICMP echo request, id 372, seq 1, length 64
    20:54:22.384284 IP 172.27.199.20 > 172.27.199.21: ICMP echo reply, id 372, seq 1, length 64
    ```
 
 2. **Packages through the proxy:** the proxy name resolves via `dnsmasq` and `apt` works:
 
-   ```console
-   root@desopve01:~# pct exec 271 -- sh -c 'echo "Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";" > /etc/apt/apt.conf.d/80proxy && apt-get update'
+   ```bash title="root@desopve01"
+   pct exec 271 -- sh -c 'echo "Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";" > /etc/apt/apt.conf.d/80proxy && apt-get update'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    Reading package lists...
    ```
 
 3. **The nodes are not connected.** Container 271 on `desopve01` does not reach 272 on `desopve02`, even though they are in the same subnet:
 
-   ```console
-   root@desopve01:~# pct exec 271 -- ping -c3 -W1 10.60.60.101
+   ```bash title="root@desopve01"
+   pct exec 271 -- ping -c3 -W1 10.60.60.101
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 0 received, 100% packet loss, time 2043ms
    ```
 
 4. **Migration.** Moved to `desopve02` (restart migration, disk on Ceph), the container keeps its address, because the IPAM belongs to the cluster, and now sees 272:
 
-   ```console
-   root@desopve01:~# pct migrate 271 desopve02 --restart
+   ```bash title="root@desopve01"
+   pct migrate 271 desopve02 --restart
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    2026-11-09 20:54:48 migration finished successfully (duration 00:00:09)
-   root@desopve02:~# cat /etc/dnsmasq.d/simple1/ethers
+   ```
+
+   ```bash title="root@desopve02"
+   cat /etc/dnsmasq.d/simple1/ethers
+   ```
+
+   ``` { .text .no-copy title="Output" }
    BC:24:11:2F:15:79,10.60.60.101
    BC:24:11:64:2E:99,10.60.60.100
-   root@desopve02:~# pct exec 271 -- ip -4 -brief addr show eth0
+   ```
+
+   ```bash title="root@desopve02"
+   pct exec 271 -- ip -4 -brief addr show eth0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    eth0@if29        UP             10.60.60.100/24 
-   root@desopve02:~# pct exec 271 -- ping -c3 -W1 10.60.60.101
+   ```
+
+   ```bash title="root@desopve02"
+   pct exec 271 -- ping -c3 -W1 10.60.60.101
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2068ms
-   root@desopve02:~# pct exec 271 -- getent hosts proxy.proxmox.community
+   ```
+
+   ```bash title="root@desopve02"
+   pct exec 271 -- getent hosts proxy.proxmox.community
+   ```
+
+   ``` { .text .no-copy title="Output" }
    172.27.199.250  netsvc.proxmox.community proxy.proxmox.community
    ```
 

@@ -56,7 +56,7 @@
 qm migrate 104 desopve02 --online
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 05:55:53 conntrack state migration not supported or disabled, active connections might get dropped
 2026-11-10 05:55:53 use dedicated network address for sending migration traffic (10.100.10.22)
 2026-11-10 05:55:58 migration downtime limit: 100 ms
@@ -75,7 +75,7 @@ qm migrate 104 desopve02 --online
 qm migrate 104 desopve01 --online --with-conntrack-state 1     # da desopve02: riporta anche la VM al suo nodo
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 06:11:33 average migration speed: 1.0 GiB/s - downtime 93 ms
 2026-11-10 06:11:33 migrated 0 conntrack state entries
 2026-11-10 06:11:36 flushing conntrack state for guest on source node
@@ -92,7 +92,7 @@ Il CT 281 è spento e ha il disco su Ceph:
 time pct migrate 281 desopve02
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 05:56:17 volume 'rbd-vm:vm-281-disk-0' is on shared storage 'rbd-vm'
 2026-11-10 05:56:18 migration finished successfully (duration 00:00:01)
 real	0m3.636s
@@ -118,7 +118,7 @@ Dalla GUI il pulsante **Migrate** avvisa che serve copiare il disco e chiede lo 
 qm migrate 480 desopve02 --online --with-local-disks --targetstorage local-zfs
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 05:58:03 scsi0: start migration to nbd:unix:/run/qemu-server/480_nbd.migrate:exportname=drive-scsi0
 mirror-scsi0: successfully switched to actively synced mode
 2026-11-10 05:58:28 starting online/live migration on unix:/run/qemu-server/480.migrate
@@ -145,7 +145,7 @@ pct exec 122 -- sh -c "ping -D -i 0.2 10.10.10.121 > /tmp/p121.log &"   # sul no
 pct migrate 121 desopve02 --restart                                    # sul nodo del CT 121
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 05:59:03 starting migration of CT 121 to node 'desopve02' (10.100.10.22)
 2026-11-10 05:59:03 volume 'rbd-vm:vm-121-disk-0' is on shared storage 'rbd-vm'
 2026-11-10 05:59:04 start container on target node
@@ -197,7 +197,7 @@ qm migrate 100 desopve02 --online --migration_type secure
 qm migrate 100 desopve01 --online --migration_type insecure     # dal nodo 02
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == insecure 100 02->01
 2026-11-10 05:59:59 starting online/live migration on tcp:10.100.10.21:60000
 2026-11-10 06:00:04 average migration speed: 413.0 MiB/s - downtime 21 ms
@@ -234,7 +234,7 @@ qm remote-migrate 480 480 \
   --target-bridge vmbr0 --target-storage local-lvm --online
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ERROR: … failed to handle 'disk-import' command - no matching import/export format found for storage 'local-lvm'
 migration aborted
 ```
@@ -288,7 +288,7 @@ qm remote-migrate 480 480 \
   --target-bridge vmbr0 --target-storage local-zfs --online --delete 1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 06:10:46 average migration speed: 682.9 MiB/s - downtime 62 ms
 2026-11-10 06:10:46 migration completed, transferred 626.2 MiB VM-state
 2026-11-10 06:10:50 migration finished successfully (duration 00:00:32)

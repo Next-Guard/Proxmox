@@ -59,8 +59,8 @@ Each OSD has two independent states:
 
 > Throughout the lab, a script runs in VM 100 that writes 16 MiB every second with `O_DIRECT` and `fsync` and logs how long each write takes. A normal write takes 25-45 ms: any much higher value is an I/O pause as seen by the VM.
 >
-> ```console
-> labuser@debian01:~$ nohup bash -c 'while true; do s=$(date +%s%N)
+> ```bash title="labuser@debian01"
+> nohup bash -c 'while true; do s=$(date +%s%N)
 >   dd if=/dev/zero of=$HOME/io.bin bs=4M count=4 oflag=direct conv=fsync 2>/dev/null
 >   e=$(date +%s%N); echo "$(date +%T) $(( (e - s) / 1000000 )) ms"; sleep 1
 > done' > $HOME/io.log 2>&1 &
@@ -72,9 +72,12 @@ Each OSD has two independent states:
 
 1. Insert the 60 GB disk into a free hot-swap bay of `desopve03`. If Linux does not see it right away, force a rescan of the bus:
 
-   ```console
-   root@desopve03:~# for h in /sys/class/scsi_host/host*/scan; do echo "- - -" > $h; done
-   root@desopve03:~# lsblk -dno NAME,SIZE,TYPE,TRAN
+   ```bash title="root@desopve03"
+   for h in /sys/class/scsi_host/host*/scan; do echo "- - -" > $h; done
+   lsblk -dno NAME,SIZE,TYPE,TRAN
+   ```
+
+   ``` { .text .no-copy title="Output" }
    sda   50G disk
    sdb   50G disk
    sdc   60G disk
@@ -92,8 +95,11 @@ Each OSD has two independent states:
 
 3. Watch the rebalancing:
 
-   ```console
-   root@desopve01:~# ceph -s
+   ```bash title="root@desopve01"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
        osd: 7 osds: 7 up (since 104s), 7 in (since 109s)
    ...
@@ -104,8 +110,11 @@ Each OSD has two independent states:
 
    In about a minute Ceph moved part of the PGs of `desopve03` to the new `osd.6`:
 
-   ```console
-   root@desopve01:~# ceph osd df tree
+   ```bash title="root@desopve01"
+   ceph osd df tree
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ID  CLASS  WEIGHT   REWEIGHT  SIZE     RAW USE  DATA     ...  %USE  VAR   PGS  STATUS  TYPE NAME
    -1         0.41016         -  420 GiB   22 GiB   22 GiB  ...  5.27  1.00    -          root default
    -3         0.11719         -  120 GiB  7.4 GiB  7.2 GiB  ...  6.13  1.16    -              host desopve01
@@ -122,9 +131,15 @@ Each OSD has two independent states:
 
 1. Stop an OSD as if its disk had failed:
 
-   ```console
-   root@desopve02:~# systemctl stop ceph-osd@2
-   root@desopve01:~# ceph health detail | head -5
+   ```bash title="root@desopve02"
+   systemctl stop ceph-osd@2
+   ```
+
+   ```bash title="root@desopve01"
+   ceph health detail | head -5
+   ```
+
+   ``` { .text .no-copy title="Output" }
    HEALTH_WARN 1 osds down; Degraded data redundancy: 866/5694 objects degraded (15.209%), 38 pgs degraded
    [WRN] OSD_DOWN: 1 osds down
        osd.2 (root=default,host=desopve02) is down
@@ -140,17 +155,29 @@ Each OSD has two independent states:
 
 2. Ceph waits 600 seconds before rebuilding the copies:
 
-   ```console
-   root@desopve01:~# ceph config get mon mon_osd_down_out_interval
+   ```bash title="root@desopve01"
+   ceph config get mon mon_osd_down_out_interval
+   ```
+
+   ``` { .text .no-copy title="Output" }
    600
    ```
 
    To avoid waiting, mark the OSD *out* yourself. In less than 40 seconds the missing copies are recreated on the other OSD of `desopve02`:
 
-   ```console
-   root@desopve01:~# ceph osd out 2
+   ```bash title="root@desopve01"
+   ceph osd out 2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    marked out osd.2.
-   root@desopve01:~# ceph -s
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
        health: HEALTH_OK
        osd: 7 osds: 6 up (since 89s), 6 in (since 41s)
@@ -159,11 +186,23 @@ Each OSD has two independent states:
 
 3. The disk has been "replaced": restart the OSD and mark it *in* again. Ceph moves the data back to `osd.2`:
 
-   ```console
-   root@desopve02:~# systemctl start ceph-osd@2
-   root@desopve01:~# ceph osd in 2
+   ```bash title="root@desopve02"
+   systemctl start ceph-osd@2
+   ```
+
+   ```bash title="root@desopve01"
+   ceph osd in 2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    marked in osd.2.
-   root@desopve01:~# ceph -s
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
        pgs:     12.371% pgs not active
                 330/5694 objects misplaced (5.796%)
@@ -175,8 +214,11 @@ Each OSD has two independent states:
 
 4. What the VM saw:
 
-   ```console
-   labuser@debian01:~$ awk '$1>="17:36:30" && $1<="17:39:30"' io.log | sort -k2 -n | tail -4
+   ```bash title="labuser@debian01"
+   awk '$1>="17:36:30" && $1<="17:39:30"' io.log | sort -k2 -n | tail -4
+   ```
+
+   ``` { .text .no-copy title="Output" }
    17:38:26 1715 ms
    17:38:18 1943 ms
    17:38:22 2051 ms
@@ -193,15 +235,21 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
    ![Ceph global flags](../images/18/04-global-flags-noout.png)
 
-   ```console
-   root@desopve01:~# ceph osd dump | grep ^flags
+   ```bash title="root@desopve01"
+   ceph osd dump | grep ^flags
+   ```
+
+   ``` { .text .no-copy title="Output" }
    flags noout,sortbitwise,recovery_deletes,purged_snapdirs,pglog_hardlimit
    ```
 
 2. Check whether there are Ceph updates to install along with the reboot:
 
-   ```console
-   root@desopve02:~# apt update && apt list --upgradable 2>/dev/null | grep -ciE "ceph|rados|rbd"
+   ```bash title="root@desopve02"
+   apt update && apt list --upgradable 2>/dev/null | grep -ciE "ceph|rados|rbd"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    0
    ```
 
@@ -216,9 +264,15 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
 3. Reboot `desopve02`. CT 101 lives on that node's `local-zfs`: shut it down first and start it again afterwards (in [Lab 48](48-migrations.md) you will see how to move it). During the reboot:
 
-   ```console
-   root@desopve02:~# pct shutdown 101; reboot
-   root@desopve01:~# ceph -s
+   ```bash title="root@desopve02"
+   pct shutdown 101; reboot
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
      cluster:
        health: HEALTH_WARN
                1 filesystem is degraded
@@ -239,19 +293,37 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
 4. The node comes back online (in this lab after about 70 seconds; a server with a long POST can take a few minutes). Ceph recovers only the writes made in the meantime; then remove the flag:
 
-   ```console
-   root@desopve01:~# ceph -s | grep -E "health|noout|pgs:"
+   ```bash title="root@desopve01"
+   ceph -s | grep -E "health|noout|pgs:"
+   ```
+
+   ``` { .text .no-copy title="Output" }
        health: HEALTH_WARN
                noout flag(s) set
        pgs:     97 active+clean
-   root@desopve01:~# ceph osd unset noout
+   ```
+
+   ```bash title="root@desopve01"
+   ceph osd unset noout
+   ```
+
+   ``` { .text .no-copy title="Output" }
    noout is unset
-   root@desopve01:~# ceph fs status | grep -E "active|STANDBY" -A1 | head -4
+   ```
+
+   ```bash title="root@desopve01"
+   ceph fs status | grep -E "active|STANDBY" -A1 | head -4
+   ```
+
+   ``` { .text .no-copy title="Output" }
     0    active  desopve01  Reqs:    0 /s    15     18     16     15
    --
    STANDBY MDS
     desopve02
-   root@desopve02:~# pct start 101
+   ```
+
+   ```bash title="root@desopve02"
+   pct start 101
    ```
 
    In the VM the longest pause was **13.5 seconds**: the time needed to notice that the node was no longer responding and to re-peer its PGs.
@@ -262,20 +334,26 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
 1. **Before joining it**, check that it has no VMs or containers and save its storage configuration: the join replaces it with the cluster's.
 
-   ```console
-   root@desopve04:~# qm list; pct list
-   root@desopve04:~# cp /etc/pve/storage.cfg /root/storage.cfg.standalone
+   ```bash title="root@desopve04"
+   qm list; pct list
+   cp /etc/pve/storage.cfg /root/storage.cfg.standalone
    ```
 
 2. **Hardware.** Power off `desopve04` (it has no guests), install the single-port network card, connect the port to the switch (a trunk port carrying the Ceph VLANs) and insert the two 40 GB disks into the free bays; then power the node back on. The new port gets a "system" name (`ens<N>`, where the number depends on the PCI slot). Pin it as `nic2`, as on the other nodes (name pinning is the subject of lab 20):
 
-   ```console
-   root@desopve04:~# pve-network-interface-pinning generate --interface ens<N> --target-name nic2
+   ```bash title="root@desopve04"
+   pve-network-interface-pinning generate --interface ens<N> --target-name nic2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    Successfully updated Proxmox VE configuration files.
 
    Please reboot to apply the changes to your configuration
-   root@desopve04:~# reboot
+   ```
+
+   ```bash title="root@desopve04"
+   reboot
    ```
 
 3. On `desopve01`: **Datacenter** → **Cluster** → **Join Information** → **Copy Information**.
@@ -288,8 +366,11 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
    ![Joining the fourth node](../images/18/07-join-cluster.png)
 
-   ```console
-   root@desopve01:~# pvecm nodes
+   ```bash title="root@desopve01"
+   pvecm nodes
+   ```
+
+   ``` { .text .no-copy title="Output" }
        Nodeid      Votes Name
             1          1 desopve01 (local)
             2          1 desopve02
@@ -301,8 +382,11 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
 5. **Fix the storages.** After the join, `desopve04` uses the cluster's `storage.cfg`: it sees storages it does not have and has lost its own.
 
-   ```console
-   root@desopve04:~# pvesm status
+   ```bash title="root@desopve04"
+   pvesm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    could not activate storage 'local-zfs', zfs error: cannot import 'rpool': no such pool available
    command '/usr/bin/iscsiadm --mode node --targetname iqn.2005-10.org.freenas.ctl:pve --login' failed: exit code 21
    ...
@@ -319,32 +403,44 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
    Restrict the local storages and the iSCSI ones to the right nodes (the initiator of `desopve04` is not authorized on the NAS), then add `local-lvm` and `tank` back for `desopve04` only. The data in `tank` is intact: only the configuration has changed.
 
-   ```console
-   root@desopve01:~# pvesm set local-zfs --nodes desopve01,desopve02,desopve03
-   root@desopve01:~# pvesm set nas-iscsi --nodes desopve01,desopve02,desopve03
-   root@desopve01:~# pvesm set nas-lvm --nodes desopve01,desopve02,desopve03
-   root@desopve01:~# pvesm add lvmthin local-lvm --vgname pve --thinpool data --content images,rootdir --nodes desopve04
-   root@desopve01:~# pvesm add zfspool tank --pool tank --mountpoint /tank --content images,rootdir --sparse 1 --nodes desopve04
+   ```bash title="root@desopve01"
+   pvesm set local-zfs --nodes desopve01,desopve02,desopve03
+   pvesm set nas-iscsi --nodes desopve01,desopve02,desopve03
+   pvesm set nas-lvm --nodes desopve01,desopve02,desopve03
+   pvesm add lvmthin local-lvm --vgname pve --thinpool data --content images,rootdir --nodes desopve04
+   pvesm add zfspool tank --pool tank --mountpoint /tank --content images,rootdir --sparse 1 --nodes desopve04
    ```
 
 6. **Ceph on the new node:** packages, VLANs 50/51 on `nic2` (as in lab 17) and the two OSDs.
 
-   ```console
-   root@desopve04:~# pveceph install --repository no-subscription --version tentacle
-   root@desopve04:~# pvesh create /nodes/desopve04/network --iface nic2.50 --type vlan --cidr 10.50.10.24/24 --autostart 1
-   root@desopve04:~# pvesh create /nodes/desopve04/network --iface nic2.51 --type vlan --cidr 10.51.10.24/24 --autostart 1
-   root@desopve04:~# pvesh set /nodes/desopve04/network
-   root@desopve04:~# ceph -s
+   ```bash title="root@desopve04"
+   pveceph install --repository no-subscription --version tentacle
+   pvesh create /nodes/desopve04/network --iface nic2.50 --type vlan --cidr 10.50.10.24/24 --autostart 1
+   pvesh create /nodes/desopve04/network --iface nic2.51 --type vlan --cidr 10.51.10.24/24 --autostart 1
+   pvesh set /nodes/desopve04/network
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Error initializing cluster client: ObjectNotFound('RADOS object not found (error calling conf_read_file)')
    ```
 
    The `ceph` client looks for `/etc/ceph/ceph.conf`, but on the new node the link to the shared configuration does not exist yet: when you only install the packages from the command line, you have to create it by hand.
 
-   ```console
-   root@desopve04:~# ln -s /etc/pve/ceph.conf /etc/ceph/ceph.conf
-   root@desopve04:~# pveceph osd create /dev/sdf
+   ```bash title="root@desopve04"
+   ln -s /etc/pve/ceph.conf /etc/ceph/ceph.conf
+   pveceph osd create /dev/sdf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    --> ceph-volume lvm create successful for: /dev/sdf
-   root@desopve04:~# pveceph osd create /dev/sdg
+   ```
+
+   ```bash title="root@desopve04"
+   pveceph osd create /dev/sdg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    --> ceph-volume lvm create successful for: /dev/sdg
    ```
 
@@ -357,18 +453,33 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
 8. Rebalancing onto the fourth host takes about a minute and a half:
 
-   ```console
-   root@desopve04:~# ceph -s
+   ```bash title="root@desopve04"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
        osd: 9 osds: 8 up (since 2s), 9 in (since 3s); 32 remapped pgs
        pgs:     ...
                 10 active+remapped+backfill_wait
                 9  remapped+peering
    ...
-   root@desopve01:~# ceph -s
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
        osd: 9 osds: 9 up (since 57s), 9 in (since 64s); 7 remapped pgs
        recovery: 87 MiB/s, 22 objects/s
    ...
-   root@desopve01:~# ceph osd df tree | grep host
+   ```
+
+   ```bash title="root@desopve01"
+   ceph osd df tree | grep host
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -3         0.11719         -  120 GiB  5.7 GiB  5.4 GiB  ...  4.75  1.06    -              host desopve01
    -5         0.11719         -  120 GiB  5.3 GiB  5.2 GiB  ...  4.45  0.99    -              host desopve02
    -7         0.17578         -  180 GiB  6.8 GiB  6.5 GiB  ...  3.77  0.84    -              host desopve03
@@ -377,8 +488,11 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
    Now the three copies are spread across four hosts, and no host has to hold everything anymore. The pool's estimated usable space goes up:
 
-   ```console
-   root@desopve01:~# ceph df | grep -E "POOL|rbd-vm"
+   ```bash title="root@desopve01"
+   ceph df | grep -E "POOL|rbd-vm"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    POOL             ID  PGS   STORED  OBJECTS     USED  %USED  MAX AVAIL
    rbd-vm            2   32  6.4 GiB    1.69k   19 GiB   4.15    148 GiB
    ```
@@ -395,8 +509,11 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
    Ceph deletes the third copy right away: the used space goes down and the available space goes up.
 
-   ```console
-   root@desopve01:~# ceph df | grep -E "POOL|rbd-vm"
+   ```bash title="root@desopve01"
+   ceph df | grep -E "POOL|rbd-vm"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    POOL             ID  PGS   STORED  OBJECTS     USED  %USED  MAX AVAIL
    rbd-vm            2   32  6.4 GiB    1.69k   13 GiB   2.75    226 GiB
    ```
@@ -405,8 +522,11 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
 2. Go back to 3-way replication:
 
-   ```console
-   root@desopve01:~# pveceph pool set rbd-vm --size 3
+   ```bash title="root@desopve01"
+   pveceph pool set rbd-vm --size 3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pool rbd-vm: applying size = 3
    ```
 
@@ -416,10 +536,13 @@ Every OSD has a *class* (`hdd`, `ssd`, `nvme`), detected automatically. A CRUSH 
 
 1. In the lab all the disks are the same: simulate one SSD per host by changing the class of one OSD per node, then create a rule that uses only the `ssd` class, still with one copy per host:
 
-   ```console
-   root@desopve01:~# for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-device-class ssd osd.$o; done
-   root@desopve01:~# ceph osd crush rule create-replicated fast default host ssd
-   root@desopve01:~# ceph osd crush rule ls
+   ```bash title="root@desopve01"
+   for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-device-class ssd osd.$o; done
+   ceph osd crush rule create-replicated fast default host ssd
+   ceph osd crush rule ls
+   ```
+
+   ``` { .text .no-copy title="Output" }
    replicated_rule
    fast
    ```
@@ -428,11 +551,20 @@ Every OSD has a *class* (`hdd`, `ssd`, `nvme`), detected automatically. A CRUSH 
 
 2. Create a pool that uses the `fast` rule: you select it in **Create** → **Crush Rule**, or from the command line.
 
-   ```console
-   root@desopve01:~# pveceph pool create rbd-fast --crush_rule fast --pg_autoscale_mode on
-   root@desopve01:~# ceph pg ls-by-pool rbd-fast -f json | python3 -c 'import sys,json; d=json.load(sys.stdin); d=d.get("pg_stats", d) if isinstance(d, dict) else d; s=set(); [s.update(p["acting"]) for p in d]; print("OSD usati da rbd-fast:", sorted(s))'
+   ```bash title="root@desopve01"
+   pveceph pool create rbd-fast --crush_rule fast --pg_autoscale_mode on
+   ceph pg ls-by-pool rbd-fast -f json | python3 -c 'import sys,json; d=json.load(sys.stdin); d=d.get("pg_stats", d) if isinstance(d, dict) else d; s=set(); [s.update(p["acting"]) for p in d]; print("OSD usati da rbd-fast:", sorted(s))'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    OSD usati da rbd-fast: [1, 3, 5, 7]
-   root@desopve01:~# ceph osd crush rule dump fast | grep -E 'item_name|type"'
+   ```
+
+   ```bash title="root@desopve01"
+   ceph osd crush rule dump fast | grep -E 'item_name|type"'
+   ```
+
+   ``` { .text .no-copy title="Output" }
        "type": 1,
                "item_name": "default~ssd"
                "type": "host"
@@ -448,9 +580,12 @@ Every OSD has a *class* (`hdd`, `ssd`, `nvme`), detected automatically. A CRUSH 
 
    It also creates the `ec22` storage:
 
-   ```console
-   root@desopve01:~# pveceph pool create ec22 --erasure-coding k=2,m=2 --add_storages 1
-   root@desopve01:~# ceph osd erasure-code-profile get pve_ec_ec22
+   ```bash title="root@desopve01"
+   pveceph pool create ec22 --erasure-coding k=2,m=2 --add_storages 1
+   ceph osd erasure-code-profile get pve_ec_ec22
+   ```
+
+   ``` { .text .no-copy title="Output" }
    crush-device-class=
    crush-failure-domain=host
    ...
@@ -458,7 +593,13 @@ Every OSD has a *class* (`hdd`, `ssd`, `nvme`), detected automatically. A CRUSH 
    m=2
    plugin=isa
    technique=reed_sol_van
-   root@desopve01:~# grep -A5 "rbd: ec22" /etc/pve/storage.cfg
+   ```
+
+   ```bash title="root@desopve01"
+   grep -A5 "rbd: ec22" /etc/pve/storage.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    rbd: ec22
    	content images,rootdir
    	data-pool ec22-data
@@ -468,14 +609,29 @@ Every OSD has a *class* (`hdd`, `ssd`, `nvme`), detected automatically. A CRUSH 
 
 2. Write 1 GiB to the EC pool and 1 GiB to the replicated pool `rbd-fast`, and compare the space used:
 
-   ```console
-   root@desopve01:~# rbd create ec22-metadata/bench --size 2G --data-pool ec22-data
-   root@desopve01:~# rbd create rbd-fast/bench --size 2G
-   root@desopve01:~# rbd bench --io-type write --io-size 4M --io-total 1G --io-pattern seq ec22-metadata/bench
+   ```bash title="root@desopve01"
+   rbd create ec22-metadata/bench --size 2G --data-pool ec22-data
+   rbd create rbd-fast/bench --size 2G
+   rbd bench --io-type write --io-size 4M --io-total 1G --io-pattern seq ec22-metadata/bench
+   ```
+
+   ``` { .text .no-copy title="Output" }
    elapsed: 3   ops: 256   ops/sec: 76.5535   bytes/sec: 306 MiB/s
-   root@desopve01:~# rbd bench --io-type write --io-size 4M --io-total 1G --io-pattern seq rbd-fast/bench
+   ```
+
+   ```bash title="root@desopve01"
+   rbd bench --io-type write --io-size 4M --io-total 1G --io-pattern seq rbd-fast/bench
+   ```
+
+   ``` { .text .no-copy title="Output" }
    elapsed: 4   ops: 256   ops/sec: 63.8073   bytes/sec: 255 MiB/s
-   root@desopve01:~# ceph df | sed -n "/POOLS/,\$p"
+   ```
+
+   ```bash title="root@desopve01"
+   ceph df | sed -n "/POOLS/,\$p"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    --- POOLS ---
    POOL             ID  PGS    STORED  OBJECTS     USED  %USED  MAX AVAIL
    .mgr              1    1   1.3 MiB        2  4.0 MiB      0    144 GiB
@@ -495,8 +651,11 @@ Every OSD has a *class* (`hdd`, `ssd`, `nvme`), detected automatically. A CRUSH 
 
 #### The PG autoscaler
 
-```console
-root@desopve01:~# ceph osd pool autoscale-status
+```bash title="root@desopve01"
+ceph osd pool autoscale-status
+```
+
+``` { .text .no-copy title="Output" }
 POOL               SIZE  TARGET SIZE  RATE  RAW CAPACITY   RATIO  FINAL RATIO  TARGET RATIO  EFFECTIVE RATIO  BIAS  PG_NUM  NEW PG_NUM  AUTOSCALE  BULK
 ...
 ec22-data         1024M                2.0        499.9G  0.0040       0.1829                                  1.0     128          32  warn       False
@@ -509,38 +668,53 @@ rbd-fast          1026M                3.0        219.9G  0.0137       0.4800   
 
 When you are done, remove the test pools and rule and set the OSDs back to class `hdd`:
 
-```console
-root@desopve01:~# rbd rm rbd-fast/bench; rbd rm ec22-metadata/bench
-root@desopve01:~# pveceph pool destroy rbd-fast
-root@desopve01:~# pveceph pool destroy ec22-data --remove_storages 1
-root@desopve01:~# pveceph pool destroy ec22-metadata
-root@desopve01:~# ceph osd crush rule rm fast
-root@desopve01:~# for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-device-class hdd osd.$o; done
+```bash title="root@desopve01"
+rbd rm rbd-fast/bench; rbd rm ec22-metadata/bench
+pveceph pool destroy rbd-fast
+pveceph pool destroy ec22-data --remove_storages 1
+pveceph pool destroy ec22-metadata
+ceph osd crush rule rm fast
+for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-device-class hdd osd.$o; done
 ```
 
 ### 6. Failure: a node suddenly powers off
 
 1. Simulate a power outage on `desopve03` (monitor, standby manager, three OSDs) while VM 100 is writing on `desopve01`:
 
-   ```console
-   root@desopve03:~# echo 1 > /proc/sys/kernel/sysrq; echo o > /proc/sysrq-trigger
+   ```bash title="root@desopve03"
+   echo 1 > /proc/sys/kernel/sysrq; echo o > /proc/sysrq-trigger
    ```
 
 2. For the first few seconds Ceph does not know anything yet: the OSDs are declared *down* only after about 20 seconds without *heartbeats*.
 
-   ```console
-   root@desopve01:~# ceph -s          # 13 seconds later
+   ```bash title="root@desopve01"
+   ceph -s          # 13 seconds later
+   ```
+
+   ``` { .text .no-copy title="Output" }
        health: HEALTH_WARN
                1/3 mons down, quorum desopve01,desopve02
        osd: 9 osds: 9 up (since 10m), 9 in (since 10m)
-   root@desopve01:~# ceph -s          # 38 seconds later
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s          # 38 seconds later
+   ```
+
+   ``` { .text .no-copy title="Output" }
        health: HEALTH_WARN
                1/3 mons down, quorum desopve01,desopve02
                3 osds down
                1 host (3 osds) down
                Degraded data redundancy: 1710/5694 objects degraded (30.032%), 70 pgs degraded
        osd: 9 osds: 6 up (since 12s), 9 in (since 10m)
-   root@desopve01:~# pvecm status | grep -E "Quorate|Total votes"
+   ```
+
+   ```bash title="root@desopve01"
+   pvecm status | grep -E "Quorate|Total votes"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Quorate:          Yes
    Total votes:      3
    ```
@@ -549,23 +723,41 @@ root@desopve01:~# for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ce
 
    The VM saw **a 26.8-second pause**: writes to the PGs whose primary was on `desopve03` stayed pending until the OSDs were declared *down*. Then I/O resumed on the remaining copies.
 
-   ```console
-   labuser@debian01:~$ sort -k2 -n io.log | tail -1
+   ```bash title="labuser@debian01"
+   sort -k2 -n io.log | tail -1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    18:04:48 26833 ms
    ```
 
 3. After 600 seconds the monitors mark the OSDs *out* and Ceph rebuilds the copies on the other three hosts: with four hosts there is room for them.
 
-   ```console
-   root@desopve01:~# grep "Marking osd" /var/log/ceph/ceph.log
+   ```bash title="root@desopve01"
+   grep "Marking osd" /var/log/ceph/ceph.log
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2026-11-09T18:14:52.615748+0100 mon.desopve01 (mon.0) 4032 : cluster [INF] Marking osd.4 out (has been down for 604 seconds)
    2026-11-09T18:14:52.615827+0100 mon.desopve01 (mon.0) 4033 : cluster [INF] Marking osd.5 out (has been down for 604 seconds)
    2026-11-09T18:14:52.615849+0100 mon.desopve01 (mon.0) 4034 : cluster [INF] Marking osd.6 out (has been down for 604 seconds)
-   root@desopve01:~# ceph -s          # 11 seconds later
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s          # 11 seconds later
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
        recovery: 181 MiB/s, 0 keys/s, 48 objects/s
    ...
-   root@desopve01:~# ceph -s          # 52 seconds later
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s          # 52 seconds later
+   ```
+
+   ``` { .text .no-copy title="Output" }
        osd: 9 osds: 6 up (since 10m), 6 in (since 52s); 2 remapped pgs
        pgs:     1.031% pgs not active
                 82/5694 objects degraded (1.440%)
@@ -574,13 +766,22 @@ root@desopve01:~# for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ce
 
 4. Power the node back on. The OSDs come back *up* and the monitors mark them *in* again on their own, because they had been marked *out* automatically:
 
-   ```console
-   root@desopve01:~# ceph -s
+   ```bash title="root@desopve01"
+   ceph -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
        health: HEALTH_WARN
                clock skew detected on mon.desopve03
        osd: 9 osds: 9 up (since 13s), 9 in (since 13s)
    ...
-   root@desopve01:~# ceph -s          # 20 seconds later
+   ```
+
+   ```bash title="root@desopve01"
+   ceph -s          # 20 seconds later
+   ```
+
+   ``` { .text .no-copy title="Output" }
        health: HEALTH_OK
    ```
 
@@ -588,8 +789,8 @@ root@desopve01:~# for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ce
    - The log also shows `OSD bench result ... is not within the threshold` warnings. At startup every OSD benchmarks its own disk. If the result falls outside the thresholds expected for the disk's class (for example a disk classified as `hdd` that performs like an SSD because it sits behind a controller cache), Ceph discards it and uses the default value. In production you measure the capacity with fio and set it with `osd_mclock_max_capacity_iops_hdd`/`_ssd`.
    - With slow disks under load, the `BLUESTORE_SLOW_OP_ALERT` warning can also appear; by default it stays visible for 24 hours after the last occurrence. If you want it to clear sooner, reduce the time to 10 minutes:
 
-     ```console
-     root@desopve01:~# ceph config set osd bluestore_slow_ops_warn_lifetime 600
+     ```bash title="root@desopve01"
+     ceph config set osd bluestore_slow_ops_warn_lifetime 600
      ```
 
 ### 7. Decommissioning a node without reinstalling it
@@ -598,10 +799,19 @@ Now `desopve04` leaves Ceph and the cluster and becomes a standalone node again,
 
 1. **Drain the OSDs.** Mark them *out* and wait until Ceph has moved everything:
 
-   ```console
-   root@desopve01:~# ceph osd out 7 8
+   ```bash title="root@desopve01"
+   ceph osd out 7 8
+   ```
+
+   ``` { .text .no-copy title="Output" }
    marked out osd.7. marked out osd.8.
-   root@desopve01:~# ceph osd safe-to-destroy 7 8
+   ```
+
+   ```bash title="root@desopve01"
+   ceph osd safe-to-destroy 7 8
+   ```
+
+   ``` { .text .no-copy title="Output" }
    OSD(s) 7,8 are safe to destroy without reducing data durability.
    ```
 
@@ -611,13 +821,28 @@ Now `desopve04` leaves Ceph and the cluster and becomes a standalone node again,
 
 2. **Destroy the OSDs** and remove the host from the CRUSH map:
 
-   ```console
-   root@desopve04:~# systemctl stop ceph-osd@7 ceph-osd@8
-   root@desopve04:~# pveceph osd destroy 7 --cleanup 1
+   ```bash title="root@desopve04"
+   systemctl stop ceph-osd@7 ceph-osd@8
+   pveceph osd destroy 7 --cleanup 1
+   ```
+
+   ``` { .text .no-copy title="Output" }
     stdout: Labels on physical volume "/dev/sdf" successfully wiped.
-   root@desopve04:~# pveceph osd destroy 8 --cleanup 1
+   ```
+
+   ```bash title="root@desopve04"
+   pveceph osd destroy 8 --cleanup 1
+   ```
+
+   ``` { .text .no-copy title="Output" }
     stdout: Labels on physical volume "/dev/sdg" successfully wiped.
-   root@desopve01:~# ceph osd crush remove desopve04
+   ```
+
+   ```bash title="root@desopve01"
+   ceph osd crush remove desopve04
+   ```
+
+   ``` { .text .no-copy title="Output" }
    removed item id -9 name 'desopve04' from crush map
    ```
 
@@ -625,23 +850,32 @@ Now `desopve04` leaves Ceph and the cluster and becomes a standalone node again,
 
 3. **Remove the Ceph VLANs** from `desopve04`:
 
-   ```console
-   root@desopve04:~# pvesh delete /nodes/desopve04/network/nic2.50
-   root@desopve04:~# pvesh delete /nodes/desopve04/network/nic2.51
-   root@desopve04:~# pvesh set /nodes/desopve04/network
+   ```bash title="root@desopve04"
+   pvesh delete /nodes/desopve04/network/nic2.50
+   pvesh delete /nodes/desopve04/network/nic2.51
+   pvesh set /nodes/desopve04/network
    ```
 
 4. **Separate the node from the cluster**, following the official *Separate a Node Without Reinstalling* procedure. On `desopve04`:
 
-   ```console
-   root@desopve04:~# systemctl stop pve-cluster corosync
-   root@desopve04:~# pmxcfs -l
+   ```bash title="root@desopve04"
+   systemctl stop pve-cluster corosync
+   pmxcfs -l
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [main] notice: forcing local mode (although corosync.conf exists)
-   root@desopve04:~# rm /etc/pve/corosync.conf
-   root@desopve04:~# rm -r /etc/corosync/*
-   root@desopve04:~# killall pmxcfs
-   root@desopve04:~# systemctl start pve-cluster
-   root@desopve04:~# pvecm status
+   ```
+
+   ```bash title="root@desopve04"
+   rm /etc/pve/corosync.conf
+   rm -r /etc/corosync/*
+   killall pmxcfs
+   systemctl start pve-cluster
+   pvecm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Error: Corosync config '/etc/pve/corosync.conf' does not exist - is this node part of a cluster?
    ```
 
@@ -650,18 +884,30 @@ Now `desopve04` leaves Ceph and the cluster and becomes a standalone node again,
 
 5. On the cluster, remove the node and its leftovers:
 
-   ```console
-   root@desopve01:~# pvecm delnode desopve04
+   ```bash title="root@desopve01"
+   pvecm delnode desopve04
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Killing node 4
    Could not kill node (error = CS_ERR_NOT_EXIST)
-   root@desopve01:~# pvecm status | grep -E "Quorate|Expected|Total"
+   ```
+
+   ```bash title="root@desopve01"
+   pvecm status | grep -E "Quorate|Expected|Total"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Quorate:          Yes
    Expected votes:   3
    Total votes:      3
-   root@desopve01:~# rm -r /etc/pve/nodes/desopve04
-   root@desopve01:~# sed -i "/root@desopve04$/d" /etc/pve/priv/authorized_keys
-   root@desopve01:~# ssh-keygen -f /etc/pve/priv/known_hosts -R desopve04
-   root@desopve01:~# pvesm remove local-lvm; pvesm remove tank
+   ```
+
+   ```bash title="root@desopve01"
+   rm -r /etc/pve/nodes/desopve04
+   sed -i "/root@desopve04$/d" /etc/pve/priv/authorized_keys
+   ssh-keygen -f /etc/pve/priv/known_hosts -R desopve04
+   pvesm remove local-lvm; pvesm remove tank
    ```
 
    - `CS_ERR_NOT_EXIST` is normal: the node had already left Corosync, so there was nothing to "kill". It was removed from the configuration anyway.
@@ -672,20 +918,35 @@ Now `desopve04` leaves Ceph and the cluster and becomes a standalone node again,
 
 6. On `desopve04`, restore the storage configuration saved in step 4 and delete the copies of the cluster configuration that are no longer needed: other nodes and Ceph.
 
-   ```console
-   root@desopve04:~# cp /root/storage.cfg.standalone /etc/pve/storage.cfg
-   root@desopve04:~# rm -rf /etc/pve/nodes/desopve01 /etc/pve/nodes/desopve02 /etc/pve/nodes/desopve03
-   root@desopve04:~# pveceph purge
+   ```bash title="root@desopve04"
+   cp /root/storage.cfg.standalone /etc/pve/storage.cfg
+   rm -rf /etc/pve/nodes/desopve01 /etc/pve/nodes/desopve02 /etc/pve/nodes/desopve03
+   pveceph purge
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Foreign MON address in ceph.conf. Keeping config & keyrings
-   root@desopve04:~# rm -f /etc/pve/ceph.conf /etc/ceph/ceph.conf /etc/pve/priv/ceph.client.admin.keyring /etc/pve/priv/ceph.mon.keyring
-   root@desopve04:~# rm -rf /etc/pve/priv/ceph
-   root@desopve04:~# systemctl disable --now ceph-crash.service
-   root@desopve04:~# pvesm status
+   ```
+
+   ```bash title="root@desopve04"
+   rm -f /etc/pve/ceph.conf /etc/ceph/ceph.conf /etc/pve/priv/ceph.client.admin.keyring /etc/pve/priv/ceph.mon.keyring
+   rm -rf /etc/pve/priv/ceph
+   systemctl disable --now ceph-crash.service
+   pvesm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
    local             dir     active        22203544         6107924        14942392   27.51%
    local-lvm     lvmthin     active        14217216               0        14217216    0.00%
    tank          zfspool     active        40265280             751        40264528    0.00%
-   root@desopve04:~# zpool status -x tank
+   ```
+
+   ```bash title="root@desopve04"
+   zpool status -x tank
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pool 'tank' is healthy
    ```
 
@@ -696,15 +957,24 @@ Now `desopve04` leaves Ceph and the cluster and becomes a standalone node again,
 
 ## Verification and tests
 
-```console
-root@desopve01:~# ceph -s | sed -n "/health:/p;/mon:/p;/mgr:/p;/mds:/p;/osd:/p;/pgs:/p"
+```bash title="root@desopve01"
+ceph -s | sed -n "/health:/p;/mon:/p;/mgr:/p;/mds:/p;/osd:/p;/pgs:/p"
+```
+
+``` { .text .no-copy title="Output" }
     health: HEALTH_OK
     mon: 3 daemons, quorum desopve01,desopve03,desopve02 (age 4m) [leader: desopve01]
     mgr: desopve01(active, since 74m), standbys: desopve02, desopve03
     mds: 1/1 daemons up, 1 standby
     osd: 7 osds: 7 up (since 100s), 7 in (since 3m)
     pgs:     97 active+clean
-root@desopve01:~# pvecm nodes
+```
+
+```bash title="root@desopve01"
+pvecm nodes
+```
+
+``` { .text .no-copy title="Output" }
     Nodeid      Votes Name
          1          1 desopve01 (local)
          2          1 desopve02
@@ -721,8 +991,8 @@ root@desopve01:~# pvecm nodes
 
 In VM 100, stop the measurement script and delete its files:
 
-```console
-labuser@debian01:~$ pkill -f io.bin; rm -f $HOME/io.bin $HOME/io.log
+```bash title="labuser@debian01"
+pkill -f io.bin; rm -f $HOME/io.bin $HOME/io.log
 ```
 
 ## Final lab state

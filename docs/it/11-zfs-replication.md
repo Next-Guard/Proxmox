@@ -55,8 +55,11 @@ La configurazione di una VM sta nel file system del cluster, in `/etc/pve/nodes/
 
 Lo storage `local-zfs` è definito una sola volta per tutto il cluster, senza la riga `nodes`, quindi esiste su tutti i nodi con lo stesso nome:
 
-```console
-root@desopve01:~# grep -A4 "zfspool: local-zfs" /etc/pve/storage.cfg
+```bash title="root@desopve01"
+grep -A4 "zfspool: local-zfs" /etc/pve/storage.cfg
+```
+
+``` { .text .no-copy title="Output" }
 zfspool: local-zfs
 	pool rpool/data
 	content rootdir,images
@@ -67,8 +70,11 @@ zfspool: local-zfs
 
 Per avere un termine di paragone, migra a caldo la VM 100 verso `desopve03`, che non ha ancora nessuna copia del disco. Con `--with-local-disks` Proxmox VE copia tutto il disco da 16 GiB mentre la VM continua a girare:
 
-```console
-root@desopve01:~# qm migrate 100 desopve03 --online --with-local-disks
+```bash title="root@desopve01"
+qm migrate 100 desopve03 --online --with-local-disks
+```
+
+``` { .text .no-copy title="Output" }
 …
 mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 57s, ready
 2026-11-09 14:19:36 average migration speed: 1.0 GiB/s - downtime 10 ms
@@ -93,8 +99,11 @@ Un minuto abbondante per un disco quasi vuoto: il tempo cresce con la dimensione
 
 La configurazione è nel file system del cluster:
 
-```console
-root@desopve03:~# cat /etc/pve/replication.cfg
+```bash title="root@desopve03"
+cat /etc/pve/replication.cfg
+```
+
+``` { .text .no-copy title="Output" }
 local: 100-0
 	comment replica verso desopve01
 	target desopve01
@@ -131,8 +140,8 @@ Il volume da 16 GiB contiene solo 1,9 GB di dati scritti: `zfs send` invia i blo
 
 1. Nella VM scrivi 500 MB di dati nuovi:
 
-   ```console
-   labuser@debian01:~$ dd if=/dev/urandom of=$HOME/dati-1.bin bs=1M count=500 status=none; sync
+   ```bash title="labuser@debian01"
+   dd if=/dev/urandom of=$HOME/dati-1.bin bs=1M count=500 status=none; sync
    ```
 
 2. Seleziona il job verso `desopve01` e premi **Schedule now**, poi apri **Log**. Questa volta il giro è **incrementale** (`incremental sync`) e invia solo i 511 MB cambiati:
@@ -145,8 +154,11 @@ Il volume da 16 GiB contiene solo 1,9 GB di dati scritti: `zfs send` invia i blo
 
    Da riga di comando:
 
-   ```console
-   root@desopve03:~# pvesr status
+   ```bash title="root@desopve03"
+   pvesr status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    JobID      Enabled    Target                           LastSync             NextSync   Duration  FailCount State
    100-0      Yes        local/desopve01       2026-11-09_14:25:01  2026-11-09_14:30:00  30.423273          0 OK
    100-1      Yes        local/desopve02       2026-11-09_14:23:01  2026-11-09_14:30:00  33.221129          0 OK
@@ -158,12 +170,21 @@ Il volume da 16 GiB contiene solo 1,9 GB di dati scritti: `zfs send` invia i blo
 
 5. Gli snapshot di replica si vedono con `zfs list`. Ogni volume conserva l'ultimo snapshot di ciascun job, che fa da base per il giro successivo:
 
-   ```console
-   root@desopve03:~# zfs list -t snapshot -o name,used,creation -r rpool/data
+   ```bash title="root@desopve03"
+   zfs list -t snapshot -o name,used,creation -r rpool/data
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME                                                      USED  CREATION
    rpool/data/vm-100-disk-0@__replicate_100-1_1794230581__  1.12M  Mon Nov  9 14:23 2026
    rpool/data/vm-100-disk-0@__replicate_100-0_1794230701__   188K  Mon Nov  9 14:25 2026
-   root@desopve03:~# ssh desopve01 zfs list -t snapshot -o name,used,creation -r rpool/data
+   ```
+
+   ```bash title="root@desopve03"
+   ssh desopve01 zfs list -t snapshot -o name,used,creation -r rpool/data
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME                                                      USED  CREATION
    rpool/data/vm-100-disk-0@__replicate_100-1_1794230581__  1.12M  Mon Nov  9 14:23 2026
    rpool/data/vm-100-disk-0@__replicate_100-0_1794230701__     0B  Mon Nov  9 14:25 2026
@@ -175,8 +196,11 @@ Il volume da 16 GiB contiene solo 1,9 GB di dati scritti: `zfs send` invia i blo
 
 Migra la VM 100 da `desopve03` a `desopve01`, che ha già una replica:
 
-```console
-root@desopve03:~# qm migrate 100 desopve01 --online --with-local-disks
+```bash title="root@desopve03"
+qm migrate 100 desopve01 --online --with-local-disks
+```
+
+``` { .text .no-copy title="Output" }
 …
 2026-11-09 14:26:55 incremental sync 'local-zfs:vm-100-disk-0' (__replicate_100-0_1794230701__ => __replicate_100-0_1794230814__)
 2026-11-09 14:26:56 send from @__replicate_100-0_1794230701__ to rpool/data/vm-100-disk-0@__replicate_100-0_1794230814__ estimated size is 154K
@@ -196,8 +220,11 @@ Prima di spostare la VM, la migrazione esegue un ultimo giro di replica; poi QEM
 
 Dopo la migrazione Proxmox VE **inverte da solo** i job: quello che puntava a `desopve01` ora replica verso il vecchio nodo, `desopve03`. Il commento, invece, resta quello scritto a mano:
 
-```console
-root@desopve01:~# cat /etc/pve/replication.cfg
+```bash title="root@desopve01"
+cat /etc/pve/replication.cfg
+```
+
+``` { .text .no-copy title="Output" }
 local: 100-0
 	comment replica verso desopve01
 	target desopve03
@@ -219,16 +246,28 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 1. Nella VM scrivi un file, avvia un giro di replica verso `desopve02` e attendi che finisca. Poi scrivi altri dati, **dopo** la replica:
 
-   ```console
-   labuser@debian01:~$ date "+%F %T" > $HOME/A-prima-della-replica.txt; sync
-   root@desopve01:~# pvesr schedule-now 100-1
-   root@desopve01:~# pvesr status
+   ```bash title="labuser@debian01"
+   date "+%F %T" > $HOME/A-prima-della-replica.txt; sync
+   ```
+
+   ```bash title="root@desopve01"
+   pvesr schedule-now 100-1
+   pvesr status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    JobID      Enabled    Target                           LastSync             NextSync   Duration  FailCount State
    100-0      Yes        local/desopve03       2026-11-09_14:26:54  2026-11-09_14:30:00   3.183833          0 OK
    100-1      Yes        local/desopve02       2026-11-09_14:28:01  2026-11-09_14:30:00  13.542599          0 OK
-   labuser@debian01:~$ date "+%F %T" > $HOME/B-dopo-la-replica.txt
-   labuser@debian01:~$ dd if=/dev/urandom of=$HOME/dati-2.bin bs=1M count=200 status=none; sync
-   labuser@debian01:~$ ls -l --time-style=+%T $HOME
+   ```
+
+   ```bash title="labuser@debian01"
+   date "+%F %T" > $HOME/B-dopo-la-replica.txt
+   dd if=/dev/urandom of=$HOME/dati-2.bin bs=1M count=200 status=none; sync
+   ls -l --time-style=+%T $HOME
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -rw-rw-r-- 1 labuser labuser        20 14:27:34 A-prima-della-replica.txt
    -rw-rw-r-- 1 labuser labuser        20 14:28:11 B-dopo-la-replica.txt
    -rw-rw-r-- 1 labuser labuser 524288000 14:24:00 dati-1.bin
@@ -237,14 +276,17 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 2. Alle 14:28:28, prima del giro successivo, spegni `desopve01` di colpo, senza chiudere niente. Il carattere `o` di *SysRq* chiede al kernel di togliere l'alimentazione all'istante:
 
-   ```console
-   root@desopve01:~# echo o > /proc/sysrq-trigger
+   ```bash title="root@desopve01"
+   echo o > /proc/sysrq-trigger
    ```
 
 3. Gli altri due nodi hanno ancora il quorum (2 voti su 3), quindi il cluster resta operativo:
 
-   ```console
-   root@desopve02:~# pvecm status | grep -E "Total votes|Quorum:|Flags"
+   ```bash title="root@desopve02"
+   pvecm status | grep -E "Total votes|Quorum:|Flags"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Total votes:      2
    Quorum:           2
    Flags:            Quorate
@@ -256,8 +298,11 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 4. Su `desopve02` controlla l'ultimo snapshot di replica ricevuto: è quello delle 14:28.
 
-   ```console
-   root@desopve02:~# zfs list -t snapshot -o name,creation -r rpool/data/vm-100-disk-0
+   ```bash title="root@desopve02"
+   zfs list -t snapshot -o name,creation -r rpool/data/vm-100-disk-0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME                                                     CREATION
    rpool/data/vm-100-disk-0@__replicate_100-0_1794230814__  Mon Nov  9 14:26 2026
    rpool/data/vm-100-disk-0@__replicate_100-1_1794230881__  Mon Nov  9 14:28 2026
@@ -265,20 +310,29 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 5. Hai la certezza che `desopve01` è spento: sposta la configurazione della VM nella cartella di `desopve02` e avviala.
 
-   ```console
-   root@desopve02:~# mv /etc/pve/nodes/desopve01/qemu-server/100.conf /etc/pve/nodes/desopve02/qemu-server/100.conf
-   root@desopve02:~# qm start 100
+   ```bash title="root@desopve02"
+   mv /etc/pve/nodes/desopve01/qemu-server/100.conf /etc/pve/nodes/desopve02/qemu-server/100.conf
+   qm start 100
    ```
 
    ![La VM 100 di nuovo in servizio su desopve02](../images/11/06-vm-recuperata.png)
 
 6. Nella VM controlla i file:
 
-   ```console
-   labuser@debian01:~$ ls -l --time-style=+%T $HOME
+   ```bash title="labuser@debian01"
+   ls -l --time-style=+%T $HOME
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -rw-rw-r-- 1 labuser labuser        20 14:27:34 A-prima-della-replica.txt
    -rw-rw-r-- 1 labuser labuser 524288000 14:24:00 dati-1.bin
-   labuser@debian01:~$ cat $HOME/B-dopo-la-replica.txt
+   ```
+
+   ```bash title="labuser@debian01"
+   cat $HOME/B-dopo-la-replica.txt
+   ```
+
+   ``` { .text .no-copy title="Output" }
    cat: /home/labuser/B-dopo-la-replica.txt: No such file or directory
    ```
 
@@ -286,8 +340,11 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 7. Intanto i job si sono adattati da soli. Quello verso `desopve02` (il nodo su cui ora gira la VM) ora punta al nodo guasto, `desopve01`, e fallisce finché il nodo è spento. Quello verso `desopve03` continua dal nuovo nodo:
 
-   ```console
-   root@desopve02:~# pvesr status
+   ```bash title="root@desopve02"
+   pvesr status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    JobID      Enabled    Target                           LastSync             NextSync   Duration  FailCount State
    100-0      Yes        local/desopve03       2026-11-09_14:30:01  2026-11-09_14:35:00   6.464296          0 OK
    100-1      Yes        local/desopve01                         -                    -   3.111215          1 command '/usr/bin/ssh -e none … root@172.27.199.21 -- pvesr prepare-local-job 100-1 --last_sync 0 -- local-zfs:vm-100-disk-0' failed: exit code 255
@@ -297,12 +354,21 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 1. Riaccendi `desopve01` dalla scheda di gestione remota. Al riavvio rientra nel cluster e riceve la configurazione aggiornata: la VM 100 non è più sua, quindi non parte.
 
-   ```console
-   root@desopve01:~# pvecm status | grep -E "Total votes|Quorate"
+   ```bash title="root@desopve01"
+   pvecm status | grep -E "Total votes|Quorate"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Quorate:          Yes
    Total votes:      3
-   root@desopve01:~# qm list
-   root@desopve01:~# zfs list -t all -o name,creation -r rpool/data | grep vm-100
+   ```
+
+   ```bash title="root@desopve01"
+   qm list
+   zfs list -t all -o name,creation -r rpool/data | grep vm-100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    rpool/data/vm-100-disk-0                                 Mon Nov  9 14:22 2026
    rpool/data/vm-100-disk-0@__replicate_100-0_1794230814__  Mon Nov  9 14:26 2026
    rpool/data/vm-100-disk-0@__replicate_100-1_1794230881__  Mon Nov  9 14:28 2026
@@ -323,8 +389,11 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 3. Riporta la VM sul suo nodo. Grazie alla replica la migrazione richiede di nuovo pochi secondi:
 
-   ```console
-   root@desopve02:~# qm migrate 100 desopve01 --online --with-local-disks
+   ```bash title="root@desopve02"
+   qm migrate 100 desopve01 --online --with-local-disks
+   ```
+
+   ``` { .text .no-copy title="Output" }
    …
    2026-11-09 14:36:43 incremental sync 'local-zfs:vm-100-disk-0' (__replicate_100-1_1794231361__ => __replicate_100-1_1794231402__)
    drive mirror re-using dirty bitmap 'repl_scsi0'
@@ -335,13 +404,31 @@ La VM 100 gira su `desopve01` e viene replicata su `desopve02` e `desopve03`. Si
 
 Elimina i job di replica e i file di prova nella VM. Rimuovere un job è un'operazione in background: il job viene marcato con `remove_job full` e al giro successivo `pvescheduler` cancella i volumi replicati sulla destinazione e gli snapshot sulla sorgente.
 
-```console
-labuser@debian01:~$ rm -f $HOME/dati-*.bin $HOME/A-*.txt $HOME/B-*.txt
-root@desopve01:~# pvesr delete 100-0
+```bash title="labuser@debian01"
+rm -f $HOME/dati-*.bin $HOME/A-*.txt $HOME/B-*.txt
+```
+
+```bash title="root@desopve01"
+pvesr delete 100-0
+```
+
+``` { .text .no-copy title="Output" }
 Replication job removal is a background task and will take some time.
-root@desopve01:~# pvesr delete 100-1
+```
+
+```bash title="root@desopve01"
+pvesr delete 100-1
+```
+
+``` { .text .no-copy title="Output" }
 Replication job removal is a background task and will take some time.
-root@desopve01:~# grep -E "^local|remove_job" /etc/pve/replication.cfg
+```
+
+```bash title="root@desopve01"
+grep -E "^local|remove_job" /etc/pve/replication.cfg
+```
+
+``` { .text .no-copy title="Output" }
 local: 100-0
 	remove_job full
 local: 100-1
@@ -350,13 +437,28 @@ local: 100-1
 
 Un minuto dopo i job sono spariti, insieme alle copie sugli altri nodi:
 
-```console
-root@desopve01:~# cat /etc/pve/replication.cfg
-root@desopve01:~# zfs list -t all -o name -r rpool/data | grep vm-100
+```bash title="root@desopve01"
+cat /etc/pve/replication.cfg
+zfs list -t all -o name -r rpool/data | grep vm-100
+```
+
+``` { .text .no-copy title="Output" }
 rpool/data/vm-100-disk-0
-root@desopve01:~# ssh desopve02 'zfs list -t all -o name -r rpool/data | grep vm-100 || echo "nessun volume della VM 100"'
+```
+
+```bash title="root@desopve01"
+ssh desopve02 'zfs list -t all -o name -r rpool/data | grep vm-100 || echo "nessun volume della VM 100"'
+```
+
+``` { .text .no-copy title="Output" }
 nessun volume della VM 100
-root@desopve01:~# ssh desopve03 'zfs list -t all -o name -r rpool/data | grep vm-100 || echo "nessun volume della VM 100"'
+```
+
+```bash title="root@desopve01"
+ssh desopve03 'zfs list -t all -o name -r rpool/data | grep vm-100 || echo "nessun volume della VM 100"'
+```
+
+``` { .text .no-copy title="Output" }
 nessun volume della VM 100
 ```
 

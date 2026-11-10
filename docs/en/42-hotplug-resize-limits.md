@@ -92,7 +92,7 @@ qm set 145 --vcpus 4
 qm guest exec 145 -- bash -c 'nproc; cat /sys/devices/system/cpu/online; dmesg | grep hot-added'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2
 0-1
 [  137.463337] ACPI: CPU2 has been hot-added
@@ -114,7 +114,7 @@ qm set 145 --vcpus 2   # back to 2
 qm set 145 --vcpus 4
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 nproc: 4
 /sys/devices/system/cpu/online: 0-3
 ```
@@ -134,7 +134,7 @@ qm set 145 --memory 4096
 qm guest exec 145 -- bash -c 'free -m | sed -n 2p; lsmem --summary=only'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Mem:            3974         368        3122           0         708        3606
 Memory block size:                128M
 Total online memory:                4G
@@ -147,7 +147,7 @@ The extra 2 GiB arrive as DIMM modules and the Debian 13 kernel brings them onli
 qm set 145 --memory 2048
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 update VM 145: -memory 2048
 try to unplug memory dimm dimm5
 try to unplug memory dimm dimm4
@@ -167,7 +167,7 @@ qm set 145 --scsi1 local-lvm:4,iothread=1,discard=on
 qm guest exec 145 -- bash -c 'lsblk -dno NAME,SIZE,TYPE; ls -l /dev/disk/by-id/ | grep drive-scsi1'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 WARNING: Sum of all thin volume sizes (26.00 GiB) exceeds the size of thin pool pve/data and the amount of free space in volume group (<6.13 GiB).
 scsi1: successfully created disk 'local-lvm:vm-145-disk-1,discard=on,iothread=1,size=4G'
 sda    6G disk
@@ -182,7 +182,7 @@ qm set 145 --net1 virtio,bridge=vmbr0
 qm guest exec 145 -- ip -br link
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 eth0             UP             <BROADCAST,MULTICAST,UP,LOWER_UP>
 ens19            DOWN           <BROADCAST,MULTICAST>
 ```
@@ -197,7 +197,7 @@ qm set 145 --delete scsi1
 qm config 145 | grep unused
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 unused0: local-lvm:vm-145-disk-1
 ```
 
@@ -207,7 +207,7 @@ The network device disappears; the disk is detached from the guest but **not del
 qm disk unlink 145 --idlist unused0 --force
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Logical volume "vm-145-disk-1" successfully removed.
 ```
 
@@ -242,7 +242,7 @@ resize2fs /dev/sda1
 df -h /
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 CHANGED: partition=1 start=262144 old: size=12320735 end=12582878 new: size=20709343 end=20971486
 /dev/sda1       9.7G  1.2G  8.2G  13% /
 ```
@@ -289,7 +289,7 @@ qm set 146 --cpuunits 100
 qm set 147 --cpuunits 300
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 VM 146: 1.01 core   VM 147: 2.93 core   totale 3.94 core   rapporto 147/146 = 2.91
 cpu.weight 146=100  cpu.max 146=max 100000
 cpu.weight 147=300  cpu.max 147=max 100000
@@ -305,7 +305,7 @@ qm set 146 --delete cpuunits; qm set 147 --delete cpuunits
 qm set 147 --cpulimit 1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 VM 146: 2.92 core   VM 147: 1.00 core   totale 3.92 core   rapporto 147/146 = 0.34
 cpu.weight 146=100  cpu.max 146=max 100000
 cpu.weight 147=100  cpu.max 147=100000 100000

@@ -202,23 +202,29 @@ Configura lo switch come descritto in [Lo switch](#lo-switch). Le istruzioni cam
 
 1. Collegati al router dalla porta `ether1` (con WinBox o in SSH, all'indirizzo di fabbrica) e azzeralo **senza** la configurazione di fabbrica, che su molti modelli attiva NAT, firewall e server DHCP:
 
-   ```text
-   [admin@MikroTik] > /system reset-configuration no-defaults=yes skip-backup=yes
+   ```text title="RouterOS — MikroTik"
+   /system reset-configuration no-defaults=yes skip-backup=yes
    ```
 
 2. Dopo il riavvio, carica il file [`rtr-core-base.rsc`](../files/01/rtr-core-base.rsc) dalla sezione *Files* e importalo, poi imposta la password:
 
-   ```text
-   [admin@MikroTik] > /import file-name=rtr-core-base.rsc
-   [admin@rtr-core] > /user set admin password=<password-lab>
+   ```text title="RouterOS — MikroTik"
+   /import file-name=rtr-core-base.rsc
+   ```
+
+   ```text title="RouterOS — rtr-core"
+   /user set admin password=<password-lab>
    ```
 
    Il file assegna il nome `rtr-core` e i due indirizzi del gateway, entrambi su `ether1`: le due reti del laboratorio viaggiano sulla stessa porta.
 
 3. Controlla gli indirizzi e le route:
 
-   ```text
-   [admin@rtr-core] > /ip address print
+   ```text title="RouterOS — rtr-core"
+   /ip address print
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Columns: ADDRESS, NETWORK, INTERFACE, VRF
    # ADDRESS          NETWORK       INTERFACE  VRF 
    ;;; rete di gestione
@@ -274,8 +280,11 @@ Annota la password che userai per tutto il laboratorio: nel manuale compare come
 
 - [ ] Il router risponde su entrambe le reti. Da `netsvc`:
 
-  ```console
-  $ ping -c3 172.27.199.1
+  ```bash title="netsvc"
+  ping -c3 172.27.199.1
+  ```
+
+  ``` { .text .no-copy title="Output" }
   PING 172.27.199.1 (172.27.199.1) 56(84) bytes of data.
   64 bytes from 172.27.199.1: icmp_seq=1 ttl=64 time=0.562 ms
   64 bytes from 172.27.199.1: icmp_seq=2 ttl=64 time=0.694 ms
@@ -284,7 +293,13 @@ Annota la password che userai per tutto il laboratorio: nel manuale compare come
   --- 172.27.199.1 ping statistics ---
   3 packets transmitted, 3 received, 0% packet loss, time 2032ms
   rtt min/avg/max/mdev = 0.562/0.754/1.008/0.187 ms
-  $ ping -c3 172.32.199.1
+  ```
+
+  ```bash title="netsvc"
+  ping -c3 172.32.199.1
+  ```
+
+  ``` { .text .no-copy title="Output" }
   PING 172.32.199.1 (172.32.199.1) 56(84) bytes of data.
   64 bytes from 172.32.199.1: icmp_seq=1 ttl=64 time=0.569 ms
   64 bytes from 172.32.199.1: icmp_seq=2 ttl=64 time=0.684 ms
@@ -297,21 +312,39 @@ Annota la password che userai per tutto il laboratorio: nel manuale compare come
 
 - [ ] Il proxy lascia passare i siti consentiti, anche in HTTPS, e blocca gli altri:
 
-  ```console
-  $ curl -s -x http://172.27.199.250:3128 -I http://deb.debian.org/debian/ | head -1
+  ```bash title="netsvc"
+  curl -s -x http://172.27.199.250:3128 -I http://deb.debian.org/debian/ | head -1
+  ```
+
+  ``` { .text .no-copy title="Output" }
   HTTP/1.1 200 OK
-  $ curl -s -x http://172.27.199.250:3128 -I https://download.proxmox.com/ | head -1
+  ```
+
+  ```bash title="netsvc"
+  curl -s -x http://172.27.199.250:3128 -I https://download.proxmox.com/ | head -1
+  ```
+
+  ``` { .text .no-copy title="Output" }
   HTTP/1.0 200 Connection established
-  $ curl -s -x http://172.27.199.250:3128 -I http://www.example.com/ | head -1
+  ```
+
+  ```bash title="netsvc"
+  curl -s -x http://172.27.199.250:3128 -I http://www.example.com/ | head -1
+  ```
+
+  ``` { .text .no-copy title="Output" }
   HTTP/1.1 403 Filtered
   ```
 
-  La seconda riga è la risposta del proxy al `CONNECT`: il tunnel HTTPS verso `download.proxmox.com` è aperto.
+  Il secondo output è la risposta del proxy al `CONNECT`: il tunnel HTTPS verso `download.proxmox.com` è aperto.
 
 - [ ] `netsvc` è sincronizzato con un server NTP pubblico:
 
-  ```console
-  $ chronyc tracking | head -3
+  ```bash title="netsvc"
+  chronyc tracking | head -3
+  ```
+
+  ``` { .text .no-copy title="Output" }
   Reference ID    : B913B823 (radha.parvati.it)
   Stratum         : 3
   Ref time (UTC)  : Tue Nov 10 10:11:31 2026

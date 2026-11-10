@@ -60,7 +60,7 @@ pveam available --section turnkeylinux | wc -l
 pveam available --section system | grep -E "debian-13|alpine-3.23|ubuntu-2[46]"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 update successful
 112
 system          alpine-3.23-default_20261105_amd64.tar.xz                    amd64
@@ -82,7 +82,7 @@ pveam download cephfs alpine-3.23-default_20261105_amd64.tar.xz
 pveam download cephfs debian-13-turnkey-core_19.0-2_amd64.tar.gz
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Proxy request sent, awaiting response... 200 OK
 calculating checksum...OK, checksum verified
 Resolving mirror.turnkeylinux.org (mirror.turnkeylinux.org)... failed: Temporary failure in name resolution.
@@ -100,7 +100,7 @@ pvesh create /nodes/desopve01/storage/cephfs/download-url --content vztmpl \
   --checksum f70345d6b1d5…ba7f11 --checksum-algorithm sha512
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 02:35:47 (76.0 MB/s) - '/mnt/pve/cephfs/template/cache/debian-13-turnkey-core_19.0-2_amd64.tar.gz.tmp_dwnl.407164' saved [266734332/266734332]
 calculating checksum...OK, checksum verified
 ```
@@ -128,7 +128,7 @@ HTTPS_PROXY=http://proxy.proxmox.community:3128 skopeo copy \
   oci-archive:/mnt/pve/cephfs/template/cache/nginx_stable-alpine.tar
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Copying config sha256:1390db6b01a8b0c865b157c7f036b0772534418b1701f598737de546d208b6e4
 Writing manifest to image destination
 ```
@@ -142,7 +142,7 @@ pct start 143
 curl -s -o /dev/null -w "HTTP %{http_code}\n" http://172.27.199.143/
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Detected OCI archive
 Auto-Enabling host-managed network for network device net0.
 Detected container architecture: amd64
@@ -221,7 +221,7 @@ pct exec 141 -- cat /proc/self/uid_map
 pct exec 142 -- cat /proc/self/uid_map
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 CT 141:          0     100000      65536
 CT 142:          0          0 4294967295
 ```
@@ -233,7 +233,7 @@ P=$(lxc-info -n 141 -p -H); ps -o uid=,user=,pid=,cmd= -p $P
 P=$(lxc-info -n 142 -p -H); ps -o uid=,user=,pid=,cmd= -p $P
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 100000 100000   408967 /sbin/init
     0 root      409389 /sbin/init
 ```
@@ -247,7 +247,7 @@ P=$(lxc-info -n 141 -p -H); ls -ln /proc/$P/root/root/prova-lxc-unpriv
 P=$(lxc-info -n 142 -p -H); ls -ln /proc/$P/root/root/prova-lxc-priv
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ## CT 141
 -rw-r--r-- 1 100000 100000 0 Nov 10 02:39 prova-lxc-unpriv
 ## CT 142
@@ -265,7 +265,7 @@ pct set 141 -mp0 rbd-vm:4,mp=/data,backup=1
 pct exec 141 -- df -h /data
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 /dev/rbd5       3.9G  1.1M  3.7G   1% /data
 ```
 
@@ -278,7 +278,7 @@ pct exec 141 -- ls -ln /condivisa
 pct exec 141 -- touch /condivisa/scrivo-io
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -rw-r--r-- 1 65534 65534 21 Nov 10 01:39 leggimi.txt
 touch: cannot touch '/condivisa/scrivo-io': Permission denied
 ```
@@ -290,7 +290,7 @@ chown -R 100000:100000 /srv/condivisa
 pct exec 141 -- touch /condivisa/scrivo-io && ls -ln /srv/condivisa
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -rw-r--r-- 1 100000 100000 21 Nov 10 02:39 leggimi.txt
 -rw-r--r-- 1 100000 100000  0 Nov 10 02:39 scrivo-io
 ```
@@ -328,7 +328,7 @@ pct exec 141 -- su - ana -c 'echo modifica di ana >> /progetti/progetto.txt && t
 ls -ln /srv/progetti
 ```
 
-```text
+``` { .text .no-copy title="Output" }
          0     100000       1000
       1000       1000          1
       1001     101001      64535
@@ -364,7 +364,7 @@ pct set 141 -dev0 /dev/net/tun
 pct exec 141 -- ip tuntap add mode tun dev tun0 && pct exec 141 -- ip -br link show tun0
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 open: No such file or directory
 tun0             DOWN           <POINTOPOINT,MULTICAST,NOARP>
 ```
@@ -377,7 +377,7 @@ Il device si aggiunge a caldo.
 pct set 141 -features nesting=1,fuse=1 && pct reboot 141 && pct exec 141 -- ls -l /dev/fuse
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 crw-rw-rw- 1 nobody nogroup 10, 229 Nov  9 13:31 /dev/fuse
 ```
 
@@ -392,7 +392,7 @@ pct exec 142 -- mount -t nfs -o vers=4.2 172.27.199.10:/mnt/dati/nfs /mnt/nas
 pct exec 141 -- mount -t nfs -o vers=4.2 172.27.199.10:/mnt/dati/nfs /mnt/nas
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 CT 142: 172.27.199.10:/mnt/dati/nfs   54G     0   54G   0% /mnt/nas
 CT 141: mount.nfs: Operation not permitted for 172.27.199.10:/mnt/dati/nfs on /mnt/nas
 ```
@@ -440,7 +440,7 @@ Swap:              0           0           0
 ./misure.sh cpu 141 pct exec 141 -- stress-ng --cpu 2 --timeout 20s --metrics-brief
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 stress-ng: metrc: [1381] cpu               12146     20.05     10.00      0.02       605.90        1211.82
 CPU usata dal cgroup: 10.1 s su 21.3 s di orologio = 47% di un core
 ```
@@ -455,7 +455,7 @@ pct exec 141 -- stress-ng --vm 1 --vm-bytes 900M --vm-keep --timeout 20s >/dev/n
 journalctl -k --since "-2min" | grep -m1 "Memory cgroup out of memory" | sed 's/^.*kernel: //'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 t+3s memory.current=506 MiB swap.current=0 MiB
 t+6s memory.current=290 MiB swap.current=0 MiB
 t+9s memory.current=511 MiB swap.current=0 MiB
@@ -482,7 +482,7 @@ pct migrate 141 desopve02 --restart
 pct migrate 142 desopve02 --online
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 can't migrate running container without --online or --restart
 ERROR: migration aborted (duration 00:00:00): cannot migrate local bind mount point 'mp1'
 ERROR: migration aborted (duration 00:00:00): lxc live migration is currently not implemented
@@ -499,7 +499,7 @@ Il CT 142, senza bind mount e con il disco su `rbd-vm`. Mentre migra, da un altr
 pct migrate 142 desopve02 --restart
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 shutdown CT 142
 starting migration of CT 142 to node 'desopve02' (10.100.10.22)
 start container on target node

@@ -64,8 +64,11 @@ LVM thick non ha snapshot utilizzabili: gli snapshot classici di LVM (*copy-on-w
 
 1. Nella VM 100 crea un file che servirà da riferimento:
 
-   ```console
-   labuser@debian01:~$ echo "creato prima dello snapshot" > $HOME/prima.txt; sync; uptime -s
+   ```bash title="labuser@debian01"
+   echo "creato prima dello snapshot" > $HOME/prima.txt; sync; uptime -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2026-11-09 14:30:12
    ```
 
@@ -77,11 +80,20 @@ LVM thick non ha snapshot utilizzabili: gli snapshot classici di LVM (*copy-on-w
 
 3. Sul nodo guarda che cosa ha creato ZFS:
 
-   ```console
-   root@desopve01:~# qm listsnapshot 100
+   ```bash title="root@desopve01"
+   qm listsnapshot 100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    `-> con-ram                     2026-11-09 16:41:06     File prima.txt presente, RAM inclusa
     `-> current                                            You are here!
-   root@desopve01:~# zfs list -t all -o name,used,refer -r rpool/data | grep -E 'NAME|vm-100'
+   ```
+
+   ```bash title="root@desopve01"
+   zfs list -t all -o name,used,refer -r rpool/data | grep -E 'NAME|vm-100'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME                               USED  REFER
    rpool/data/vm-100-disk-0          5.86G  5.86G
    rpool/data/vm-100-disk-0@con-ram   804K  5.86G
@@ -93,13 +105,31 @@ LVM thick non ha snapshot utilizzabili: gli snapshot classici di LVM (*copy-on-w
 
 4. Nella VM cancella il file e creane un altro, poi fai il rollback:
 
-   ```console
-   labuser@debian01:~$ rm $HOME/prima.txt; echo "creato dopo lo snapshot" > $HOME/dopo.txt; sync
-   root@desopve01:~# time qm rollback 100 con-ram
+   ```bash title="labuser@debian01"
+   rm $HOME/prima.txt; echo "creato dopo lo snapshot" > $HOME/dopo.txt; sync
+   ```
+
+   ```bash title="root@desopve01"
+   time qm rollback 100 con-ram
+   ```
+
+   ``` { .text .no-copy title="Output" }
    real	0m4.404s
-   root@desopve01:~# qm status 100
+   ```
+
+   ```bash title="root@desopve01"
+   qm status 100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    status: running
-   labuser@debian01:~$ ls $HOME; uptime -s
+   ```
+
+   ```bash title="labuser@debian01"
+   ls $HOME; uptime -s
+   ```
+
+   ``` { .text .no-copy title="Output" }
    prima.txt
    2026-11-09 14:30:12
    ```
@@ -110,9 +140,12 @@ LVM thick non ha snapshot utilizzabili: gli snapshot classici di LVM (*copy-on-w
 
 1. Fai uno snapshot senza la RAM:
 
-   ```console
-   root@desopve01:~# qm snapshot 100 senza-ram --vmstate 0
-   root@desopve01:~# qm listsnapshot 100
+   ```bash title="root@desopve01"
+   qm snapshot 100 senza-ram --vmstate 0
+   qm listsnapshot 100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    `-> con-ram                     2026-11-09 16:41:06     File prima.txt presente, RAM inclusa
     `-> senza-ram                  2026-11-09 16:45:34     no-description
      `-> current                                           You are here!
@@ -120,8 +153,11 @@ LVM thick non ha snapshot utilizzabili: gli snapshot classici di LVM (*copy-on-w
 
 2. Prova a tornare al primo snapshot, che non è il più recente:
 
-   ```console
-   root@desopve01:~# qm rollback 100 con-ram
+   ```bash title="root@desopve01"
+   qm rollback 100 con-ram
+   ```
+
+   ``` { .text .no-copy title="Output" }
    can't rollback, 'con-ram' is not most recent snapshot on 'local-zfs:vm-100-disk-0'
    ```
 
@@ -129,19 +165,31 @@ LVM thick non ha snapshot utilizzabili: gli snapshot classici di LVM (*copy-on-w
 
 3. Fai il rollback a `senza-ram`: senza la RAM la VM si ritrova **spenta** e va riavviata.
 
-   ```console
-   root@desopve01:~# qm rollback 100 senza-ram; qm status 100
+   ```bash title="root@desopve01"
+   qm rollback 100 senza-ram; qm status 100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    status: stopped
-   root@desopve01:~# qm start 100
+   ```
+
+   ```bash title="root@desopve01"
+   qm start 100
    ```
 
 4. Cancella `senza-ram`: ora `con-ram` è il più recente e il rollback è permesso. Poi cancella anche `con-ram`.
 
-   ```console
-   root@desopve01:~# qm delsnapshot 100 senza-ram
-   root@desopve01:~# qm rollback 100 con-ram; qm status 100
+   ```bash title="root@desopve01"
+   qm delsnapshot 100 senza-ram
+   qm rollback 100 con-ram; qm status 100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    status: running
-   root@desopve01:~# qm delsnapshot 100 con-ram
+   ```
+
+   ```bash title="root@desopve01"
+   qm delsnapshot 100 con-ram
    ```
 
    Se `qm delsnapshot` risponde `can't lock file '/var/lock/qemu-server/lock-100.conf' - got timeout`, il rollback precedente sta ancora terminando: riprova dopo qualche secondo.
@@ -150,18 +198,27 @@ LVM thick non ha snapshot utilizzabili: gli snapshot classici di LVM (*copy-on-w
 
 Su uno storage di file con dischi qcow2 gli snapshot sono **interni** al file e si può tornare a uno qualsiasi. Usa una VM di prova senza sistema operativo:
 
-```console
-root@desopve01:~# qm create 110 --name snap-qcow2 --memory 512 --scsihw virtio-scsi-single --scsi0 nas-nfs:4,format=qcow2
-root@desopve01:~# qm snapshot 110 s1 --description "stato s1"
-root@desopve01:~# qm snapshot 110 s2 --description "stato s2"
-root@desopve01:~# qm rollback 110 s1
-root@desopve01:~# qm snapshot 110 s3 --description "dopo il rollback a s1"
-root@desopve01:~# qm listsnapshot 110
+```bash title="root@desopve01"
+qm create 110 --name snap-qcow2 --memory 512 --scsihw virtio-scsi-single --scsi0 nas-nfs:4,format=qcow2
+qm snapshot 110 s1 --description "stato s1"
+qm snapshot 110 s2 --description "stato s2"
+qm rollback 110 s1
+qm snapshot 110 s3 --description "dopo il rollback a s1"
+qm listsnapshot 110
+```
+
+``` { .text .no-copy title="Output" }
 `-> s1                          2026-11-09 16:46:35     stato s1
  `-> s2                         2026-11-09 16:46:36     stato s2
  `-> s3                         2026-11-09 16:46:39     dopo il rollback a s1
   `-> current                                           You are here!
-root@desopve01:~# qemu-img snapshot -l /mnt/pve/nas-nfs/images/110/vm-110-disk-0.qcow2
+```
+
+```bash title="root@desopve01"
+qemu-img snapshot -l /mnt/pve/nas-nfs/images/110/vm-110-disk-0.qcow2
+```
+
+``` { .text .no-copy title="Output" }
 Snapshot list:
 ID      TAG               VM_SIZE                DATE        VM_CLOCK     ICOUNT
 1       s1                    0 B 2026-11-09 16:46:35  0000:00:00.000          0
@@ -179,10 +236,13 @@ Creare o cancellare uno snapshot interno qcow2 **blocca la VM** per la durata de
 
 Su `desopve04` lo storage `local-lvm` è LVM-thin (lab 09):
 
-```console
-root@desopve04:~# qm create 940 --name snap-thin --memory 512 --scsihw virtio-scsi-single --scsi0 local-lvm:4
-root@desopve04:~# qm snapshot 940 prima
-root@desopve04:~# lvs -o lv_name,lv_attr,lv_size,pool_lv,origin,data_percent pve | grep -E 'LV|940'
+```bash title="root@desopve04"
+qm create 940 --name snap-thin --memory 512 --scsihw virtio-scsi-single --scsi0 local-lvm:4
+qm snapshot 940 prima
+lvs -o lv_name,lv_attr,lv_size,pool_lv,origin,data_percent pve | grep -E 'LV|940'
+```
+
+``` { .text .no-copy title="Output" }
   LV                       Attr       LSize   Pool Origin        Data%
   snap_vm-940-disk-0_prima Vri---tz-k   4.00g data vm-940-disk-0
   vm-940-disk-0            Vwi-a-tz--   4.00g data               0.00
@@ -194,9 +254,12 @@ Lo snapshot è un volume thin (`snap_vm-940-disk-0_prima`) che ha come origine i
 
 Sullo storage `nas-lvm` del lab 15, così come è stato creato, i dischi sono LV `raw`:
 
-```console
-root@desopve01:~# qm create 112 --name snap-lvm --memory 512 --scsihw virtio-scsi-single --scsi0 nas-lvm:4
-root@desopve01:~# qm snapshot 112 prova
+```bash title="root@desopve01"
+qm create 112 --name snap-lvm --memory 512 --scsihw virtio-scsi-single --scsi0 nas-lvm:4
+qm snapshot 112 prova
+```
+
+``` { .text .no-copy title="Output" }
 snapshot feature is not available
 ```
 
@@ -208,15 +271,24 @@ snapshot feature is not available
 
 2. L'opzione vale solo per i dischi **creati da quel momento**:
 
-   ```console
-   root@desopve01:~# grep -A6 "lvm: nas-lvm" /etc/pve/storage.cfg
+   ```bash title="root@desopve01"
+   grep -A6 "lvm: nas-lvm" /etc/pve/storage.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    lvm: nas-lvm
    	vgname vg_nas
    	content rootdir,images
    	saferemove 0
    	shared 1
    	snapshot-as-volume-chain 1
-   root@desopve01:~# qm snapshot 112 prova
+   ```
+
+   ```bash title="root@desopve01"
+   qm snapshot 112 prova
+   ```
+
+   ``` { .text .no-copy title="Output" }
    snapshot feature is not available
    ```
 
@@ -224,39 +296,75 @@ snapshot feature is not available
 
 3. Sposta a caldo il disco della VM 100 su `nas-lvm` in formato **qcow2**:
 
-   ```console
-   root@desopve01:~# qm disk move 100 scsi0 nas-lvm --format qcow2 --delete 1
+   ```bash title="root@desopve01"
+   qm disk move 100 scsi0 nas-lvm --format qcow2 --delete 1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 1m 57s, ready
    removing source volume 'local-zfs:vm-100-disk-0' after successful copy
-   root@desopve01:~# qm config 100 | grep scsi0
+   ```
+
+   ```bash title="root@desopve01"
+   qm config 100 | grep scsi0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    scsi0: nas-lvm:vm-100-disk-0.qcow2,iothread=1,size=16G
    ```
 
 4. Nella VM crea `a.txt`, fai lo snapshot `v1`, poi scrivi 300 MiB di dati e prova un secondo snapshot `v2`:
 
-   ```console
-   labuser@debian01:~$ echo uno > $HOME/a.txt; sync
-   root@desopve01:~# qm snapshot 100 v1 --vmstate 0 --description 'solo a.txt'
+   ```bash title="labuser@debian01"
+   echo uno > $HOME/a.txt; sync
+   ```
+
+   ```bash title="root@desopve01"
+   qm snapshot 100 v1 --vmstate 0 --description 'solo a.txt'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    blockdev replace current by v1
    blockdev-snapshot: reopen current with v1 backing image
-   labuser@debian01:~$ head -c 300M /dev/urandom > $HOME/b.bin; sync
-   root@desopve01:~# qm snapshot 100 v2 --vmstate 0 --description 'a.txt e b.bin (300 MiB)'
+   ```
+
+   ```bash title="labuser@debian01"
+   head -c 300M /dev/urandom > $HOME/b.bin; sync
+   ```
+
+   ```bash title="root@desopve01"
+   qm snapshot 100 v2 --vmstate 0 --description 'a.txt e b.bin (300 MiB)'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    snapshot create failed: starting cleanup
    lvcreate 'vg_nas/vm-100-disk-0.qcow2' error:   Volume group "vg_nas" has insufficient free space (1020 extents): 4097 required.
-   labuser@debian01:~$ echo tre > $HOME/c.txt; sync
+   ```
+
+   ```bash title="labuser@debian01"
+   echo tre > $HOME/c.txt; sync
    ```
 
    Il secondo snapshot non entra: nel gruppo da 40 GiB ci sono già il disco (16 GiB), lo snapshot `v1` (altri 16 GiB) e il disco della VM 112 (4 GiB). Ogni snapshot chiede un nuovo LV della **dimensione intera** del disco, anche se le differenze sono solo 300 MiB.
 
 5. Guarda la catena:
 
-   ```console
-   root@desopve01:~# lvs -o lv_name,lv_size,lv_attr vg_nas
+   ```bash title="root@desopve01"
+   lvs -o lv_name,lv_size,lv_attr vg_nas
+   ```
+
+   ``` { .text .no-copy title="Output" }
      LV                          LSize  Attr
      snap_vm-100-disk-0_v1.qcow2 16.00g -wi-ao----
      vm-100-disk-0.qcow2         16.00g -wi-ao----
      vm-112-disk-0                4.00g -wi-a-----
-   root@desopve01:~# qemu-img info --backing-chain /dev/vg_nas/vm-100-disk-0.qcow2 | grep -E '^image|backing file:'
+   ```
+
+   ```bash title="root@desopve01"
+   qemu-img info --backing-chain /dev/vg_nas/vm-100-disk-0.qcow2 | grep -E '^image|backing file:'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    image: /dev/vg_nas/vm-100-disk-0.qcow2
    backing file: snap_vm-100-disk-0_v1.qcow2 (actual path: /dev/vg_nas/snap_vm-100-disk-0_v1.qcow2)
    image: /dev/vg_nas/snap_vm-100-disk-0_v1.qcow2
@@ -270,15 +378,27 @@ snapshot feature is not available
 
 6. Rollback a `v1` (senza RAM, quindi la VM si ferma):
 
-   ```console
-   root@desopve01:~# time qm rollback 100 v1
+   ```bash title="root@desopve01"
+   time qm rollback 100 v1
+   ```
+
+   ``` { .text .no-copy title="Output" }
      Logical volume "vm-100-disk-0.qcow2" successfully removed.
      Rounding up size to full physical extent 16.00 GiB
      Logical volume "vm-100-disk-0.qcow2" created.
    Formatting '/dev/vg_nas/vm-100-disk-0.qcow2', fmt=qcow2 cluster_size=131072 extended_l2=on preallocation=metadata compression_type=zlib size=17179869184 backing_file=snap_vm-100-disk-0_v1.qcow2 backing_fmt=qcow2 lazy_refcounts=off refcount_bits=16
    real	0m3.610s
-   root@desopve01:~# qm start 100
-   labuser@debian01:~$ ls -s $HOME
+   ```
+
+   ```bash title="root@desopve01"
+   qm start 100
+   ```
+
+   ```bash title="labuser@debian01"
+   ls -s $HOME
+   ```
+
+   ``` { .text .no-copy title="Output" }
    total 4
    4 a.txt
    ```
@@ -287,8 +407,11 @@ snapshot feature is not available
 
 7. Cancellare uno snapshot vuol dire **fondere** le differenze nel volume sottostante:
 
-   ```console
-   root@desopve01:~# time qm delsnapshot 100 v1
+   ```bash title="root@desopve01"
+   time qm delsnapshot 100 v1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    commit-drive-scsi0: Completed successfully.
    commit-drive-scsi0: commit-job finished
    delete old /dev/vg_nas/vm-100-disk-0.qcow2
@@ -304,19 +427,40 @@ snapshot feature is not available
 
 Con un disco piccolo lo spazio basta per più snapshot. Cancella la VM 112 e crea una VM di prova da 4 GiB:
 
-```console
-root@desopve01:~# qm destroy 112 --purge
-root@desopve01:~# qm create 113 --name snap-chain --memory 512 --scsihw virtio-scsi-single --scsi0 nas-lvm:4
-root@desopve01:~# qm config 113 | grep scsi0
+```bash title="root@desopve01"
+qm destroy 112 --purge
+qm create 113 --name snap-chain --memory 512 --scsihw virtio-scsi-single --scsi0 nas-lvm:4
+qm config 113 | grep scsi0
+```
+
+``` { .text .no-copy title="Output" }
 scsi0: nas-lvm:vm-113-disk-0.qcow2,size=4G
-root@desopve01:~# qm snapshot 113 s1; qm snapshot 113 s2
-root@desopve01:~# lvs -o lv_name,lv_size vg_nas | grep 113
+```
+
+```bash title="root@desopve01"
+qm snapshot 113 s1; qm snapshot 113 s2
+lvs -o lv_name,lv_size vg_nas | grep 113
+```
+
+``` { .text .no-copy title="Output" }
   snap_vm-113-disk-0_s1.qcow2  4.00g
   snap_vm-113-disk-0_s2.qcow2  4.00g
   vm-113-disk-0.qcow2          4.00g
-root@desopve01:~# qm rollback 113 s1
+```
+
+```bash title="root@desopve01"
+qm rollback 113 s1
+```
+
+``` { .text .no-copy title="Output" }
 can't rollback, 's1' is not most recent snapshot on 'vm-113-disk-0.qcow2'
-root@desopve01:~# qm delsnapshot 113 s1
+```
+
+```bash title="root@desopve01"
+qm delsnapshot 113 s1
+```
+
+``` { .text .no-copy title="Output" }
 vm-113-disk-0.qcow2: deleting snapshot 's1' by commiting snapshot 's2'
 running 'qemu-img commit /dev/vg_nas/snap_vm-113-disk-0_s2.qcow2'
 Image committed.
@@ -343,14 +487,29 @@ rename snap_vm-113-disk-0_s1.qcow2 to snap_vm-113-disk-0_s2.qcow2
 
 Cancella le VM di prova, riporta il disco della VM 100 su `local-zfs` (con la volume chain non si sposta un disco che ha snapshot: vanno cancellati prima) e disattiva la volume chain, in anteprima tecnologica, sullo storage condiviso usato dai lab successivi:
 
-```console
-root@desopve01:~# qm destroy 113 --purge; qm destroy 110 --purge
-root@desopve04:~# qm destroy 940 --purge
-root@desopve01:~# qm disk move 100 scsi0 local-zfs --delete 1
+```bash title="root@desopve01"
+qm destroy 113 --purge; qm destroy 110 --purge
+```
+
+```bash title="root@desopve04"
+qm destroy 940 --purge
+```
+
+```bash title="root@desopve01"
+qm disk move 100 scsi0 local-zfs --delete 1
+```
+
+``` { .text .no-copy title="Output" }
 mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 2m 2s, ready
 removing source volume 'nas-lvm:vm-100-disk-0.qcow2' after successful copy
-root@desopve01:~# pvesm set nas-lvm --delete snapshot-as-volume-chain
-labuser@debian01:~$ rm -f $HOME/a.txt
+```
+
+```bash title="root@desopve01"
+pvesm set nas-lvm --delete snapshot-as-volume-chain
+```
+
+```bash title="labuser@debian01"
+rm -f $HOME/a.txt
 ```
 
 ## Stato finale del lab

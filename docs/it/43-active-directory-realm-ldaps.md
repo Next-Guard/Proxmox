@@ -56,7 +56,7 @@ Install-AdcsCertificationAuthority -CAType EnterpriseRootCA -CACommonName "PROXM
 Get-Service CertSvc
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Install-WindowsFeature: Success=True Restart=No Features=Active Directory Certificate Services, Certification Authority, Active Directory Certificate Services Tools, Certification Authority Management Tools
 Install-AdcsCertificationAuthority: ErrorId=0
 
@@ -76,7 +76,7 @@ certutil -pulse
 Get-ChildItem Cert:\LocalMachine\My
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 CertUtil: -pulse command completed successfully.
 CN=desopve-dc01.proxmox.community | CN=PROXMOX-CA, DC=proxmox, DC=community | Client Authentication,Server Authentication | 2027-11-10 | DNS Name=desopve-dc01.proxmox.community
 ```
@@ -91,7 +91,7 @@ AD DS lo usa subito, senza riavvio. Dal nodo `desopve01`:
 openssl s_client -connect desopve-dc01.proxmox.community:636 </dev/null 2>&1 | grep -E "subject=|issuer=|Verify return code"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 subject=CN=desopve-dc01.proxmox.community
 issuer=DC=community, DC=proxmox, CN=PROXMOX-CA
 Verify return code: 21 (unable to verify the first certificate)
@@ -119,7 +119,7 @@ Il file arriva nella home di `root` di ogni nodo, con l'OpenSSH del [Lab 05](05-
 openssl x509 -in proxmox-ca.pem -noout -subject -dates -fingerprint -sha256
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 subject=DC = community, DC = proxmox, CN = PROXMOX-CA
 notBefore=Nov 10 02:12:38 2026 GMT
 notAfter=Nov 10 02:22:38 2036 GMT
@@ -134,7 +134,7 @@ update-ca-certificates
 openssl s_client -connect desopve-dc01.proxmox.community:636 -verify_hostname desopve-dc01.proxmox.community </dev/null 2>&1 | grep -E "^depth|Verify return code"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == desopve01
 depth=1 DC=community, DC=proxmox, CN=PROXMOX-CA
 depth=0 CN=desopve-dc01.proxmox.community
@@ -182,7 +182,7 @@ New-ADUser -Name 'Utente Esterno' -SamAccountName utente.esterno -UserPrincipalN
   -Path "CN=Users,$base" -AccountPassword $pw -Enabled $true
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 ObjectClass        DistinguishedName
 -----------        -----------------
 user               CN=Laura Bianchi,OU=Utenti,OU=PVE,DC=proxmox,DC=community
@@ -247,7 +247,7 @@ mv /usr/local/share/ca-certificates/proxmox-ca.crt /root/ && update-ca-certifica
 pveum realm sync proxmox.community --dry-run
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 (dry test run) starting sync for realm proxmox.community
 SSL connect attempt failed error:0A000086:SSL routines::certificate verify failed
 ```
@@ -285,7 +285,7 @@ pveum realm modify proxmox.community --filter \
 pveum realm sync proxmox.community --dry-run
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 adding user 'laura.bianchi@proxmox.community'
 adding user 'mario.rossi@proxmox.community'
 adding user 'paolo.verdi@proxmox.community'
@@ -301,7 +301,7 @@ Ora la sincronizzazione vera, dal pulsante **Sync** della GUI o da CLI:
 pveum realm sync proxmox.community
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 successfully updated users and groups configuration
 laura.bianchi@proxmox.community Laura Bianchi laura.bianchi@proxmox.community enable=1
 mario.rossi@proxmox.community Mario Rossi mario.rossi@proxmox.community enable=1
@@ -388,7 +388,7 @@ t utente.esterno@proxmox.community '<password-lab>'
 t svc-pve-ldap@proxmox.community '<password-lab>'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 mario.rossi@proxmox.community -> HTTP 200
 mario.rossi@proxmox.community -> HTTP 401
 utente.esterno@proxmox.community -> HTTP 401

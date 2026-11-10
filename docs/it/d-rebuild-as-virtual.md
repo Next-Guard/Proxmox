@@ -65,8 +65,11 @@ Due accorgimenti sui dischi:
 
 1. Verifica che l'annidamento sia attivo nel modulo KVM:
 
-   ```text
-   root@desopve03:~# cat /sys/module/kvm_intel/parameters/nested
+   ```bash title="root@desopve03"
+   cat /sys/module/kvm_intel/parameters/nested
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Y
    ```
 
@@ -97,27 +100,33 @@ La prova usa una VM-nodo piccola (2 vCPU, 4 GB, un disco), installata in automat
 
 1. Crea la VM con il tipo di CPU `host` e avviala:
 
-   ```text
-   root@desopve03:~# qm create 801 --name pve-virt01 --memory 4096 --cores 2 --cpu host --machine q35 \
+   ```bash title="root@desopve03"
+   qm create 801 --name pve-virt01 --memory 4096 --cores 2 --cpu host --machine q35 \
          --bios ovmf --efidisk0 local-zfs:1,efitype=4m,pre-enrolled-keys=0 --scsihw virtio-scsi-single \
          --scsi0 local-zfs:32,discard=on,iothread=1 --net0 virtio,bridge=vmbr0 \
          --ide2 local:iso/pve92-auto.iso,media=cdrom --boot "order=scsi0;ide2" --ostype l26
-   root@desopve03:~# qm start 801
+   qm start 801
    ```
 
    Circa cinque minuti dopo l'installazione è finita e il nodo risponde in SSH.
 
 2. Aggiungi la scheda trunk verso le VLAN delle VM. `trunks=10;20` lascia passare solo le VLAN 10 e 20:
 
-   ```text
-   root@desopve03:~# qm set 801 --net1 "virtio,bridge=vmbr1,trunks=10;20"
+   ```bash title="root@desopve03"
+   qm set 801 --net1 "virtio,bridge=vmbr1,trunks=10;20"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    update VM 801: -net1 virtio,bridge=vmbr1,trunks=10;20
    ```
 
    La configurazione della VM-nodo:
 
-   ```text
-   root@desopve03:~# qm config 801
+   ```bash title="root@desopve03"
+   qm config 801
+   ```
+
+   ``` { .text .no-copy title="Output" }
    bios: ovmf
    boot: order=scsi0;ide2
    cores: 2
@@ -140,15 +149,30 @@ La prova usa una VM-nodo piccola (2 vCPU, 4 GB, un disco), installata in automat
 
 1. Il nodo è Proxmox VE 9.2 e vede le estensioni di virtualizzazione:
 
-   ```text
-   root@pve-virt01:~# hostname -f; pveversion
+   ```bash title="root@pve-virt01"
+   hostname -f; pveversion
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pve-virt01.proxmox.community
    pve-manager/9.2.2/b9984c6d90a4bd80 (running kernel: 7.0.2-6-pve)
-   root@pve-virt01:~# lscpu | grep -E "Virtualization|Hypervisor vendor"
+   ```
+
+   ```bash title="root@pve-virt01"
+   lscpu | grep -E "Virtualization|Hypervisor vendor"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Virtualization:                          VT-x
    Hypervisor vendor:                       KVM
    Virtualization type:                     full
-   root@pve-virt01:~# ls -l /dev/kvm
+   ```
+
+   ```bash title="root@pve-virt01"
+   ls -l /dev/kvm
+   ```
+
+   ``` { .text .no-copy title="Output" }
    crw-rw---- 1 root kvm 10, 232 Nov 10 11:26 /dev/kvm
    ```
 
@@ -156,13 +180,25 @@ La prova usa una VM-nodo piccola (2 vCPU, 4 GB, un disco), installata in automat
 
 2. Una VM annidata parte con l'accelerazione KVM. La VM di prova non ha dischi: basta che si avvii.
 
-   ```text
-   root@pve-virt01:~# qm create 100 --name test-l2 --memory 256 --cores 1 --net0 virtio,bridge=vmbr0
-   root@pve-virt01:~# qm start 100
-   root@pve-virt01:~# qm status 100
+   ```bash title="root@pve-virt01"
+   qm create 100 --name test-l2 --memory 256 --cores 1 --net0 virtio,bridge=vmbr0
+   qm start 100
+   qm status 100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    status: running
-   root@pve-virt01:~# qm monitor 100
-   qm> info kvm
+   ```
+
+   ```bash title="root@pve-virt01"
+   qm monitor 100
+   ```
+
+   ```text title="qm monitor"
+   info kvm
+   ```
+
+   ``` { .text .no-copy title="Output" }
    kvm support: enabled
    ```
 
@@ -172,12 +208,15 @@ La prova usa una VM-nodo piccola (2 vCPU, 4 GB, un disco), installata in automat
 
 3. Il trunk porta le VLAN consentite fino al resto del laboratorio. Dentro la VM-nodo la seconda scheda è `ens19`: un'interfaccia temporanea sulla VLAN 10 raggiunge il gateway della VLAN (`router01`, [Lab 26](26-virtual-router.md)) e un container su un altro nodo:
 
-   ```text
-   root@pve-virt01:~# ip link set ens19 up
-   root@pve-virt01:~# ip link add link ens19 name ens19.10 type vlan id 10
-   root@pve-virt01:~# ip addr add 10.10.10.82/24 dev ens19.10
-   root@pve-virt01:~# ip link set ens19.10 up
-   root@pve-virt01:~# ping -c3 -W1 10.10.10.1
+   ```bash title="root@pve-virt01"
+   ip link set ens19 up
+   ip link add link ens19 name ens19.10 type vlan id 10
+   ip addr add 10.10.10.82/24 dev ens19.10
+   ip link set ens19.10 up
+   ping -c3 -W1 10.10.10.1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    PING 10.10.10.1 (10.10.10.1) 56(84) bytes of data.
    64 bytes from 10.10.10.1: icmp_seq=1 ttl=64 time=3.86 ms
    64 bytes from 10.10.10.1: icmp_seq=2 ttl=64 time=0.930 ms
@@ -186,7 +225,13 @@ La prova usa una VM-nodo piccola (2 vCPU, 4 GB, un disco), installata in automat
    --- 10.10.10.1 ping statistics ---
    3 packets transmitted, 3 received, 0% packet loss, time 2003ms
    rtt min/avg/max/mdev = 0.930/2.083/3.860/1.274 ms
-   root@pve-virt01:~# ping -c3 -W1 10.10.10.122
+   ```
+
+   ```bash title="root@pve-virt01"
+   ping -c3 -W1 10.10.10.122
+   ```
+
+   ``` { .text .no-copy title="Output" }
    PING 10.10.10.122 (10.10.10.122) 56(84) bytes of data.
    64 bytes from 10.10.10.122: icmp_seq=1 ttl=64 time=2.66 ms
    64 bytes from 10.10.10.122: icmp_seq=2 ttl=64 time=1.61 ms
@@ -199,11 +244,14 @@ La prova usa una VM-nodo piccola (2 vCPU, 4 GB, un disco), installata in automat
 
 4. Una VLAN fuori da `trunks` non passa. La VLAN 100 è la rete di migrazione del [Lab 22](22-dedicated-networks.md):
 
-   ```text
-   root@pve-virt01:~# ip link add link ens19 name ens19.100 type vlan id 100
-   root@pve-virt01:~# ip addr add 10.100.10.82/24 dev ens19.100
-   root@pve-virt01:~# ip link set ens19.100 up
-   root@pve-virt01:~# ping -c3 -W1 10.100.10.21
+   ```bash title="root@pve-virt01"
+   ip link add link ens19 name ens19.100 type vlan id 100
+   ip addr add 10.100.10.82/24 dev ens19.100
+   ip link set ens19.100 up
+   ping -c3 -W1 10.100.10.21
+   ```
+
+   ``` { .text .no-copy title="Output" }
    PING 10.100.10.21 (10.100.10.21) 56(84) bytes of data.
 
    --- 10.100.10.21 ping statistics ---
@@ -216,12 +264,18 @@ La prova usa una VM-nodo piccola (2 vCPU, 4 GB, un disco), installata in automat
 
 La VM di prova ha esaurito il suo compito. La ISO preparata contiene la password di `root` in chiaro, quindi va distrutta con `shred`:
 
-```text
-root@desopve03:~# qm stop 801 && qm destroy 801 --purge 1 --destroy-unreferenced-disks 1
+```bash title="root@desopve03"
+qm stop 801 && qm destroy 801 --purge 1 --destroy-unreferenced-disks 1
+```
+
+``` { .text .no-copy title="Output" }
 purging VM 801 from related configurations..
-root@desopve03:~# shred -u /var/lib/vz/template/iso/pve92-auto.iso /dev/shm/answer.toml
-root@desopve03:~# rm -f /var/lib/vz/template/iso/proxmox-ve_9.2-1.iso
-root@desopve03:~# apt remove proxmox-auto-install-assistant
+```
+
+```bash title="root@desopve03"
+shred -u /var/lib/vz/template/iso/pve92-auto.iso /dev/shm/answer.toml
+rm -f /var/lib/vz/template/iso/proxmox-ve_9.2-1.iso
+apt remove proxmox-auto-install-assistant
 ```
 
 ## Cosa cambia rispetto ai server fisici

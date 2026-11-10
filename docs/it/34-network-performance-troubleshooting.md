@@ -79,7 +79,7 @@ sudo apt-get update && sudo apt-get install -y iperf3
 echo "$(hostname): $(iperf3 --version | head -1); code: $(ls /sys/class/net/eth0/queues | tr '\n' ' ')"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 perf-341: iperf 3.18 (cJSON 1.7.15); code: rx-0 tx-0
 perf-342: iperf 3.18 (cJSON 1.7.15); code: rx-0 tx-0
 ```
@@ -129,7 +129,7 @@ ls /sys/class/net/eth0/queues | tr '\n' ' '; echo
 ethtool -l eth0 | grep -E "parameters|maximums|hardware|Combined"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 rx-0 rx-1 rx-2 rx-3 tx-0 tx-1 tx-2 tx-3
 Channel parameters for eth0:
 Pre-set maximums:
@@ -177,7 +177,7 @@ tc -s qdisc show dev tap342i0
 tc filter show dev tap342i0 parent ffff: | grep police
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 qdisc htb 1: root refcnt 257 r2q 10 default 0x1 direct_packets_stat 1 direct_qlen 1000
  Sent 13626 bytes 9 pkt (dropped 0, overlimits 0 requeues 0)
  backlog 0b 0p requeues 0
@@ -214,7 +214,7 @@ for i in nic0 tap341i0; do
 done
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -- nic0
 rx-checksumming: on
 tx-checksumming: on
@@ -238,7 +238,7 @@ ping -M do -s 1472 -c1 172.27.199.22 | grep transmitted
 ping -M do -s 1473 -c1 172.27.199.22
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
 PING 172.27.199.22 (172.27.199.22) 1473(1501) bytes of data.
 ping: sendmsg: Message too long
@@ -319,7 +319,7 @@ veth122i0         11 PVID Egress Untagged
 pct set 122 --net0 name=eth0,bridge=vmbr1,gw=10.10.10.1,hwaddr=BC:24:11:10:9A:74,ip=10.10.10.122/24,tag=10,type=veth
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 veth122i0         10 PVID Egress Untagged
 2 packets transmitted, 2 received, 0% packet loss, time 1001ms
 ```
@@ -438,7 +438,7 @@ La prima riga è il ping verso 10.10.10.121, la seconda quello verso 172.27.199.
 pct set 122 --net0 name=eth0,bridge=vmbr1,gw=10.10.10.1,hwaddr=BC:24:11:10:9A:74,ip=10.10.10.122/24,tag=10,type=veth
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 default via 10.10.10.1 dev eth0
 1 packets transmitted, 1 received, 0% packet loss, time 0ms
 ```
@@ -481,7 +481,7 @@ pct set 404 --net0 bridge=vmbr0,name=eth0,gw=172.27.199.1,hwaddr=BC:24:11:3C:C6:
 ip link del vmbr7
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1002ms
 ```
 
@@ -524,7 +524,7 @@ Nella tabella NAT di `desopve02` le regole SNAT delle zone SDN compaiono più vo
 iptables -t nat -S POSTROUTING | sort | uniq -c | sort -rn | head -4
 ```
 
-```text
+``` { .text .no-copy title="Output" }
      12 -A POSTROUTING -s 10.60.60.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.22
       5 -A POSTROUTING -s 10.72.72.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.22
       5 -A POSTROUTING -s 10.71.71.0/24 -o vmbr0 -j SNAT --to-source 172.27.199.22

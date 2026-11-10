@@ -68,15 +68,24 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 1. Spegni `desopve04` (i suoi guest sono spenti o non ci sono), monta la seconda scheda a una porta, cablala verso lo switch e riaccendi il nodo. La porta nuova compare con il nome di sistema (`ens<N>`, assegnato da udev). Si fissa il nome come nel lab 20:
 
-   ```console
-   root@desopve04:~# cp /etc/network/interfaces /root/interfaces.bak-lab23
-   root@desopve04:~# pve-network-interface-pinning generate --interface ens<N> --target-name nic3
+   ```bash title="root@desopve04"
+   cp /etc/network/interfaces /root/interfaces.bak-lab23
+   pve-network-interface-pinning generate --interface ens<N> --target-name nic3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Name for link 'ens<N>' (enp<B>s<S>f<F>, enx<MAC>) will change to 'nic3'
    Generating link files
    Successfully generated .link files in '/usr/local/lib/systemd/network/'
    ...
-   root@desopve04:~# udevadm trigger -c add /sys/class/net/ens<N>; udevadm settle
-   root@desopve04:~# ip -br link | grep -E "^nic"
+   ```
+
+   ```bash title="root@desopve04"
+   udevadm trigger -c add /sys/class/net/ens<N>; udevadm settle
+   ip -br link | grep -E "^nic"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nic0             UP             <MAC> <BROADCAST,MULTICAST,UP,LOWER_UP>
    nic1             UP             <MAC> <BROADCAST,MULTICAST,UP,LOWER_UP>
    nic2             UP             <MAC> <BROADCAST,MULTICAST,UP,LOWER_UP>
@@ -85,13 +94,28 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 2. Installa Open vSwitch (scaricato tramite il proxy):
 
-   ```console
-   root@desopve04:~# apt install openvswitch-switch
+   ```bash title="root@desopve04"
+   apt install openvswitch-switch
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ...
    Setting up openvswitch-switch (3.5.0-1+b1) ...
-   root@desopve04:~# systemctl is-active openvswitch-switch
+   ```
+
+   ```bash title="root@desopve04"
+   systemctl is-active openvswitch-switch
+   ```
+
+   ``` { .text .no-copy title="Output" }
    active
-   root@desopve04:~# ovs-vsctl show
+   ```
+
+   ```bash title="root@desopve04"
+   ovs-vsctl show
+   ```
+
+   ``` { .text .no-copy title="Output" }
    6704ca2b-e02a-493d-a7bc-582606dafa2e
        ovs_version: "3.5.0"
    ```
@@ -155,12 +179,15 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 1. Crea il CT 401 con la scheda su `vmbr2` e il tag 10. Dalla GUI si sceglie **Bridge** `vmbr2` e **VLAN Tag** `10`, come con un Linux bridge; da riga di comando:
 
-   ```console
-   root@desopve04:~# pct create 401 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
+   ```bash title="root@desopve04"
+   pct create 401 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
        --hostname ovs-ct1 --memory 512 --cores 1 --rootfs local-lvm:4 \
        --net0 name=eth0,bridge=vmbr2,tag=10,ip=10.10.10.124/24 \
        --unprivileged 1 --features nesting=1 --password '<password-lab>' --start 1
-   root@desopve04:~# pct config 401 | grep net0
+   pct config 401 | grep net0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    net0: name=eth0,bridge=vmbr2,hwaddr=BC:24:11:2B:5F:96,ip=10.10.10.124/24,tag=10,type=veth
    ```
 
@@ -168,16 +195,31 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 2. Il container raggiunge il CT 122, che sta su un **Linux bridge** di `desopve02`, e la porta interna del nodo. Il tag 802.1Q è lo stesso standard: per la rete non importa che tipo di switch software lo abbia messo.
 
-   ```console
-   root@desopve04:~# pct exec 401 -- ping -c3 -W1 10.10.10.122
+   ```bash title="root@desopve04"
+   pct exec 401 -- ping -c3 -W1 10.10.10.122
+   ```
+
+   ``` { .text .no-copy title="Output" }
    64 bytes from 10.10.10.122: icmp_seq=1 ttl=64 time=2.21 ms
    64 bytes from 10.10.10.122: icmp_seq=2 ttl=64 time=0.606 ms
    64 bytes from 10.10.10.122: icmp_seq=3 ttl=64 time=0.572 ms
    3 packets transmitted, 3 received, 0% packet loss, time 2061ms
-   root@desopve04:~# pct exec 401 -- ping -c3 -W1 10.10.10.24 | tail -2
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 401 -- ping -c3 -W1 10.10.10.24 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2015ms
    rtt min/avg/max/mdev = 0.164/0.454/1.029/0.406 ms
-   root@desopve04:~# pct exec 401 -- ping -c2 -W1 10.20.20.123
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 401 -- ping -c2 -W1 10.20.20.123
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ping: connect: Network is unreachable
    ```
 
@@ -187,8 +229,11 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 1. **La struttura dello switch:** porte, membri del bond, tag.
 
-   ```console
-   root@desopve04:~# ovs-vsctl show
+   ```bash title="root@desopve04"
+   ovs-vsctl show
+   ```
+
+   ``` { .text .no-copy title="Output" }
    6704ca2b-e02a-493d-a7bc-582606dafa2e
        Bridge vmbr2
            Port bond1
@@ -211,8 +256,11 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 2. **La tabella dei MAC appresi**, con la VLAN di ciascuno:
 
-   ```console
-   root@desopve04:~# ovs-appctl fdb/show vmbr2
+   ```bash title="root@desopve04"
+   ovs-appctl fdb/show vmbr2
+   ```
+
+   ``` { .text .no-copy title="Output" }
     port  VLAN  MAC                Age
    LOCAL     0  de:b1:d7:6e:4e:4f   71
        2    10  bc:24:11:af:bc:fc   47
@@ -227,8 +275,11 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 3. **I flussi OpenFlow:** senza un controller c'è una sola regola, `NORMAL`, cioè "comportati da switch che impara i MAC".
 
-   ```console
-   root@desopve04:~# ovs-ofctl dump-flows vmbr2
+   ```bash title="root@desopve04"
+   ovs-ofctl dump-flows vmbr2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NXST_FLOW reply (xid=0x4):
     cookie=0x0, duration=71.116s, table=0, n_packets=16563, n_bytes=1310428, idle_age=0, priority=0 actions=NORMAL
    ```
@@ -237,17 +288,32 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 1. **active-backup, guasto del membro attivo.** Il membro attivo è `nic3`. Mentre il container manda 5 ping al secondo verso il CT 122, si spegne `nic3`:
 
-   ```console
-   root@desopve04:~# ovs-appctl bond/show bond1 | grep -E "active member|^member"
+   ```bash title="root@desopve04"
+   ovs-appctl bond/show bond1 | grep -E "active member|^member"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    active member mac: <MAC>(nic3)
    member nic2: enabled
    member nic3: enabled
-   root@desopve04:~# pct exec 401 -- ping -i 0.2 -c 75 -W1 10.10.10.122 > /tmp/p1.txt &
-   root@desopve04:~# ip link set nic3 down
-   root@desopve04:~# tail -2 /tmp/p1.txt
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 401 -- ping -i 0.2 -c 75 -W1 10.10.10.122 > /tmp/p1.txt &
+   ip link set nic3 down
+   tail -2 /tmp/p1.txt
+   ```
+
+   ``` { .text .no-copy title="Output" }
    75 packets transmitted, 75 received, 0% packet loss, time 15335ms
    rtt min/avg/max/mdev = 0.436/0.658/1.016/0.118 ms
-   root@desopve04:~# ovs-appctl bond/show bond1 | sed -n "/active-backup primary/,\$p"
+   ```
+
+   ```bash title="root@desopve04"
+   ovs-appctl bond/show bond1 | sed -n "/active-backup primary/,\$p"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    active-backup primary: <none>
    active member mac: <MAC>(nic2)
 
@@ -263,9 +329,12 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 2. **balance-slb.** La modalità si cambia anche a caldo:
 
-   ```console
-   root@desopve04:~# ovs-vsctl set port bond1 bond_mode=balance-slb
-   root@desopve04:~# ovs-appctl bond/show bond1
+   ```bash title="root@desopve04"
+   ovs-vsctl set port bond1 bond_mode=balance-slb
+   ovs-appctl bond/show bond1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ---- bond1 ----
    bond_mode: balance-slb
    ...
@@ -285,9 +354,12 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 3. **LACP senza partner.** `balance-tcp` richiede LACP:
 
-   ```console
-   root@desopve04:~# ovs-vsctl set port bond1 lacp=active bond_mode=balance-tcp
-   root@desopve04:~# ovs-appctl bond/show bond1 | grep -E "bond_mode|lacp_status|lacp_fallback|^member|may_enable"
+   ```bash title="root@desopve04"
+   ovs-vsctl set port bond1 lacp=active bond_mode=balance-tcp
+   ovs-appctl bond/show bond1 | grep -E "bond_mode|lacp_status|lacp_fallback|^member|may_enable"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    bond_mode: balance-tcp
    lacp_status: configured
    lacp_fallback_ab: false
@@ -295,10 +367,22 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
      may_enable: false
    member nic3: disabled
      may_enable: false
-   root@desopve04:~# ovs-appctl lacp/show bond1 | grep -E "actor sys_id|partner sys_id" | head -2
+   ```
+
+   ```bash title="root@desopve04"
+   ovs-appctl lacp/show bond1 | grep -E "actor sys_id|partner sys_id" | head -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
      actor sys_id: <MAC>
      partner sys_id: 00:00:00:00:00:00
-   root@desopve04:~# pct exec 401 -- ping -c3 -W1 10.10.10.122 | tail -1
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 401 -- ping -c3 -W1 10.10.10.122 | tail -1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 0 received, 100% packet loss, time 2083ms
    ```
 
@@ -306,22 +390,34 @@ Con `lacp=active` OVS negozia LACP (802.3ad) con lo switch. Se dall'altra parte 
 
 4. **Il ripiego in active-backup.** Con `lacp-fallback-ab` il bond torna a funzionare anche senza partner:
 
-   ```console
-   root@desopve04:~# ovs-vsctl set port bond1 other_config:lacp-fallback-ab=true
-   root@desopve04:~# ovs-appctl bond/show bond1 | grep -E "lacp_status|lacp_fallback|active member$"
+   ```bash title="root@desopve04"
+   ovs-vsctl set port bond1 other_config:lacp-fallback-ab=true
+   ovs-appctl bond/show bond1 | grep -E "lacp_status|lacp_fallback|active member$"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    lacp_status: configured
    lacp_fallback_ab: true
      active member
-   root@desopve04:~# pct exec 401 -- ping -c3 -W1 10.10.10.122 | tail -2
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 401 -- ping -c3 -W1 10.10.10.122 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2065ms
    rtt min/avg/max/mdev = 0.639/0.684/0.753/0.049 ms
    ```
 
 5. **Ritorno alla configurazione del file.** Le modifiche fatte con `ovs-vsctl` stanno nel database di OVS e non in `/etc/network/interfaces`: vanno annullate a mano, oppure scritte nel file con `ovs_options` (ad esempio `ovs_options bond_mode=balance-tcp lacp=active other_config:lacp-fallback-ab=true`).
 
-   ```console
-   root@desopve04:~# ovs-vsctl set port bond1 lacp=off bond_mode=active-backup -- remove port bond1 other_config lacp-fallback-ab
-   root@desopve04:~# ovs-vsctl get port bond1 bond_mode lacp other_config
+   ```bash title="root@desopve04"
+   ovs-vsctl set port bond1 lacp=off bond_mode=active-backup -- remove port bond1 other_config lacp-fallback-ab
+   ovs-vsctl get port bond1 bond_mode lacp other_config
+   ```
+
+   ``` { .text .no-copy title="Output" }
    active-backup
    off
    {}

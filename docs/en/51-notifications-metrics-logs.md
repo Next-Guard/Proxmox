@@ -50,7 +50,7 @@ The address of `root@pam` is `admin@proxmox.community`, set during the installat
 postqueue -p | head -8
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -Queue ID-  --Size-- ----Arrival Time---- -Sender/Recipient-------
 4339E298E9*    9722 Tue Nov 10 04:37:39  root@desopve01.proxmox.community
                                          admin@proxmox.community
@@ -89,7 +89,7 @@ pct create 151 cephfs:vztmpl/axllent_mailpit_latest.tar --hostname mailpit --unp
 pct start 151
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Detected OCI archive
 Auto-Enabling host-managed network for network device net0.
 Detected container architecture: amd64
@@ -136,7 +136,7 @@ The test, however, fails:
 pvesh create /cluster/notifications/targets/gotify/test
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 500 Could not test target: could not notify via endpoint(s): gotify: CONNECT proxy failed: proxy server responded 403/403
 ```
 
@@ -200,7 +200,7 @@ postqueue -f
 postqueue -p | tail -1
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Mail queue is empty
 ```
 
@@ -227,7 +227,7 @@ To test the error path you need a real error. A backup to a storage that does no
 vzdump 121 --storage backup-guasto --mode snapshot
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 INFO: notified via target `mail-to-root`
 INFO: notified via target `mailpit`
 INFO: notified via target `gotify`
@@ -267,7 +267,7 @@ apt-get update && apt-get install -y influxdb2 influxdb2-cli grafana rsyslog
 systemctl enable --now influxdb grafana-server
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 grafana 13.3.0
 influxdb2 2.9.1-1
 rsyslog 8.2504.0-1+deb13u2
@@ -330,7 +330,7 @@ The journal keeps the history of the services. The fencing of Lab 49, as seen by
 journalctl -u pve-ha-crm --since "2026-11-10 06:35" --until "2026-11-10 06:40" -o short-iso | grep -iE "fenc|recover|node .desopve03"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10T06:35:54+01:00 desopve01 pve-ha-crm[1679]: node 'desopve03': state changed from 'online' => 'unknown'
 2026-11-10T06:36:44+01:00 desopve01 pve-ha-crm[1679]: service 'vm:106': state changed from 'started' to 'fence'
 2026-11-10T06:36:44+01:00 desopve01 pve-ha-crm[1679]: node 'desopve03': state changed from 'unknown' => 'fence'
@@ -353,7 +353,7 @@ pvenode task list --limit 4
 tail -n 1 /var/log/pve/tasks/index
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 │ UPID:desopve01:000AED42:0064A85D:6AF2CCD8:vzdump:121:root@pam:     │ vzdump     │ 121 │ root@pam │ 2026-11-10 08:50:48 │ 2026-11-10 08:50:48 │ ERROR  │
 UPID:desopve01:000AED42:0064A85D:6AF2CCD8:vzdump:121:root@pam: 6AF2CCD8 could not activate storage 'backup-guasto': storage 'backup-guasto' does not exist …
 ```

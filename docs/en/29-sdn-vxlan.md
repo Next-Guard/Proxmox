@@ -76,18 +76,30 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
    #underlay VXLAN/EVPN
    ```
 
-   ```console
-   root@desopve02:~# ifreload -a
-   root@desopve02:~# ip -br -4 addr show vmbr1.61
+   ```bash title="root@desopve02"
+   ifreload -a
+   ip -br -4 addr show vmbr1.61
+   ```
+
+   ``` { .text .no-copy title="Output" }
    vmbr1.61@vmbr1   UP             10.61.10.22/24
    ```
 
 3. Measure the underlay MTU with the *don't fragment* bit: a 1500-byte IP packet (1472 bytes of data + 28 of headers) goes through, a 1501-byte one does not even leave the node.
 
-   ```console
-   root@desopve01:~# ping -c2 -W1 -M do -s 1472 10.61.10.23
+   ```bash title="root@desopve01"
+   ping -c2 -W1 -M do -s 1472 10.61.10.23
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1024ms
-   root@desopve01:~# ping -c1 -W1 -M do -s 1473 10.61.10.23
+   ```
+
+   ```bash title="root@desopve01"
+   ping -c1 -W1 -M do -s 1473 10.61.10.23
+   ```
+
+   ``` { .text .no-copy title="Output" }
    PING 10.61.10.23 (10.61.10.23) 1473(1501) bytes of data.
    ping: sendmsg: Message too long
    ```
@@ -111,9 +123,12 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 3. Apply and zone status; the same result on all three nodes:
 
-   ```console
-   root@desopve01:~# pvesh set /cluster/sdn
-   root@desopve01:~# pvesh get /nodes/desopve03/sdn/zones
+   ```bash title="root@desopve01"
+   pvesh set /cluster/sdn
+   pvesh get /nodes/desopve03/sdn/zones
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ┌───────────┬─────────┐
    │ status    │ zone    │
    ╞═══════════╪═════════╡
@@ -149,15 +164,21 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 2. The kernel confirms the VNI, the local address and the UDP port:
 
-   ```console
-   root@desopve01:~# ip -d link show vxlan_vnvx1 | grep -o "vxlan id .* dstport [0-9]*"
+   ```bash title="root@desopve01"
+   ip -d link show vxlan_vnvx1 | grep -o "vxlan id .* dstport [0-9]*"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    vxlan id 10062 local 10.61.10.21 srcport 0 0 dstport 4789
    ```
 
 3. The two all-zero MAC entries are the *head-end replication*: every broadcast frame, or frame addressed to an unknown MAC, is copied to both other nodes.
 
-   ```console
-   root@desopve01:~# bridge fdb show dev vxlan_vnvx1 | grep 00:00:00:00:00:00
+   ```bash title="root@desopve01"
+   bridge fdb show dev vxlan_vnvx1 | grep 00:00:00:00:00:00
+   ```
+
+   ``` { .text .no-copy title="Output" }
    00:00:00:00:00:00 dst 10.61.10.22 self permanent
    00:00:00:00:00:00 dst 10.61.10.23 self permanent
    ```
@@ -166,23 +187,35 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 1. One container on `desopve01` and one on `desopve03` in the `vnvx1` VNet, with a static address:
 
-   ```console
-   root@desopve01:~# pct create 291 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vxlan-ct1 \
+   ```bash title="root@desopve01"
+   pct create 291 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vxlan-ct1 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnvx1,ip=10.62.62.11/24 --password
-   root@desopve01:~# pct start 291
-   root@desopve03:~# pct create 292 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vxlan-ct2 \
+   pct start 291
+   ```
+
+   ```bash title="root@desopve03"
+   pct create 292 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vxlan-ct2 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnvx1,ip=10.62.62.12/24 --password
-   root@desopve03:~# pct start 292
-   root@desopve01:~# pct exec 291 -- ping -c3 -W1 10.62.62.12
+   pct start 292
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- ping -c3 -W1 10.62.62.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2042ms
    ```
 
 2. On the underlay you can see the tunnel: UDP packets to port 4789 with VNI 10062 and, inside, the guest's ARP request.
 
-   ```console
-   root@desopve01:~# tcpdump -lnni vmbr1.61 -c2 udp port 4789
+   ```bash title="root@desopve01"
+   tcpdump -lnni vmbr1.61 -c2 udp port 4789
+   ```
+
+   ``` { .text .no-copy title="Output" }
    21:19:27.662568 IP 10.61.10.23.38568 > 10.61.10.21.4789: VXLAN, flags [I] (0x08), vni 10062
    ARP, Request who-has 10.62.62.11 tell 10.62.62.12, length 28
    21:19:27.662669 IP 10.61.10.21.52130 > 10.61.10.23.4789: VXLAN, flags [I] (0x08), vni 10062
@@ -193,19 +226,37 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 1. The VNet has an MTU of 1450, and the host has also set its side of the container's `veth` pair to 1450. Inside the container, however, the network interface stayed at **1500**:
 
-   ```console
-   root@desopve01:~# ip link show veth291i0 | grep -o "mtu [0-9]*"
+   ```bash title="root@desopve01"
+   ip link show veth291i0 | grep -o "mtu [0-9]*"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    mtu 1450
-   root@desopve01:~# pct exec 291 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    mtu 1500
    ```
 
 2. Up to 1450 bytes everything goes through; the guest sends a 1500-byte packet, but the host drops it:
 
-   ```console
-   root@desopve01:~# pct exec 291 -- ping -c3 -W1 -M do -s 1422 10.62.62.12
+   ```bash title="root@desopve01"
+   pct exec 291 -- ping -c3 -W1 -M do -s 1422 10.62.62.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2034ms
-   root@desopve01:~# pct exec 291 -- ping -c3 -W1 -M do -s 1472 10.62.62.12
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- ping -c3 -W1 -M do -s 1472 10.62.62.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ping: sendmsg: No buffer space available
    ping: sendmsg: No buffer space available
    ping: sendmsg: No buffer space available
@@ -216,22 +267,34 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 3. TCP, on the other hand, seems to work. The reason becomes clear when capturing on the host side of the container: at the first oversized segment, the host itself replies with an ICMP *fragmentation needed* (MTU 1450) on behalf of the tunnel. The guest caches it and from then on uses smaller segments.
 
-   ```console
-   root@desopve01:~# pct exec 291 -- ip route flush cache
-   root@desopve01:~# tcpdump -lnni veth291i0 -c3 "icmp or (tcp port 5001 and tcp[tcpflags] & tcp-syn != 0)"
+   ```bash title="root@desopve01"
+   pct exec 291 -- ip route flush cache
+   tcpdump -lnni veth291i0 -c3 "icmp or (tcp port 5001 and tcp[tcpflags] & tcp-syn != 0)"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    21:22:50.971022 IP 10.62.62.11.47094 > 10.62.62.12.5001: Flags [S], seq 2687240530, win 64240, options [mss 1460,sackOK,TS val 566963034 ecr 0,nop,wscale 10], length 0
    21:22:50.971630 IP 10.62.62.12.5001 > 10.62.62.11.47094: Flags [S.], seq 1554622400, ack 2687240531, win 65160, options [mss 1460,sackOK,TS val 2751837441 ecr 566963034,nop,wscale 10], length 0
    21:22:50.971801 IP 10.62.62.12 > 10.62.62.11: ICMP 10.62.62.12 unreachable - need to frag (mtu 1450), length 556
-   root@desopve01:~# pct exec 291 -- ip route get 10.62.62.12
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- ip route get 10.62.62.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    10.62.62.12 dev eth0 src 10.62.62.11 uid 0
        cache expires 591sec mtu 1450
    ```
 
    Start the capture before the transfer that triggers it: 2 MB with `nc` from CT 291 to CT 292, which arrived complete. `nc` is already in the Debian template:
 
-   ```console
-   root@desopve03:~# pct exec 292 -- sh -c 'nc -l -p 5001 > /dev/null'
-   root@desopve01:~# pct exec 291 -- sh -c 'head -c 2M /dev/urandom | nc -q1 10.62.62.12 5001'
+   ```bash title="root@desopve03"
+   pct exec 292 -- sh -c 'nc -l -p 5001 > /dev/null'
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- sh -c 'head -c 2M /dev/urandom | nc -q1 10.62.62.12 5001'
    ```
 
    This is *Path MTU Discovery*: it works as long as the ICMP reaches the guest. A firewall that blocks ICMP (labs 32-33), or a UDP application that sends large packets, is enough for connections to hang without a clear error. That is why the MTU is set on the guests instead of relying on ICMP.
@@ -244,24 +307,42 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 2. **A trap with Debian 13 containers:** even after a reboot the interface inside the container stays at 1500. Proxmox VE creates the `veth` with the right MTU, but does not write it into the container's network file, and at boot `ifupdown2` (included in the template) resets interfaces without an explicit MTU to 1500.
 
-   ```console
-   root@desopve01:~# grep mtu /var/lib/lxc/291/config
+   ```bash title="root@desopve01"
+   grep mtu /var/lib/lxc/291/config
+   ```
+
+   ``` { .text .no-copy title="Output" }
    lxc.net.0.mtu = 1450
-   root@desopve01:~# pct exec 291 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    mtu 1500
    ```
 
    The fix is to add `mtu 1450` to the interface in the container's file. Proxmox VE keeps the line when it rewrites the file at every start:
 
-   ```console
-   root@desopve01:~# pct exec 291 -- sed -i '/address 10.62.62.11/a\	mtu 1450' /etc/network/interfaces
-   root@desopve01:~# pct reboot 291
-   root@desopve01:~# pct exec 291 -- cat /etc/network/interfaces | sed -n '/eth0/,$p'
+   ```bash title="root@desopve01"
+   pct exec 291 -- sed -i '/address 10.62.62.11/a\	mtu 1450' /etc/network/interfaces
+   pct reboot 291
+   pct exec 291 -- cat /etc/network/interfaces | sed -n '/eth0/,$p'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    auto eth0
    iface eth0 inet static
    	address 10.62.62.11/24
    	mtu 1450
-   root@desopve01:~# pct exec 291 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    mtu 1450
    ```
 
@@ -269,21 +350,39 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 3. Now the oversized packet is rejected right away by the guest, and TCP advertises an MSS of 1410 bytes (1450 − 40) on its own in both directions, with no need for ICMP:
 
-   ```console
-   root@desopve01:~# pct exec 291 -- ping -c1 -W1 -M do -s 1423 10.62.62.12
+   ```bash title="root@desopve01"
+   pct exec 291 -- ping -c1 -W1 -M do -s 1423 10.62.62.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    PING 10.62.62.12 (10.62.62.12) 1423(1451) bytes of data.
    ping: sendmsg: Message too long
-   root@desopve01:~# pct exec 291 -- ping -c3 -W1 -M do -s 1422 10.62.62.12
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 291 -- ping -c3 -W1 -M do -s 1422 10.62.62.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2038ms
-   root@desopve01:~# tcpdump -lnni veth291i0 -c2 "icmp or (tcp port 5001 and tcp[tcpflags] & tcp-syn != 0)"
+   ```
+
+   ```bash title="root@desopve01"
+   tcpdump -lnni veth291i0 -c2 "icmp or (tcp port 5001 and tcp[tcpflags] & tcp-syn != 0)"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    21:27:11.768115 IP 10.62.62.11.45450 > 10.62.62.12.5001: Flags [S], seq 4032040915, win 64860, options [mss 1410,sackOK,TS val 3643972739 ecr 0,nop,wscale 10], length 0
    21:27:11.768786 IP 10.62.62.12.5001 > 10.62.62.11.45450: Flags [S.], seq 3506410363, ack 4032040916, win 64308, options [mss 1410,sackOK,TS val 4258233405 ecr 3643972739,nop,wscale 10], length 0
    ```
 
    A 200 MB transfer between the two containers over the VXLAN takes about 2 seconds, including the startup of `pct exec` (with the receiver listening again on CT 292):
 
-   ```console
-   root@desopve01:~# time pct exec 291 -- sh -c 'head -c 200M /dev/zero | nc -q1 10.62.62.12 5001'
+   ```bash title="root@desopve01"
+   time pct exec 291 -- sh -c 'head -c 200M /dev/zero | nc -q1 10.62.62.12 5001'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    real	0m2.497s
    ```
 
@@ -291,12 +390,27 @@ With a 1500-byte underlay, the guest is left with an MTU of **1450** bytes. In p
 
 ### 7. The rest of the network has not changed
 
-```console
-root@desopve01:~# ceph health
+```bash title="root@desopve01"
+ceph health
+```
+
+``` { .text .no-copy title="Output" }
 HEALTH_OK
-root@desopve01:~# pct exec 121 -- ping -c2 -W1 10.10.10.122
+```
+
+```bash title="root@desopve01"
+pct exec 121 -- ping -c2 -W1 10.10.10.122
+```
+
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1001ms
-root@desopve01:~# ping -c2 -W1 10.100.10.23
+```
+
+```bash title="root@desopve01"
+ping -c2 -W1 10.100.10.23
+```
+
+``` { .text .no-copy title="Output" }
 2 packets transmitted, 2 received, 0% packet loss, time 1058ms
 ```
 

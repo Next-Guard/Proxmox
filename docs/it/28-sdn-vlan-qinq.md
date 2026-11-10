@@ -70,10 +70,19 @@ Il protocollo della service VLAN è `802.1q` per default; `802.1ad` è quello pr
 
 2. Applica, anche da riga di comando, e verifica lo stato:
 
-   ```console
-   root@desopve01:~# pvesh set /cluster/sdn
+   ```bash title="root@desopve01"
+   pvesh set /cluster/sdn
+   ```
+
+   ``` { .text .no-copy title="Output" }
    UPID:desopve01:00027B63:0023AE2B:6AF22680:reloadnetworkall::root@pam:
-   root@desopve01:~# ip -d link show vmbr1.30 | grep -v link/ether
+   ```
+
+   ```bash title="root@desopve01"
+   ip -d link show vmbr1.30 | grep -v link/ether
+   ```
+
+   ``` { .text .no-copy title="Output" }
    73: vmbr1.30@vmbr1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master vnv30 state UP mode DEFAULT group default qlen 1000
        vlan protocol 802.1Q id 30 <REORDER_HDR> 
    ```
@@ -82,35 +91,44 @@ Il protocollo della service VLAN è `802.1q` per default; `802.1ad` è quello pr
 
 1. Un container su `desopve01` e uno su `desopve03`, con indirizzo statico. La VNet non ha subnet: è una rete di livello 2, e un eventuale gateway è un router sulla VLAN, come `router01` del lab 26.
 
-   ```console
-   root@desopve01:~# pct create 281 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vlan30-ct1 \
+   ```bash title="root@desopve01"
+   pct create 281 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vlan30-ct1 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnv30,ip=10.30.30.11/24 --password
-   root@desopve01:~# pct start 281
-   root@desopve03:~# pct create 282 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vlan30-ct2 \
+   pct start 281
+   ```
+
+   ```bash title="root@desopve03"
+   pct create 282 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname vlan30-ct2 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnv30,ip=10.30.30.12/24 --password
-   root@desopve03:~# pct start 282
+   pct start 282
    ```
 
 2. I due container si vedono, e sul bond il traffico ha il tag 30. La cattura va avviata prima del ping, in un secondo terminale; in questo e nei lab successivi il `tcpdump` compare dopo il comando che genera il traffico solo per leggere l'output nell'ordine giusto:
 
-   ```console
-   root@desopve01:~# tcpdump -lnei bond0 -c2 "vlan 30 and icmp"      # secondo terminale, prima del ping
-   root@desopve01:~# pct exec 281 -- ping -c3 -W1 10.30.30.12
+   ```bash title="root@desopve01"
+   tcpdump -lnei bond0 -c2 "vlan 30 and icmp"      # secondo terminale, prima del ping
+   pct exec 281 -- ping -c3 -W1 10.30.30.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2016ms
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    16:26:01.301288 bc:24:11:53:8e:d8 > bc:24:11:ed:d7:ff, ethertype 802.1Q (0x8100), length 102: vlan 30, p 0, ethertype IPv4 (0x0800), 10.30.30.11 > 10.30.30.12: ICMP echo request, id 326, seq 1, length 64
    16:26:01.301592 bc:24:11:ed:d7:ff > bc:24:11:53:8e:d8, ethertype 802.1Q (0x8100), length 102: vlan 30, p 0, ethertype IPv4 (0x0800), 10.30.30.12 > 10.30.30.11: ICMP echo reply, id 326, seq 1, length 64
    ```
 
    Finita la prova i due container si spengono: restano pronti per la migrazione del [Lab 48](48-migrations.md).
 
-   ```console
-   root@desopve01:~# pct shutdown 281
-   root@desopve03:~# pct shutdown 282
+   ```bash title="root@desopve01"
+   pct shutdown 281
+   ```
+
+   ```bash title="root@desopve03"
+   pct shutdown 282
    ```
 
 ### 4. Zona QinQ con service VLAN 802.1q
@@ -121,9 +139,9 @@ Il protocollo della service VLAN è `802.1q` per default; `802.1ad` è quello pr
 
 2. La VNet (VLAN cliente 10) e l'Apply, da riga di comando:
 
-   ```console
-   root@desopve01:~# pvesh create /cluster/sdn/vnets --vnet vnq10 --zone qinqz --tag 10
-   root@desopve01:~# pvesh set /cluster/sdn
+   ```bash title="root@desopve01"
+   pvesh create /cluster/sdn/vnets --vnet vnq10 --zone qinqz --tag 10
+   pvesh set /cluster/sdn
    ```
 
 3. Cosa genera l'SDN su ogni nodo: un bridge VLAN-aware per la zona (`z_qinqz`), collegato a `vmbr1.300` (la service VLAN), e dentro di esso la VLAN cliente `z_qinqz.10`, porta della VNet:
@@ -149,8 +167,11 @@ Il protocollo della service VLAN è `802.1q` per default; `802.1ad` è quello pr
    	bridge_fd 0
    ```
 
-   ```console
-   root@desopve01:~# ip -d link show | grep -A2 -E "vmbr1.300|z_qinqz|qinqz" | grep -E "^[0-9]+:|vlan protocol" | head -10
+   ```bash title="root@desopve01"
+   ip -d link show | grep -A2 -E "vmbr1.300|z_qinqz|qinqz" | grep -E "^[0-9]+:|vlan protocol" | head -10
+   ```
+
+   ``` { .text .no-copy title="Output" }
    76: vmbr1.300@vmbr1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master z_qinqz state UP mode DEFAULT group default qlen 1000
        vlan protocol 802.1Q id 300 <REORDER_HDR> 
    77: ln_qinqz@pr_qinqz: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master z_qinqz state UP mode DEFAULT group default qlen 1000
@@ -164,35 +185,62 @@ Il protocollo della service VLAN è `802.1q` per default; `802.1ad` è quello pr
 
 4. Due container (CT 283 su `desopve01`, CT 284 su `desopve03`, indirizzi 10.31.10.11 e .12) su `vnq10`, creati come quelli della VLAN 30:
 
-   ```console
-   root@desopve01:~# pct create 283 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname qinq-ct1 \
+   ```bash title="root@desopve01"
+   pct create 283 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname qinq-ct1 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnq10,ip=10.31.10.11/24 --password
-   root@desopve01:~# pct start 283
-   root@desopve03:~# pct create 284 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname qinq-ct2 \
+   pct start 283
+   ```
+
+   ```bash title="root@desopve03"
+   pct create 284 cephfs:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst --hostname qinq-ct2 \
      --unprivileged 1 --features nesting=1 --cores 1 --memory 512 --rootfs rbd-vm:4 \
      --net0 name=eth0,bridge=vnq10,ip=10.31.10.12/24 --password
-   root@desopve03:~# pct start 284
+   pct start 284
    ```
 
    Il ping passa e sul bond i frame hanno **due** tag, 300 fuori e 10 dentro:
 
-   ```console
-   root@desopve01:~# pct exec 283 -- ping -c3 -W1 10.31.10.12
+   ```bash title="root@desopve01"
+   pct exec 283 -- ping -c3 -W1 10.31.10.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2002ms
-   root@desopve01:~# tcpdump -lnei bond0 -c2 "vlan 300 and vlan 10 and icmp"
+   ```
+
+   ```bash title="root@desopve01"
+   tcpdump -lnei bond0 -c2 "vlan 300 and vlan 10 and icmp"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    21:04:57.411769 bc:24:11:af:71:cf > bc:24:11:7c:50:ed, ethertype 802.1Q (0x8100), length 106: vlan 300, p 0, ethertype 802.1Q (0x8100), vlan 10, p 0, ethertype IPv4 (0x0800), 10.31.10.11 > 10.31.10.12: ICMP echo request, id 342, seq 2, length 64
    21:04:57.413112 bc:24:11:7c:50:ed > bc:24:11:af:71:cf, ethertype 802.1Q (0x8100), length 106: vlan 300, p 0, ethertype 802.1Q (0x8100), vlan 10, p 0, ethertype IPv4 (0x0800), 10.31.10.12 > 10.31.10.11: ICMP echo reply, id 342, seq 2, length 64
    ```
 
 5. **MTU.** La scheda del container ha MTU 1500: l'SDN non l'ha ridotta da solo. Con il bit *don't fragment* si prova un pacchetto IP di 1500 e uno di 1496 byte:
 
-   ```console
-   root@desopve01:~# pct exec 283 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```bash title="root@desopve01"
+   pct exec 283 -- ip link show eth0 | grep -o "mtu [0-9]*"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    mtu 1500
-   root@desopve01:~# pct exec 283 -- ping -c3 -W1 -M do -s 1472 10.31.10.12
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 283 -- ping -c3 -W1 -M do -s 1472 10.31.10.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2081ms
-   root@desopve01:~# pct exec 283 -- ping -c3 -W1 -M do -s 1468 10.31.10.12
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 283 -- ping -c3 -W1 -M do -s 1468 10.31.10.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2060ms
    ```
 
@@ -202,43 +250,82 @@ Il protocollo della service VLAN è `802.1q` per default; `802.1ad` è quello pr
 
 1. Una seconda zona QinQ con service VLAN 301 e protocollo `802.1ad`, con la sua VNet. Prima di applicare, il **Dry-Run** mostra che su `vmbr1` si aggiunge solo la sottointerfaccia della service VLAN (`vmbr1.301` con `vlan-protocol 802.1ad`): il bridge `vmbr1` e le sue VLAN 802.1Q non vengono toccati.
 
-   ```console
-   root@desopve01:~# pvesh create /cluster/sdn/zones --type qinq --zone qinqad --bridge vmbr1 --tag 301 --vlan-protocol 802.1ad
-   root@desopve01:~# pvesh create /cluster/sdn/vnets --vnet vnqad10 --zone qinqad --tag 10
+   ```bash title="root@desopve01"
+   pvesh create /cluster/sdn/zones --type qinq --zone qinqad --bridge vmbr1 --tag 301 --vlan-protocol 802.1ad
+   pvesh create /cluster/sdn/vnets --vnet vnqad10 --zone qinqad --tag 10
    ```
 
    ![Dry-Run della zona 802.1ad](../images/28/05-dry-run-8021ad.png)
 
 2. Dopo l'Apply il bridge resta 802.1Q (`0x8100`) e la service VLAN è 802.1ad:
 
-   ```console
-   root@desopve01:~# pvesh set /cluster/sdn
-   root@desopve01:~# cat /sys/class/net/vmbr1/bridge/vlan_protocol
+   ```bash title="root@desopve01"
+   pvesh set /cluster/sdn
+   cat /sys/class/net/vmbr1/bridge/vlan_protocol
+   ```
+
+   ``` { .text .no-copy title="Output" }
    0x8100
-   root@desopve01:~# ip -d link show vmbr1.301 | grep -o "vlan protocol [^ ]* id [0-9]*"
+   ```
+
+   ```bash title="root@desopve01"
+   ip -d link show vmbr1.301 | grep -o "vlan protocol [^ ]* id [0-9]*"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    vlan protocol 802.1ad id 301
    ```
 
 3. I due container passano sulla VNet `vnqad10` (stesso MAC e indirizzo) e il tag esterno ora ha ethertype `0x88a8`:
 
-   ```console
-   root@desopve01:~# pct set 283 --net0 name=eth0,bridge=vnqad10,hwaddr=BC:24:11:AF:71:CF,ip=10.31.10.11/24
-   root@desopve03:~# pct set 284 --net0 name=eth0,bridge=vnqad10,hwaddr=BC:24:11:7C:50:ED,ip=10.31.10.12/24
-   root@desopve01:~# pct exec 283 -- ping -c3 -W1 10.31.10.12
+   ```bash title="root@desopve01"
+   pct set 283 --net0 name=eth0,bridge=vnqad10,hwaddr=BC:24:11:AF:71:CF,ip=10.31.10.11/24
+   ```
+
+   ```bash title="root@desopve03"
+   pct set 284 --net0 name=eth0,bridge=vnqad10,hwaddr=BC:24:11:7C:50:ED,ip=10.31.10.12/24
+   ```
+
+   ```bash title="root@desopve01"
+   pct exec 283 -- ping -c3 -W1 10.31.10.12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2061ms
-   root@desopve01:~# tcpdump -lnei bond0 -c2 "ether proto 0x88a8"
+   ```
+
+   ```bash title="root@desopve01"
+   tcpdump -lnei bond0 -c2 "ether proto 0x88a8"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    21:06:55.911301 bc:24:11:af:71:cf > bc:24:11:7c:50:ed, ethertype 802.1Q-QinQ (0x88a8), length 106: vlan 301, p 0, ethertype 802.1Q (0x8100), vlan 10, p 0, ethertype IPv4 (0x0800), 10.31.10.11 > 10.31.10.12: ICMP echo request, id 346, seq 1, length 64
    21:06:56.948753 bc:24:11:af:71:cf > bc:24:11:7c:50:ed, ethertype 802.1Q-QinQ (0x88a8), length 106: vlan 301, p 0, ethertype 802.1Q (0x8100), vlan 10, p 0, ethertype IPv4 (0x0800), 10.31.10.11 > 10.31.10.12: ICMP echo request, id 346, seq 2, length 64
    ```
 
 4. Il resto della rete non ha risentito della nuova zona: VLAN 10 dei container, rete di migrazione e Ceph funzionano.
 
-   ```console
-   root@desopve01:~# pct exec 121 -- ping -c2 -W1 10.10.10.122
+   ```bash title="root@desopve01"
+   pct exec 121 -- ping -c2 -W1 10.10.10.122
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1002ms
-   root@desopve01:~# ping -c2 -W1 10.100.10.22
+   ```
+
+   ```bash title="root@desopve01"
+   ping -c2 -W1 10.100.10.22
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1058ms
-   root@desopve01:~# ceph health
+   ```
+
+   ```bash title="root@desopve01"
+   ceph health
+   ```
+
+   ``` { .text .no-copy title="Output" }
    HEALTH_OK
    ```
 
@@ -250,13 +337,22 @@ Il protocollo della service VLAN è `802.1q` per default; `802.1ad` è quello pr
 
 2. Le zone QinQ servivano solo come prova: si eliminano i container, le VNet e le zone, poi si applica. Le zone si eliminano solo dopo le loro VNet.
 
-   ```console
-   root@desopve01:~# pct stop 283 && pct destroy 283 --purge
-   root@desopve03:~# pct stop 284 && pct destroy 284 --purge
-   root@desopve01:~# for v in vnqad10 vnq10; do pvesh delete /cluster/sdn/vnets/$v; done
-   root@desopve01:~# for z in qinqad qinqz; do pvesh delete /cluster/sdn/zones/$z; done
-   root@desopve01:~# pvesh set /cluster/sdn
-   root@desopve01:~# ip link show vmbr1.300
+   ```bash title="root@desopve01"
+   pct stop 283 && pct destroy 283 --purge
+   ```
+
+   ```bash title="root@desopve03"
+   pct stop 284 && pct destroy 284 --purge
+   ```
+
+   ```bash title="root@desopve01"
+   for v in vnqad10 vnq10; do pvesh delete /cluster/sdn/vnets/$v; done
+   for z in qinqad qinqz; do pvesh delete /cluster/sdn/zones/$z; done
+   pvesh set /cluster/sdn
+   ip link show vmbr1.300
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Device "vmbr1.300" does not exist.
    ```
 

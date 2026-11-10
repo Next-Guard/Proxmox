@@ -68,8 +68,11 @@ When run as `root` on the node, they do not ask for credentials. Each command ha
 
 3. Leave the terminal open: you need it in the next step to read the fingerprint of the node key.
 
-   ```console
-   root@desopve01:~# ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+   ```bash title="root@desopve01"
+   ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+   ```
+
+   ``` { .text .no-copy title="Output" }
    256 SHA256:p5TwLK+YB4jXj40TfBtjT2Y/g848HB8t3VSoFoKXJIM root@desopve01 (ED25519)
    ```
 
@@ -147,8 +150,11 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
 1. **`pvesh`** queries the API. The version:
 
-   ```console
-   root@desopve01:~# pvesh get /version
+   ```bash title="root@desopve01"
+   pvesh get /version
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ┌─────────┬──────────────────┐
    │ key     │ value            │
    ╞═════════╪══════════════════╡
@@ -162,8 +168,11 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
    `pvesh ls` lists the paths under a node. The letters show the allowed methods: `D` subdirectory, `r` read (get), `w` modify (set), `c` create, `d` delete.
 
-   ```console
-   root@desopve01:~# pvesh ls /nodes/desopve01 | head -12
+   ```bash title="root@desopve01"
+   pvesh ls /nodes/desopve01 | head -12
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -r-c-        aplinfo
    Dr---        apt
    Dr---        capabilities
@@ -180,8 +189,11 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
    The `--output-format` option changes the format (`text`, `json`, `json-pretty`, `yaml`), which is useful in scripts:
 
-   ```console
-   root@desopve01:~# pvesh get /nodes --output-format yaml
+   ```bash title="root@desopve01"
+   pvesh get /nodes --output-format yaml
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ---
    - cpu: 0.125779885200898
      disk: 3614965760
@@ -200,15 +212,21 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
    `pvesh usage` shows the parameters of a call, for example the creation of a VM (`--verbose` describes them all):
 
-   ```console
-   root@desopve01:~# pvesh usage /nodes/desopve01/qemu --command create
+   ```bash title="root@desopve01"
+   pvesh usage /nodes/desopve01/qemu --command create
+   ```
+
+   ``` { .text .no-copy title="Output" }
    USAGE: pvesh create /nodes/desopve01/qemu --vmid <integer> [OPTIONS]
    ```
 
 2. **`pvesm`** shows the node storages. With the ZFS installation there are `local`, a directory for ISOs, templates and backups, and `local-zfs`, for VM and container disks:
 
-   ```console
-   root@desopve01:~# pvesm status
+   ```bash title="root@desopve01"
+   pvesm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
    local             dir     active        46288000             128        46287872    0.00%
    local-zfs     zfspool     active        46288016              96        46287920    0.00%
@@ -216,8 +234,11 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
 3. **`pveum`** manages users. For now there is only `root@pam`:
 
-   ```console
-   root@desopve01:~# pveum user list
+   ```bash title="root@desopve01"
+   pveum user list
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ┌──────────┬─────────┬─────────────────────────┬────────┬────────┬───────────┬────────┬──────┬──────────┬────────────┬──────────────────┬────────┬─────────────┐
    │ userid   │ comment │ email                   │ enable │ expire │ firstname │ groups │ keys │ lastname │ realm-type │ tfa-locked-until │ tokens │ totp-locked │
    ╞══════════╪═════════╪═════════════════════════╪════════╪════════╪═══════════╪════════╪══════╪══════════╪════════════╪══════════════════╪════════╪═════════════╡
@@ -227,8 +248,11 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
 4. **`pvenode task list`** shows the latest tasks of the node, the same ones as in the **Tasks** panel. Each task has a unique identifier (UPID) that contains the node, the type and the user:
 
-   ```console
-   root@desopve01:~# pvenode task list --limit 3
+   ```bash title="root@desopve01"
+   pvenode task list --limit 3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ┌───────────────────────────────────────────────────────────────┬──────────┬────┬──────────┬─────────────────────┬─────────────────────┬────────┐
    │ UPID                                                          │ Type     │ ID │ User     │           Starttime │             Endtime │ Status │
    ╞═══════════════════════════════════════════════════════════════╪══════════╪════╪══════════╪═════════════════════╪═════════════════════╪════════╡
@@ -242,8 +266,11 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
 5. **`qm`** and **`pct`** manage VMs and containers; you will use them from lab 07 on. Without arguments they show the subcommands:
 
-   ```console
-   root@desopve01:~# pct
+   ```bash title="root@desopve01"
+   pct
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ERROR: no command specified
    USAGE: pct <COMMAND> [ARGS] [OPTIONS]
 
@@ -255,8 +282,11 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 
 6. **`pvecm`** manages the cluster. For now it returns an error, because the node is not part of a cluster yet: you will create the cluster in lab 06.
 
-   ```console
-   root@desopve01:~# pvecm status
+   ```bash title="root@desopve01"
+   pvecm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Error: Corosync config '/etc/pve/corosync.conf' does not exist - is this node part of a cluster?
    ```
 
@@ -267,25 +297,55 @@ Connect to `desopve01` (`ssh root@desopve01.proxmox.community`) and try the main
 1. From the DC, the loop of step 6 returns the four names without asking for a password.
 2. On each node, the DC key is in `authorized_keys`, without CR characters:
 
-   ```console
-   root@desopve01:~# tail -1 /root/.ssh/authorized_keys | cut -d' ' -f1,3
+   ```bash title="root@desopve01"
+   tail -1 /root/.ssh/authorized_keys | cut -d' ' -f1,3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ssh-ed25519 administrator@proxmox.community
-   root@desopve01:~# grep -c $'\r' /root/.ssh/authorized_keys
+   ```
+
+   ```bash title="root@desopve01"
+   grep -c $'\r' /root/.ssh/authorized_keys
+   ```
+
+   ``` { .text .no-copy title="Output" }
    0
    ```
 
 3. **Test: without the agent, you need the passphrase.** Empty the agent and connect: the key still works, but now `ssh` asks for the passphrase. Load the key again with `ssh-add`, and login is automatic again:
 
-   ```console
-   PS C:\Users\Administrator> ssh-add -D
+   ```powershell title="PowerShell — desopve-dc01"
+   ssh-add -D
+   ```
+
+   ``` { .text .no-copy title="Output" }
    All identities removed.
-   PS C:\Users\Administrator> ssh root@desopve02.proxmox.community hostname -f
+   ```
+
+   ```powershell title="PowerShell — desopve-dc01"
+   ssh root@desopve02.proxmox.community hostname -f
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Enter passphrase for key 'C:\Users\Administrator/.ssh/id_ed25519':
    desopve02.proxmox.community
-   PS C:\Users\Administrator> ssh-add
+   ```
+
+   ```powershell title="PowerShell — desopve-dc01"
+   ssh-add
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Enter passphrase for C:\Users\Administrator/.ssh/id_ed25519:
    Identity added: C:\Users\Administrator/.ssh/id_ed25519 (administrator@proxmox.community)
-   PS C:\Users\Administrator> ssh root@desopve02.proxmox.community hostname -f
+   ```
+
+   ```powershell title="PowerShell — desopve-dc01"
+   ssh root@desopve02.proxmox.community hostname -f
+   ```
+
+   ``` { .text .no-copy title="Output" }
    desopve02.proxmox.community
    ```
 

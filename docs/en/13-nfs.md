@@ -69,10 +69,19 @@ In the lab we use **NFS 4.2**, set in the mount options of the storage.
 
 Before adding the storage, check from the node that the server exports the directory and responds over NFSv4:
 
-```console
-root@desopve01:~# pvesm scan nfs 172.27.199.10
+```bash title="root@desopve01"
+pvesm scan nfs 172.27.199.10
+```
+
+``` { .text .no-copy title="Output" }
 /mnt/dati/nfs 172.27.199.0/24
-root@desopve01:~# rpcinfo -T tcp 172.27.199.10 nfs 4
+```
+
+```bash title="root@desopve01"
+rpcinfo -T tcp 172.27.199.10 nfs 4
+```
+
+``` { .text .no-copy title="Output" }
 program 100003 version 4 ready and waiting
 ```
 
@@ -95,8 +104,11 @@ program 100003 version 4 ready and waiting
 
 From the command line:
 
-```console
-root@desopve01:~# grep -A6 "nfs: nas-nfs" /etc/pve/storage.cfg
+```bash title="root@desopve01"
+grep -A6 "nfs: nas-nfs" /etc/pve/storage.cfg
+```
+
+``` { .text .no-copy title="Output" }
 nfs: nas-nfs
 	export /mnt/dati/nfs
 	path /mnt/pve/nas-nfs
@@ -104,11 +116,29 @@ nfs: nas-nfs
 	content images,iso,backup,vztmpl
 	options vers=4.2
 	prune-backups keep-all=1
-root@desopve01:~# pvesm status | grep nas-nfs
+```
+
+```bash title="root@desopve01"
+pvesm status | grep nas-nfs
+```
+
+``` { .text .no-copy title="Output" }
 nas-nfs           nfs     active       100070400               0       100070400    0.00%
-root@desopve01:~# mount | grep nas-nfs
+```
+
+```bash title="root@desopve01"
+mount | grep nas-nfs
+```
+
+``` { .text .no-copy title="Output" }
 172.27.199.10:/mnt/dati/nfs on /mnt/pve/nas-nfs type nfs4 (rw,relatime,vers=4.2,rsize=1048576,wsize=1048576,namlen=255,hard,fatal_neterrors=none,proto=tcp,timeo=600,retrans=2,sec=sys,clientaddr=172.27.199.21,local_lock=none,addr=172.27.199.10)
-root@desopve01:~# ssh desopve03 ls /mnt/pve/nas-nfs
+```
+
+```bash title="root@desopve01"
+ssh desopve03 ls /mnt/pve/nas-nfs
+```
+
+``` { .text .no-copy title="Output" }
 dump
 images
 template
@@ -124,8 +154,11 @@ Before moving the disk, measure how it performs on local storage: these are the 
 
 **A misleading test.** In the VM, write 1 GiB of zeros with `dd`:
 
-```console
-labuser@debian01:~$ dd if=/dev/zero of=$HOME/test.bin bs=1M count=1024 oflag=direct
+```bash title="labuser@debian01"
+dd if=/dev/zero of=$HOME/test.bin bs=1M count=1024 oflag=direct
+```
+
+``` { .text .no-copy title="Output" }
 1073741824 bytes (1.1 GB, 1.0 GiB) copied, 1.40965 s, 762 MB/s
 ```
 
@@ -133,27 +166,48 @@ You will repeat it on NFS in step 6, and there you will see why zeros are no goo
 
 **Sequential writes and reads with random data.** Generate 512 MiB of random data in RAM (`/dev/shm`), write it to the disk with direct I/O, waiting until it has actually reached the storage (`oflag=direct conv=fsync`), then read it back. Repeat the write three times and the read twice, because a single value is not enough:
 
-```console
-labuser@debian01:~$ head -c 512M /dev/urandom > /dev/shm/rnd.bin
-labuser@debian01:~$ for i in 1 2 3; do dd if=/dev/shm/rnd.bin of=$HOME/test.bin bs=1M oflag=direct conv=fsync 2>&1 | tail -1; done
+```bash title="labuser@debian01"
+head -c 512M /dev/urandom > /dev/shm/rnd.bin
+for i in 1 2 3; do dd if=/dev/shm/rnd.bin of=$HOME/test.bin bs=1M oflag=direct conv=fsync 2>&1 | tail -1; done
+```
+
+``` { .text .no-copy title="Output" }
 536870912 bytes (537 MB, 512 MiB) copied, 15.0205 s, 35.7 MB/s
 536870912 bytes (537 MB, 512 MiB) copied, 5.48904 s, 97.8 MB/s
 536870912 bytes (537 MB, 512 MiB) copied, 16.7323 s, 32.1 MB/s
-labuser@debian01:~$ for i in 1 2; do dd if=$HOME/test.bin of=/dev/null bs=1M iflag=direct 2>&1 | tail -1; done
+```
+
+```bash title="labuser@debian01"
+for i in 1 2; do dd if=$HOME/test.bin of=/dev/null bs=1M iflag=direct 2>&1 | tail -1; done
+```
+
+``` { .text .no-copy title="Output" }
 536870912 bytes (537 MB, 512 MiB) copied, 0.737017 s, 728 MB/s
 536870912 bytes (537 MB, 512 MiB) copied, 0.620782 s, 865 MB/s
-labuser@debian01:~$ rm -f $HOME/test.bin /dev/shm/rnd.bin
+```
+
+```bash title="labuser@debian01"
+rm -f $HOME/test.bin /dev/shm/rnd.bin
 ```
 
 **Random writes in 4 KiB blocks**, the typical workload of databases and operating systems, measured with `fio` directly from the node on the local storage. The `--unlink=1` option deletes the test file at the end:
 
-```console
-root@desopve01:~# apt install fio
-root@desopve01:~# fio --name=rw4k --directory=/var/lib/vz --rw=randwrite --bs=4k --size=1G \
+```bash title="root@desopve01"
+apt install fio
+fio --name=rw4k --directory=/var/lib/vz --rw=randwrite --bs=4k --size=1G \
       --iodepth=16 --ioengine=libaio --direct=1 --runtime=30 --time_based --group_reporting --unlink=1
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=2118, BW=8476KiB/s (8679kB/s)(275MiB/33273msec); 0 zone resets
-root@desopve01:~# fio --name=rw4k --directory=/var/lib/vz --rw=randwrite --bs=4k --size=1G \
+```
+
+```bash title="root@desopve01"
+fio --name=rw4k --directory=/var/lib/vz --rw=randwrite --bs=4k --size=1G \
       --iodepth=16 --ioengine=libaio --direct=1 --runtime=30 --time_based --group_reporting --unlink=1
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=11.2k, BW=43.7MiB/s (45.8MB/s)(1310MiB/30001msec); 0 zone resets
 ```
 
@@ -177,10 +231,19 @@ root@desopve01:~# fio --name=rw4k --directory=/var/lib/vz --rw=randwrite --bs=4k
 
    ![The VM disk on nas-nfs](../images/13/07-disco-su-nfs.png)
 
-   ```console
-   root@desopve01:~# qm config 100 | grep scsi0
+   ```bash title="root@desopve01"
+   qm config 100 | grep scsi0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    scsi0: nas-nfs:100/vm-100-disk-0.qcow2,iothread=1,size=16G
-   root@desopve01:~# qemu-img info /mnt/pve/nas-nfs/images/100/vm-100-disk-0.qcow2 | head -4
+   ```
+
+   ```bash title="root@desopve01"
+   qemu-img info /mnt/pve/nas-nfs/images/100/vm-100-disk-0.qcow2 | head -4
+   ```
+
+   ``` { .text .no-copy title="Output" }
    image: /mnt/pve/nas-nfs/images/100/vm-100-disk-0.qcow2
    file format: qcow2
    virtual size: 16 GiB (17179869184 bytes)
@@ -193,30 +256,57 @@ root@desopve01:~# fio --name=rw4k --directory=/var/lib/vz --rw=randwrite --bs=4k
 
 In the VM, repeat the same commands as in step 4, now with the disk on NFS:
 
-```console
-labuser@debian01:~$ dd if=/dev/zero of=$HOME/test.bin bs=1M count=1024 oflag=direct
+```bash title="labuser@debian01"
+dd if=/dev/zero of=$HOME/test.bin bs=1M count=1024 oflag=direct
+```
+
+``` { .text .no-copy title="Output" }
 1073741824 bytes (1.1 GB, 1.0 GiB) copied, 0.403307 s, 2.7 GB/s
-labuser@debian01:~$ head -c 512M /dev/urandom > /dev/shm/rnd.bin
-labuser@debian01:~$ for i in 1 2 3; do dd if=/dev/shm/rnd.bin of=$HOME/test.bin bs=1M oflag=direct conv=fsync 2>&1 | tail -1; done
+```
+
+```bash title="labuser@debian01"
+head -c 512M /dev/urandom > /dev/shm/rnd.bin
+for i in 1 2 3; do dd if=/dev/shm/rnd.bin of=$HOME/test.bin bs=1M oflag=direct conv=fsync 2>&1 | tail -1; done
+```
+
+``` { .text .no-copy title="Output" }
 536870912 bytes (537 MB, 512 MiB) copied, 6.69699 s, 80.2 MB/s
 536870912 bytes (537 MB, 512 MiB) copied, 20.2377 s, 26.5 MB/s
 536870912 bytes (537 MB, 512 MiB) copied, 26.9102 s, 20.0 MB/s
-labuser@debian01:~$ for i in 1 2; do dd if=$HOME/test.bin of=/dev/null bs=1M iflag=direct 2>&1 | tail -1; done
+```
+
+```bash title="labuser@debian01"
+for i in 1 2; do dd if=$HOME/test.bin of=/dev/null bs=1M iflag=direct 2>&1 | tail -1; done
+```
+
+``` { .text .no-copy title="Output" }
 536870912 bytes (537 MB, 512 MiB) copied, 1.44691 s, 371 MB/s
 536870912 bytes (537 MB, 512 MiB) copied, 1.7027 s, 315 MB/s
-labuser@debian01:~$ rm -f $HOME/test.bin /dev/shm/rnd.bin
+```
+
+```bash title="labuser@debian01"
+rm -f $HOME/test.bin /dev/shm/rnd.bin
 ```
 
 Zeros on NFS at 2.7 GB/s, faster than the local disk? No: QEMU detects blocks full of zeros and, on `qcow2`, records them as "zero" without writing them. To measure for real you need **random data**.
 
 And from the node, 4 KiB random writes on the NFS share:
 
-```console
-root@desopve01:~# fio --name=rw4k --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
+```bash title="root@desopve01"
+fio --name=rw4k --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
       --iodepth=16 --ioengine=libaio --direct=1 --runtime=30 --time_based --group_reporting --unlink=1
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=865, BW=3463KiB/s (3546kB/s)(101MiB/30007msec); 0 zone resets
-root@desopve01:~# fio --name=rw4k --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
+```
+
+```bash title="root@desopve01"
+fio --name=rw4k --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
       --iodepth=16 --ioengine=libaio --direct=1 --runtime=30 --time_based --group_reporting --unlink=1
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=966, BW=3867KiB/s (3959kB/s)(114MiB/30151msec); 0 zone resets
 ```
 
@@ -238,8 +328,8 @@ You leave the VM disk on NFS and stop the NFS service on the NAS, as would happe
 
 1. In the VM, start a "heartbeat" that writes the time every second and forces it to disk:
 
-   ```console
-   labuser@debian01:~$ nohup sh -c 'while true; do date +%T >> $HOME/battito.log; sync; sleep 1; done' >/dev/null 2>&1 &
+   ```bash title="labuser@debian01"
+   nohup sh -c 'while true; do date +%T >> $HOME/battito.log; sync; sleep 1; done' >/dev/null 2>&1 &
    ```
 
 2. On the NAS: **System** → **Services** → **NFS** → **Stop Service** and confirm with **Stop**.
@@ -248,19 +338,40 @@ You leave the VM disk on NFS and stop the NFS service on the NAS, as would happe
 
 3. A minute later, on the node, the server no longer responds over NFS and `pvestatd` marks the storage as not active. The VM, however, still shows as running:
 
-   ```console
-   root@desopve01:~# rpcinfo -T tcp 172.27.199.10 nfs 4
+   ```bash title="root@desopve01"
+   rpcinfo -T tcp 172.27.199.10 nfs 4
+   ```
+
+   ``` { .text .no-copy title="Output" }
    rpcinfo: RPC: Program not registered
-   root@desopve01:~# pvesm status
+   ```
+
+   ```bash title="root@desopve01"
+   pvesm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    storage 'nas-nfs' is not online
    Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
    local             dir     active        46255488          768000        45487488    1.66%
    local-zfs     zfspool     active        45487664              96        45487568    0.00%
    nas-nfs           nfs   inactive               0               0               0    0.00%
-   root@desopve01:~# journalctl -u pvestatd --since "-3 min" | tail -2
+   ```
+
+   ```bash title="root@desopve01"
+   journalctl -u pvestatd --since "-3 min" | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Nov 09 15:21:57 desopve01 pvestatd[1611]: storage 'nas-nfs' is not online
    Nov 09 15:22:07 desopve01 pvestatd[1611]: storage 'nas-nfs' is not online
-   root@desopve01:~# qm status 100
+   ```
+
+   ```bash title="root@desopve01"
+   qm status 100
+   ```
+
+   ``` { .text .no-copy title="Output" }
    status: running
    ```
 
@@ -272,13 +383,22 @@ You leave the VM disk on NFS and stop the NFS service on the NAS, as would happe
 
 4. Try to access the mount: the process gets stuck in state **`D`** (uninterruptible I/O wait), waiting for the server. The kernel reports it in the log:
 
-   ```console
-   root@desopve01:~# timeout 20 ls -la /mnt/pve/nas-nfs/images/100/ &
-   root@desopve01:~# ps -eo stat,pid,etime,comm,wchan:28 | awk 'NR==1 || $1 ~ /^D/'
+   ```bash title="root@desopve01"
+   timeout 20 ls -la /mnt/pve/nas-nfs/images/100/ &
+   ps -eo stat,pid,etime,comm,wchan:28 | awk 'NR==1 || $1 ~ /^D/'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    STAT     PID     ELAPSED COMMAND         WCHAN
    D      12326       00:20 172.27.199.10-m rpc_wait_bit_killable
    D      12419       00:03 ls              rpc_wait_bit_killable
-   root@desopve01:~# dmesg -T | grep "nfs: server"
+   ```
+
+   ```bash title="root@desopve01"
+   dmesg -T | grep "nfs: server"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [Mon Nov  9 15:24:04 2026] nfs: server 172.27.199.10 not responding, still trying
    ```
 
@@ -292,12 +412,27 @@ You leave the VM disk on NFS and stop the NFS service on the NAS, as would happe
 
 6. Restart the service on the NAS (**Start Service**). A few seconds later the NFS client reconnects, the storage becomes active again and no process is left in state `D`:
 
-   ```console
-   root@desopve01:~# dmesg -T | grep "nfs: server" | tail -1
+   ```bash title="root@desopve01"
+   dmesg -T | grep "nfs: server" | tail -1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    [Mon Nov  9 15:37:36 2026] nfs: server 172.27.199.10 OK
-   root@desopve01:~# pvesm status | grep nas-nfs
+   ```
+
+   ```bash title="root@desopve01"
+   pvesm status | grep nas-nfs
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nas-nfs           nfs     active       100069376         2021376        98048000    2.02%
-   root@desopve01:~# ps -eo stat,comm | awk '$1 ~ /^D/' | wc -l
+   ```
+
+   ```bash title="root@desopve01"
+   ps -eo stat,comm | awk '$1 ~ /^D/' | wc -l
+   ```
+
+   ``` { .text .no-copy title="Output" }
    0
    ```
 
@@ -307,13 +442,25 @@ You leave the VM disk on NFS and stop the NFS service on the NAS, as would happe
 
 Stop the heartbeat and move the VM disk back to local storage. The `nas-nfs` storage stays configured for the following labs.
 
-```console
-labuser@debian01:~$ pkill -f battito.log; rm -f $HOME/battito.log
-root@desopve01:~# qm disk move 100 scsi0 local-zfs --delete 1
+```bash title="labuser@debian01"
+pkill -f battito.log; rm -f $HOME/battito.log
+```
+
+```bash title="root@desopve01"
+qm disk move 100 scsi0 local-zfs --delete 1
+```
+
+``` { .text .no-copy title="Output" }
 …
 mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 38s, ready
 removing source volume 'nas-nfs:100/vm-100-disk-0.qcow2' after successful copy
-root@desopve01:~# qm config 100 | grep scsi0
+```
+
+```bash title="root@desopve01"
+qm config 100 | grep scsi0
+```
+
+``` { .text .no-copy title="Output" }
 scsi0: local-zfs:vm-100-disk-0,iothread=1,size=16G
 ```
 

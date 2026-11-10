@@ -62,54 +62,63 @@ Instead of installing Debian from the ISO, use the official *cloud* image: a rea
 
 1. On `desopve01` and on `desopve04` create an SSH key without a passphrase, used only to log in to the two test VMs (you will delete it at the end):
 
-   ```console
-   root@desopve01:~# ssh-keygen -q -t ed25519 -N '' -f /root/bench
-   root@desopve04:~# ssh-keygen -q -t ed25519 -N '' -f /root/bench
+   ```bash title="root@desopve01"
+   ssh-keygen -q -t ed25519 -N '' -f /root/bench
+   ```
+
+   ```bash title="root@desopve04"
+   ssh-keygen -q -t ed25519 -N '' -f /root/bench
    ```
 
    Then download the image into the `local` storage (content **import**) of `desopve01` and of `desopve04`. The Debian site redirects to a mirror, so you need `-L`:
 
-   ```console
-   root@desopve01:~# curl -sL -x http://proxy.proxmox.community:3128 \
+   ```bash title="root@desopve01"
+   curl -sL -x http://proxy.proxmox.community:3128 \
        -o /var/lib/vz/import/debian-13-genericcloud-amd64.qcow2 \
        https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2
-   root@desopve01:~# qemu-img info /var/lib/vz/import/debian-13-genericcloud-amd64.qcow2 | grep -E "format|virtual"
+   qemu-img info /var/lib/vz/import/debian-13-genericcloud-amd64.qcow2 | grep -E "format|virtual"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    file format: qcow2
    virtual size: 3 GiB (3221225472 bytes)
-   root@desopve04:~# curl -sL -x http://proxy.proxmox.community:3128 \
+   ```
+
+   ```bash title="root@desopve04"
+   curl -sL -x http://proxy.proxmox.community:3128 \
        -o /var/lib/vz/import/debian-13-genericcloud-amd64.qcow2 \
        https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2
    ```
 
 2. Create `bench01` on `desopve01`. The system disk is imported from the image (`import-from`); cloud-init sets up the user, the SSH key and the network. Then add an 8 GiB disk for each storage to measure:
 
-   ```console
-   root@desopve01:~# qm create 190 --name bench01 --memory 2048 --cores 2 --cpu host \
+   ```bash title="root@desopve01"
+   qm create 190 --name bench01 --memory 2048 --cores 2 --cpu host \
        --scsihw virtio-scsi-single --net0 virtio,bridge=vmbr0 --boot order=scsi0 \
        --serial0 socket --vga serial0 \
        --scsi0 local-zfs:0,import-from=local:import/debian-13-genericcloud-amd64.qcow2,iothread=1 \
        --ide2 local-zfs:cloudinit --ciuser labuser --sshkeys /root/bench.pub \
        --ipconfig0 ip=172.27.199.190/24,gw=172.27.199.1 \
        --nameserver 172.27.199.20 --searchdomain proxmox.community
-   root@desopve01:~# qm set 190 --scsi1 local-zfs:8,iothread=1 --scsi2 nas-nfs:8,format=raw,iothread=1 \
+   qm set 190 --scsi1 local-zfs:8,iothread=1 --scsi2 nas-nfs:8,format=raw,iothread=1 \
        --scsi3 nas-lvm:8,iothread=1 --scsi4 rbd-vm:8,iothread=1
-   root@desopve01:~# qm start 190
+   qm start 190
    ```
 
    ![bench01: one disk per storage](../images/19/01-bench01-hardware.png)
 
    `bench04` (VMID 191, 172.27.199.191) is identical, on `desopve04`, with the system disk on `local-lvm` and the test disks on `local-lvm` and `tank`:
 
-   ```console
-   root@desopve04:~# qm create 191 --name bench04 --memory 2048 --cores 2 --cpu host \
+   ```bash title="root@desopve04"
+   qm create 191 --name bench04 --memory 2048 --cores 2 --cpu host \
        --scsihw virtio-scsi-single --net0 virtio,bridge=vmbr0 --boot order=scsi0 \
        --serial0 socket --vga serial0 \
        --scsi0 local-lvm:0,import-from=local:import/debian-13-genericcloud-amd64.qcow2,iothread=1 \
        --ide2 local-lvm:cloudinit --ciuser labuser --sshkeys /root/bench.pub \
        --ipconfig0 ip=172.27.199.191/24,gw=172.27.199.1 \
        --nameserver 172.27.199.20 --searchdomain proxmox.community
-   root@desopve04:~# qm set 191 --scsi1 local-lvm:8,iothread=1 --scsi2 tank:8,iothread=1
-   root@desopve04:~# qm start 191
+   qm set 191 --scsi1 local-lvm:8,iothread=1 --scsi2 tank:8,iothread=1
+   qm start 191
    ```
 
    ![bench04: the disks on local-lvm and tank](../images/19/02-bench04-hardware.png)
@@ -118,18 +127,27 @@ Instead of installing Debian from the ISO, use the official *cloud* image: a rea
 
 3. Log in to the VMs with the key created in step 1 (`bench04` the same way, from `desopve04` to `.191`):
 
-   ```console
-   root@desopve01:~# ssh -i /root/bench labuser@172.27.199.190
+   ```bash title="root@desopve01"
+   ssh -i /root/bench labuser@172.27.199.190
    ```
 
    Install fio. The cloud image uses the Debian repositories over **HTTPS**, so the proxy must be declared for `https` as well:
 
-   ```console
-   labuser@bench01:~$ printf 'Acquire::http::Proxy "http://proxy.proxmox.community:3128";\nAcquire::https::Proxy "http://proxy.proxmox.community:3128";\n' | sudo tee /etc/apt/apt.conf.d/80proxy
-   labuser@bench01:~$ sudo apt-get update && sudo apt-get install -y fio
-   labuser@bench01:~$ fio --version
+   ```bash title="labuser@bench01"
+   printf 'Acquire::http::Proxy "http://proxy.proxmox.community:3128";\nAcquire::https::Proxy "http://proxy.proxmox.community:3128";\n' | sudo tee /etc/apt/apt.conf.d/80proxy
+   sudo apt-get update && sudo apt-get install -y fio
+   fio --version
+   ```
+
+   ``` { .text .no-copy title="Output" }
    fio-3.39
-   labuser@bench01:~$ ls -l /dev/disk/by-id/ | grep drive-scsi | awk '{print $9, $11}'
+   ```
+
+   ```bash title="labuser@bench01"
+   ls -l /dev/disk/by-id/ | grep drive-scsi | awk '{print $9, $11}'
+   ```
+
+   ``` { .text .no-copy title="Output" }
    scsi-0QEMU_QEMU_HARDDISK_drive-scsi0 ../../sdb
    ...
    scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 ../../sda
@@ -144,11 +162,11 @@ Instead of installing Debian from the ISO, use the official *cloud* image: a rea
 
 The script is published in [`files/19/bench.sh`](../files/19/bench.sh). Create it in both VMs, for example by pasting it with a *here document*, and make it executable:
 
-```console
-labuser@bench01:~$ cat > ~/bench.sh <<'FINE'
+```bash title="labuser@bench01"
+cat > ~/bench.sh <<'FINE'
 (paste the contents of bench.sh here)
 FINE
-labuser@bench01:~$ chmod +x ~/bench.sh
+chmod +x ~/bench.sh
 ```
 
 Its contents:
@@ -176,28 +194,34 @@ touch ~/res/DONE
 
 Start it in the background on `bench01` and, only when it has finished, on `bench04`:
 
-```console
-labuser@bench01:~$ nohup ./bench.sh local-zfs:scsi1 nas-nfs:scsi2 nas-lvm:scsi3 rbd-vm:scsi4 > bench.log 2>&1 &
-labuser@bench01:~$ cat bench.log
+```bash title="labuser@bench01"
+nohup ./bench.sh local-zfs:scsi1 nas-nfs:scsi2 nas-lvm:scsi3 rbd-vm:scsi4 > bench.log 2>&1 &
+cat bench.log
+```
+
+``` { .text .no-copy title="Output" }
 17:36:30 local-zfs finito
 17:41:39 nas-nfs finito
 17:46:13 nas-lvm finito
 17:51:30 rbd-vm finito
-labuser@bench04:~$ nohup ./bench.sh local-lvm:scsi1 tank:scsi2 > bench.log 2>&1 &
+```
+
+```bash title="labuser@bench04"
+nohup ./bench.sh local-lvm:scsi1 tank:scsi2 > bench.log 2>&1 &
 ```
 
 Then one last job for each disk, with an `fsync` after **every** write:
 
-```console
-labuser@bench01:~$ sudo fio --name=sync --filename=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 \
+```bash title="labuser@bench01"
+sudo fio --name=sync --filename=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 \
     --rw=randwrite --bs=4k --iodepth=1 --fsync=1 --size=2G --direct=1 --ioengine=libaio \
     --time_based --runtime=15 --ramp_time=2 --output-format=json
 ```
 
 The fio JSON files contain everything (IOPS, bandwidth, mean latencies and percentiles). The table for the normal workload is produced by the [`files/19/riassunto.py`](../files/19/riassunto.py) script, which reads `jobs[0].read` and `jobs[0].write` from each file and computes the average and the spread of the two runs:
 
-```console
-labuser@bench01:~$ python3 riassunto.py ~/res
+```bash title="labuser@bench01"
+python3 riassunto.py ~/res
 ```
 
 For the `fsync` table, just read `jobs[0].write.iops`, `jobs[0].write.lat_ns.mean` and `jobs[0].sync.lat_ns.mean` in the JSON of the last job.
@@ -251,9 +275,12 @@ For the `fsync` table, just read `jobs[0].write.iops`, `jobs[0].write.lat_ns.mea
 
 Destroy the test VMs along with their disks and delete the test SSH key:
 
-```console
-root@desopve01:~# qm stop 190 && qm destroy 190 --purge && rm -f /root/bench /root/bench.pub
-root@desopve04:~# qm stop 191 && qm destroy 191 --purge && rm -f /root/bench /root/bench.pub
+```bash title="root@desopve01"
+qm stop 190 && qm destroy 190 --purge && rm -f /root/bench /root/bench.pub
+```
+
+```bash title="root@desopve04"
+qm stop 191 && qm destroy 191 --purge && rm -f /root/bench /root/bench.pub
 ```
 
 ## Final lab state

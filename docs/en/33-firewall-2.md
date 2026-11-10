@@ -148,7 +148,7 @@ pvesh create $G --type in --action ACCEPT --macro Ping --source +dc/reti-sdn --e
 pvesh create $G --type in --action ACCEPT --macro DNS --source +dc/reti-sdn --enable 1 --comment "DNS di dnsmasq per le zone SDN"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 [group servizi-cluster] # Traffico tra i nodi del cluster
 
 IN DNS(ACCEPT) -source +dc/reti-sdn # DNS di dnsmasq per le zone SDN
@@ -223,7 +223,7 @@ systemctl is-active proxmox-firewall
 pvesh get /nodes/desopve03/firewall/options --output-format json
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 0
 inactive
 {"digest":"e6af7727c9dfe3d89839c54416cd1ca62764752f","enable":0,"nftables":0}
@@ -313,7 +313,7 @@ foreach ($h in 'fd27:199::21', 'fd27:199::22', 'fd27:199::23') {
 'desopve02 (per nome) 8006 -> ' + (Test-NetConnection desopve02.proxmox.community -Port 8006 -InformationLevel Quiet)
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 fd27:199::21 ssh/22 -> True
 fd27:199::22 ssh/22 -> True
 fd27:199::23 ssh/22 -> True
@@ -346,7 +346,7 @@ echo "== dal CT 403 verso SSH di desopve01"
 pct exec 403 -- nc -zw3 172.27.199.21 22 && echo ok || echo BLOCCATO
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 == da desopve02 sulla rete di gestione verso 172.27.199.21:8080
 BLOCCATO
 == da desopve02 sulla rete di migrazione verso 10.100.10.21:8080
@@ -379,7 +379,7 @@ The security group becomes a chain of the `inet proxmox-firewall` table:
 nft list chain inet proxmox-firewall group-servizi-cluster-in
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 table inet proxmox-firewall {
 	chain group-servizi-cluster-in {
 		udp dport 53 ip saddr @v4-dc/reti-sdn ip saddr != @v4-dc/reti-sdn-nomatch accept
@@ -457,7 +457,7 @@ pct exec 101 -- bash -c '
   ip addr del 172.27.199.199/24 dev eth0'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -- ping dal suo indirizzo (.101):
 2 packets transmitted, 2 received, 0% packet loss, time 1024ms
 -- ping con sorgente falsa (.199):
@@ -473,7 +473,7 @@ pct exec 101 -- bash -c '
   ping -c2 -W2 172.27.199.20'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -- MAC cambiato in 02:11:22:33:44:55:
 2 packets transmitted, 0 received, 100% packet loss, time 1028ms
 -- MAC originale bc:24:11:0c:31:84:
@@ -487,7 +487,7 @@ pct exec 101 -- bash -c '
 > pct exec 101 -- ping -6 -c2 -W2 fe80::1%eth0    # the router, link-local
 > ```
 >
-> ```text
+> ``` { .text .no-copy title="Output" }
 > 2 packets transmitted, 0 received, 100% packet loss, time 1002ms
 > rtt min/avg/max/mdev = 0.741/0.746/0.751/0.005 ms
 > ```
@@ -529,7 +529,7 @@ pvesh set $V/options --enable 1 --policy_forward DROP --log_level_forward info
 cat /etc/pve/sdn/firewall/vnsimp1.fw
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 [OPTIONS]
 
 log_level_forward: info
@@ -599,7 +599,7 @@ sysctl net.netfilter.nf_conntrack_count net.netfilter.nf_conntrack_max \
        net.netfilter.nf_conntrack_tcp_timeout_established
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 tcp      6 431994 ESTABLISHED src=172.27.199.20 dst=172.27.199.101 sport=51596 dport=22 src=172.27.199.101 dst=172.27.199.20 sport=22 dport=51596 [ASSURED] mark=101 use=1
 net.netfilter.nf_conntrack_count = 235
 net.netfilter.nf_conntrack_max = 262144
@@ -643,7 +643,7 @@ The most likely explanation lies in the rule that the SDN adds for the Simple zo
 iptables -t raw -S | grep zone | sort -u
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 -A PREROUTING -i fwbr+ -j CT --zone 1
 ```
 
@@ -653,7 +653,7 @@ The behavior is not systematic, though. Repeating the test later, with the same 
 pct exec 271 -- bash -c 'exec 3<>/dev/tcp/172.27.199.101/80; printf "GET / HTTP/1.0\r\n\r\n" >&3; head -1 <&3'
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 HTTP/1.1 200 OK
 ```
 

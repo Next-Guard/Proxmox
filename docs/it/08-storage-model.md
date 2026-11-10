@@ -95,8 +95,11 @@ Un disco **thin** occupa solo lo spazio effettivamente scritto; un disco **thick
 
 2. Gli stessi dati sono nel file condiviso del cluster:
 
-   ```console
-   root@desopve01:~# cat /etc/pve/storage.cfg
+   ```bash title="root@desopve01"
+   cat /etc/pve/storage.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    dir: local
    	path /var/lib/vz
    	content iso,vztmpl,backup,import
@@ -112,8 +115,11 @@ Un disco **thin** occupa solo lo spazio effettivamente scritto; un disco **thick
 
 3. L'elenco dei tipi è anche nell'help di `pvesm`:
 
-   ```console
-   root@desopve01:~# pvesm help add | sed -n 1,7p
+   ```bash title="root@desopve01"
+   pvesm help add | sed -n 1,7p
+   ```
+
+   ``` { .text .no-copy title="Output" }
    USAGE: pvesm add <type> <storage> [OPTIONS]
 
      Create a new storage.
@@ -127,8 +133,11 @@ Un disco **thin** occupa solo lo spazio effettivamente scritto; un disco **thick
 
 1. **Stato** di tutti gli storage del nodo, oppure solo di quelli che accettano un certo contenuto:
 
-   ```console
-   root@desopve01:~# pvesm status
+   ```bash title="root@desopve01"
+   pvesm status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
    local             dir     active        44854016          768000        44086016    1.71%
    local-zfs     zfspool     active        45518240         1432128        44086112    3.15%
@@ -138,21 +147,39 @@ Un disco **thin** occupa solo lo spazio effettivamente scritto; un disco **thick
 
 2. **Contenuto** di uno storage, con volume ID, formato e dimensione:
 
-   ```console
-   root@desopve01:~# pvesm list local
+   ```bash title="root@desopve01"
+   pvesm list local
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Volid                                     Format  Type           Size VMID
    local:iso/debian-13.7.0-amd64-netinst.iso iso     iso       792723456
-   root@desopve01:~# pvesm list local-zfs
+   ```
+
+   ```bash title="root@desopve01"
+   pvesm list local-zfs
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Volid                   Format  Type             Size VMID
    local-zfs:vm-100-disk-0 raw     images    17179869184 100
    ```
 
 3. **Percorso** reale di un volume e spazio effettivamente occupato. Il disco della VM 100 è uno zvol, cioè un block device:
 
-   ```console
-   root@desopve01:~# pvesm path local-zfs:vm-100-disk-0
+   ```bash title="root@desopve01"
+   pvesm path local-zfs:vm-100-disk-0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    /dev/zvol/rpool/data/vm-100-disk-0
-   root@desopve01:~# zfs get -H -o property,value volsize,used,refreservation,volblocksize,compression rpool/data/vm-100-disk-0
+   ```
+
+   ```bash title="root@desopve01"
+   zfs get -H -o property,value volsize,used,refreservation,volblocksize,compression rpool/data/vm-100-disk-0
+   ```
+
+   ``` { .text .no-copy title="Output" }
    volsize	16G
    used	1.37G
    refreservation	none
@@ -168,9 +195,12 @@ Uno storage `dir` può stare su qualsiasi file system montato. Qui usi un nuovo 
 
 1. Crea il dataset, che ZFS monta da solo in `/rpool/lab08`:
 
-   ```console
-   root@desopve01:~# zfs create rpool/lab08
-   root@desopve01:~# zfs list -o name,used,avail,mountpoint rpool/lab08
+   ```bash title="root@desopve01"
+   zfs create rpool/lab08
+   zfs list -o name,used,avail,mountpoint rpool/lab08
+   ```
+
+   ``` { .text .no-copy title="Output" }
    NAME          USED  AVAIL  MOUNTPOINT
    rpool/lab08    96K  42.0G  /rpool/lab08
    ```
@@ -189,9 +219,12 @@ Uno storage `dir` può stare su qualsiasi file system montato. Qui usi un nuovo 
 
 4. Lo storage punta a un punto di mount. Se il dataset non fosse montato, Proxmox VE scriverebbe i dischi nella cartella vuota sottostante, sul file system di sistema. L'opzione `is_mountpoint`, che si imposta da riga di comando, lo impedisce: se il percorso non è montato, lo storage risulta non attivo.
 
-   ```console
-   root@desopve01:~# pvesm set lab08-dir --is_mountpoint yes
-   root@desopve01:~# grep -A6 "dir: lab08-dir" /etc/pve/storage.cfg
+   ```bash title="root@desopve01"
+   pvesm set lab08-dir --is_mountpoint yes
+   grep -A6 "dir: lab08-dir" /etc/pve/storage.cfg
+   ```
+
+   ``` { .text .no-copy title="Output" }
    dir: lab08-dir
    	path /rpool/lab08
    	content iso,images
@@ -235,14 +268,29 @@ Sposti il disco della VM `100`, **accesa**, da `local-zfs` (zvol, raw) a `lab08-
 
 5. Da riga di comando: il file "pesa" 17 GB come dimensione apparente, ma ne occupa 1,2 sul disco. `qemu-img` mostra la dimensione virtuale del disco e quella reale del file.
 
-   ```console
-   root@desopve01:~# pvesm list lab08-dir
+   ```bash title="root@desopve01"
+   pvesm list lab08-dir
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Volid                             Format  Type             Size VMID
    lab08-dir:100/vm-100-disk-0.qcow2 qcow2   images    17179869184 100
-   root@desopve01:~# ls -lsh /rpool/lab08/images/100/
+   ```
+
+   ```bash title="root@desopve01"
+   ls -lsh /rpool/lab08/images/100/
+   ```
+
+   ``` { .text .no-copy title="Output" }
    total 1.2G
    1.2G -rw-r----- 1 root root 17G Nov  9 13:33 vm-100-disk-0.qcow2
-   root@desopve01:~# qemu-img info /rpool/lab08/images/100/vm-100-disk-0.qcow2 | head -4
+   ```
+
+   ```bash title="root@desopve01"
+   qemu-img info /rpool/lab08/images/100/vm-100-disk-0.qcow2 | head -4
+   ```
+
+   ``` { .text .no-copy title="Output" }
    image: /rpool/lab08/images/100/vm-100-disk-0.qcow2
    file format: qcow2
    virtual size: 16 GiB (17179869184 bytes)
@@ -253,8 +301,11 @@ Sposti il disco della VM `100`, **accesa**, da `local-zfs` (zvol, raw) a `lab08-
 
 Lo stesso spostamento si fa con `qm disk move`. Riporta il disco su `local-zfs`, dove deve restare per i lab successivi. Il formato diventa di nuovo `raw`, perché su uno zvol non ne esistono altri.
 
-```console
-root@desopve01:~# qm disk move 100 scsi0 local-zfs --delete 1
+```bash title="root@desopve01"
+qm disk move 100 scsi0 local-zfs --delete 1
+```
+
+``` { .text .no-copy title="Output" }
 copying volume 'lab08-dir:100/vm-100-disk-0.qcow2' from current storage 'lab08-dir' to target storage 'local-zfs'
 create full clone of drive scsi0 (lab08-dir:100/vm-100-disk-0.qcow2)
 allocated target volume 'local-zfs:vm-100-disk-0'
@@ -266,9 +317,21 @@ mirror-scsi0: Completing block job...
 mirror-scsi0: Completed successfully.
 mirror-scsi0: mirror-job finished
 removing source volume 'lab08-dir:100/vm-100-disk-0.qcow2' after successful copy
-root@desopve01:~# qm config 100 | grep scsi0
+```
+
+```bash title="root@desopve01"
+qm config 100 | grep scsi0
+```
+
+``` { .text .no-copy title="Output" }
 scsi0: local-zfs:vm-100-disk-0,iothread=1,size=16G
-root@desopve01:~# zfs get -H -o property,value volsize,used,refreservation rpool/data/vm-100-disk-0
+```
+
+```bash title="root@desopve01"
+zfs get -H -o property,value volsize,used,refreservation rpool/data/vm-100-disk-0
+```
+
+``` { .text .no-copy title="Output" }
 volsize	16G
 used	1.37G
 refreservation	none
@@ -282,13 +345,28 @@ Il disco è tornato thin: la copia non ha scritto gli spazi vuoti.
 
 L'opzione `sparse` dello storage decide se uno zvol è thin. Per vederlo, definisci un secondo storage `lab08-thick` sullo **stesso** dataset ma senza `sparse`, e crea un volume da 4 GiB in ciascuno. `pvesm alloc` crea un volume senza VM, qui intestato a un VMID inesistente (`990`).
 
-```console
-root@desopve01:~# pvesm alloc local-zfs 990 vm-990-disk-0 4G
+```bash title="root@desopve01"
+pvesm alloc local-zfs 990 vm-990-disk-0 4G
+```
+
+``` { .text .no-copy title="Output" }
 successfully created 'local-zfs:vm-990-disk-0'
-root@desopve01:~# pvesm add zfspool lab08-thick --pool rpool/data --content images --nodes desopve01
-root@desopve01:~# pvesm alloc lab08-thick 990 vm-990-disk-1 4G
+```
+
+```bash title="root@desopve01"
+pvesm add zfspool lab08-thick --pool rpool/data --content images --nodes desopve01
+pvesm alloc lab08-thick 990 vm-990-disk-1 4G
+```
+
+``` { .text .no-copy title="Output" }
 successfully created 'lab08-thick:vm-990-disk-1'
-root@desopve01:~# zfs list -o name,volsize,used,refreservation,avail -r rpool/data
+```
+
+```bash title="root@desopve01"
+zfs list -o name,volsize,used,refreservation,avail -r rpool/data
+```
+
+``` { .text .no-copy title="Output" }
 NAME                      VOLSIZE   USED  REFRESERV  AVAIL
 rpool/data                      -  5.43G       none  38.0G
 rpool/data/vm-100-disk-0      16G  1.37G       none  38.0G
@@ -301,27 +379,48 @@ rpool/data/vm-990-disk-1       4G  4.06G      4.06G  42.0G
 
 Elimina i volumi di prova e lo storage `lab08-thick`:
 
-```console
-root@desopve01:~# pvesm free local-zfs:vm-990-disk-0
+```bash title="root@desopve01"
+pvesm free local-zfs:vm-990-disk-0
+```
+
+``` { .text .no-copy title="Output" }
 Removed volume 'local-zfs:vm-990-disk-0'
-root@desopve01:~# pvesm free lab08-thick:vm-990-disk-1
+```
+
+```bash title="root@desopve01"
+pvesm free lab08-thick:vm-990-disk-1
+```
+
+``` { .text .no-copy title="Output" }
 Removed volume 'lab08-thick:vm-990-disk-1'
-root@desopve01:~# pvesm remove lab08-thick
+```
+
+```bash title="root@desopve01"
+pvesm remove lab08-thick
 ```
 
 ### Test 2 – Uno storage Directory non montato
 
 Smonta il dataset e guarda lo stato dello storage: grazie a `is_mountpoint`, Proxmox VE lo dichiara non attivo invece di scrivere sul disco di sistema.
 
-```console
-root@desopve01:~# zfs unmount rpool/lab08
-root@desopve01:~# pvesm status
+```bash title="root@desopve01"
+zfs unmount rpool/lab08
+pvesm status
+```
+
+``` { .text .no-copy title="Output" }
 unable to activate storage 'lab08-dir' - directory is expected to be a mount point but is not mounted: '/rpool/lab08'
 Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
 lab08-dir         dir   inactive               0               0               0    0.00%
 ...
-root@desopve01:~# zfs mount rpool/lab08
-root@desopve01:~# pvesm status | grep lab08
+```
+
+```bash title="root@desopve01"
+zfs mount rpool/lab08
+pvesm status | grep lab08
+```
+
+``` { .text .no-copy title="Output" }
 lab08-dir         dir     active        44085504             128        44085376    0.00%
 ```
 
@@ -329,10 +428,13 @@ lab08-dir         dir     active        44085504             128        44085376
 
 Rimuovere uno storage cancella solo la sua definizione, non i dati: il dataset va distrutto a parte.
 
-```console
-root@desopve01:~# pvesm remove lab08-dir
-root@desopve01:~# zfs destroy rpool/lab08
-root@desopve01:~# pvesm status
+```bash title="root@desopve01"
+pvesm remove lab08-dir
+zfs destroy rpool/lab08
+pvesm status
+```
+
+``` { .text .no-copy title="Output" }
 Name             Type     Status     Total (KiB)      Used (KiB) Available (KiB)        %
 local             dir     active        44853504          768000        44085504    1.71%
 local-zfs     zfspool     active        45517724         1432132        44085592    3.15%

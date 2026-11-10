@@ -59,8 +59,8 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 1. Make a backup copy of the network configuration:
 
-   ```console
-   root@desopve04:~# cp /etc/network/interfaces /root/interfaces.bak-lab24
+   ```bash title="root@desopve04"
+   cp /etc/network/interfaces /root/interfaces.bak-lab24
    ```
 
 2. Node **desopve04** → **System** → **Network** → **Create** → **Linux Bridge**. **Name** `vmbr9`, **IPv4/CIDR** `192.168.100.1/24`, **Bridge ports** empty, no gateway. Comment `rete privata con NAT`.
@@ -77,9 +77,12 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 5. Enable IP forwarding permanently:
 
-   ```console
-   root@desopve04:~# echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/80-ip-forward.conf
-   root@desopve04:~# sysctl -p /etc/sysctl.d/80-ip-forward.conf
+   ```bash title="root@desopve04"
+   echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/80-ip-forward.conf
+   sysctl -p /etc/sysctl.d/80-ip-forward.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    net.ipv4.ip_forward = 1
    ```
 
@@ -99,17 +102,20 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
    #rete privata con NAT
    ```
 
-   ```console
-   root@desopve04:~# ifreload -a
-   root@desopve04:~# iptables -t nat -S POSTROUTING
+   ```bash title="root@desopve04"
+   ifreload -a
+   iptables -t nat -S POSTROUTING
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -P POSTROUTING ACCEPT
    -A POSTROUTING -s 192.168.100.0/24 -o vmbr0 -j MASQUERADE
    ```
 
 2. Create CT 402 on the private network, with the node as its gateway:
 
-   ```console
-   root@desopve04:~# pct create 402 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
+   ```bash title="root@desopve04"
+   pct create 402 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
        --hostname nat-ct1 --memory 512 --cores 1 --rootfs local-lvm:4 \
        --net0 name=eth0,bridge=vmbr9,ip=192.168.100.10/24,gw=192.168.100.1 \
        --nameserver 172.27.199.20 --searchdomain proxmox.community \
@@ -118,25 +124,49 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 3. The container reaches the DC and resolves names:
 
-   ```console
-   root@desopve04:~# pct exec 402 -- ip route
+   ```bash title="root@desopve04"
+   pct exec 402 -- ip route
+   ```
+
+   ``` { .text .no-copy title="Output" }
    default via 192.168.100.1 dev eth0 proto kernel onlink
    192.168.100.0/24 dev eth0 proto kernel scope link src 192.168.100.10
-   root@desopve04:~# pct exec 402 -- ping -c3 -W1 172.27.199.20 | tail -2
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 402 -- ping -c3 -W1 172.27.199.20 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2074ms
    rtt min/avg/max/mdev = 0.743/0.820/0.862/0.054 ms
-   root@desopve04:~# pct exec 402 -- getent hosts desopve-dc01.proxmox.community
+   ```
+
+   ```bash title="root@desopve04"
+   pct exec 402 -- getent hosts desopve-dc01.proxmox.community
+   ```
+
+   ``` { .text .no-copy title="Output" }
    172.27.199.20   desopve-dc01.proxmox.community
    172.32.199.20   desopve-dc01.proxmox.community
    ```
 
 4. On `vmbr0` the packets leave with the **node's** address, and the conntrack table remembers whom to send the reply back to:
 
-   ```console
-   root@desopve04:~# tcpdump -ni vmbr0 icmp and host 172.27.199.20
+   ```bash title="root@desopve04"
+   tcpdump -ni vmbr0 icmp and host 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    19:59:00.253879 IP 172.27.199.24 > 172.27.199.20: ICMP echo request, id 347, seq 1, length 64
    19:59:00.254872 IP 172.27.199.20 > 172.27.199.24: ICMP echo reply, id 347, seq 1, length 64
-   root@desopve04:~# conntrack -L -p icmp
+   ```
+
+   ```bash title="root@desopve04"
+   conntrack -L -p icmp
+   ```
+
+   ``` { .text .no-copy title="Output" }
    icmp     1 24 src=192.168.100.10 dst=172.27.199.20 type=8 code=0 id=347 src=172.27.199.20 dst=172.27.199.24 type=0 code=0 id=347 mark=0 use=1
    ```
 
@@ -144,11 +174,20 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 5. **Test without masquerading.** Remove the rule and try again:
 
-   ```console
-   root@desopve04:~# iptables -t nat -D POSTROUTING -s 192.168.100.0/24 -o vmbr0 -j MASQUERADE
-   root@desopve04:~# pct exec 402 -- ping -c3 -W1 172.27.199.20 | tail -1
+   ```bash title="root@desopve04"
+   iptables -t nat -D POSTROUTING -s 192.168.100.0/24 -o vmbr0 -j MASQUERADE
+   pct exec 402 -- ping -c3 -W1 172.27.199.20 | tail -1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 0 received, 100% packet loss, time 2055ms
-   root@desopve04:~# tcpdump -ni vmbr0 icmp and host 172.27.199.20
+   ```
+
+   ```bash title="root@desopve04"
+   tcpdump -ni vmbr0 icmp and host 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    19:59:08.670035 IP 192.168.100.10 > 172.27.199.20: ICMP echo request, id 348, seq 1, length 64
    19:59:09.700834 IP 192.168.100.10 > 172.27.199.20: ICMP echo request, id 348, seq 2, length 64
    19:59:10.725095 IP 192.168.100.10 > 172.27.199.20: ICMP echo request, id 348, seq 3, length 64
@@ -158,11 +197,11 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 6. The container installs packages through the NAT and the lab proxy:
 
-   ```console
-   root@desopve04:~# pct exec 402 -- sh -c 'echo "Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";" > /etc/apt/apt.conf.d/80proxy'
-   root@desopve04:~# pct exec 402 -- apt-get update
-   root@desopve04:~# pct exec 402 -- apt-get install -y nginx
-   root@desopve04:~# pct exec 402 -- sh -c 'echo "nat-ct1: servizio raggiunto con il port forwarding" > /var/www/html/index.html'
+   ```bash title="root@desopve04"
+   pct exec 402 -- sh -c 'echo "Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";" > /etc/apt/apt.conf.d/80proxy'
+   pct exec 402 -- apt-get update
+   pct exec 402 -- apt-get install -y nginx
+   pct exec 402 -- sh -c 'echo "nat-ct1: servizio raggiunto con il port forwarding" > /var/www/html/index.html'
    ```
 
 ### 3. Port forwarding
@@ -176,9 +215,12 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 2. **Watch out for `ifreload`.** When you reload the network after the change, ifupdown2 runs the `post-up` commands of `vmbr9` again: the masquerading rule that was already there gets added a second time too.
 
-   ```console
-   root@desopve04:~# ifreload -a
-   root@desopve04:~# iptables -t nat -S | grep -E "DNAT|MASQ"
+   ```bash title="root@desopve04"
+   ifreload -a
+   iptables -t nat -S | grep -E "DNAT|MASQ"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -A PREROUTING -i vmbr0 -p tcp -m tcp --dport 8080 -j DNAT --to-destination 192.168.100.10:80
    -A POSTROUTING -s 192.168.100.0/24 -o vmbr0 -j MASQUERADE
    -A POSTROUTING -s 192.168.100.0/24 -o vmbr0 -j MASQUERADE
@@ -202,19 +244,31 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
    Once you have removed the extra copies by hand (`iptables -t nat -D ...` once per rule), two reloads in a row no longer duplicate anything:
 
-   ```console
-   root@desopve04:~# ifreload -a; ifreload -a
-   root@desopve04:~# iptables -t nat -S | grep -E "DNAT|MASQ"
+   ```bash title="root@desopve04"
+   ifreload -a; ifreload -a
+   iptables -t nat -S | grep -E "DNAT|MASQ"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    -A PREROUTING -i vmbr0 -p tcp -m tcp --dport 8080 -j DNAT --to-destination 192.168.100.10:80
    -A POSTROUTING -s 192.168.100.0/24 -o vmbr0 -j MASQUERADE
    ```
 
 3. The container's service is reachable from the management network on port 8080 of the node:
 
-   ```console
-   root@desopve01:~# curl -s http://172.27.199.24:8080/
+   ```bash title="root@desopve01"
+   curl -s http://172.27.199.24:8080/
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nat-ct1: servizio raggiunto con il port forwarding
-   root@desopve01:~# curl -s -i http://172.27.199.24:8080/ | head -3
+   ```
+
+   ```bash title="root@desopve01"
+   curl -s -i http://172.27.199.24:8080/ | head -3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    HTTP/1.1 200 OK
    Server: nginx
    Date: Mon, 09 Nov 2026 18:59:43 GMT
@@ -222,10 +276,19 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 4. From the node itself, however, it does not work:
 
-   ```console
-   root@desopve04:~# curl -s -m 5 http://172.27.199.24:8080/ || echo "nessuna risposta (codice $?)"
+   ```bash title="root@desopve04"
+   curl -s -m 5 http://172.27.199.24:8080/ || echo "nessuna risposta (codice $?)"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    nessuna risposta (codice 7)
-   root@desopve04:~# iptables -t nat -L PREROUTING -n -v
+   ```
+
+   ```bash title="root@desopve04"
+   iptables -t nat -L PREROUTING -n -v
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Chain PREROUTING (policy ACCEPT 41 packets, 2952 bytes)
     pkts bytes target     prot opt in     out     source               destination
        2   120 DNAT       tcp  --  vmbr0  *       0.0.0.0/0            0.0.0.0/0            tcp dpt:8080 to:192.168.100.10:80
@@ -237,8 +300,8 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 1. Create CT 403 on the routed subnet, with the node as its gateway:
 
-   ```console
-   root@desopve04:~# pct create 403 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
+   ```bash title="root@desopve04"
+   pct create 403 local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst \
        --hostname routed-ct1 --memory 512 --cores 1 --rootfs local-lvm:4 \
        --net0 name=eth0,bridge=vmbr8,ip=10.99.99.2/28,gw=10.99.99.1 \
        --nameserver 172.27.199.20 --searchdomain proxmox.community \
@@ -247,16 +310,22 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 2. As long as the router does not know that the subnet is behind `desopve04`, the container is unreachable:
 
-   ```console
-   root@desopve01:~# ping -c2 -W1 10.99.99.2 | tail -1
+   ```bash title="root@desopve01"
+   ping -c2 -W1 10.99.99.2 | tail -1
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 0 received, +2 errors, 100% packet loss, time 1001ms
    ```
 
 3. On the router (`rtr-core` here, the provider's router in production) route the subnet to the node's main address:
 
-   ```console
-   [admin@rtr-core] > /ip route add dst-address=10.99.99.0/28 gateway=172.27.199.24 comment="subnet instradata verso desopve04 (lab 24)"
-   [admin@rtr-core] > /ip route print where dst-address=10.99.99.0/28
+   ```text title="RouterOS — rtr-core"
+   /ip route add dst-address=10.99.99.0/28 gateway=172.27.199.24 comment="subnet instradata verso desopve04 (lab 24)"
+   /ip route print where dst-address=10.99.99.0/28
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Flags: A - ACTIVE; s - STATIC
    Columns: DST-ADDRESS, GATEWAY, ROUTING-TABLE, DISTANCE
    #    DST-ADDRESS    GATEWAY        ROUTING-TABLE  DISTANCE
@@ -266,11 +335,20 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 4. Now the container is reachable at **its own** address, and `traceroute` shows the path: router, node, container.
 
-   ```console
-   root@desopve01:~# ping -c3 -W1 10.99.99.2 | tail -2
+   ```bash title="root@desopve01"
+   ping -c3 -W1 10.99.99.2 | tail -2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    3 packets transmitted, 3 received, 0% packet loss, time 2052ms
    rtt min/avg/max/mdev = 0.633/0.776/0.907/0.112 ms
-   root@desopve01:~# traceroute -n -w1 -q1 10.99.99.2
+   ```
+
+   ```bash title="root@desopve01"
+   traceroute -n -w1 -q1 10.99.99.2
+   ```
+
+   ``` { .text .no-copy title="Output" }
    traceroute to 10.99.99.2 (10.99.99.2), 30 hops max, 60 byte packets
     1  172.27.199.1  0.440 ms
     2  172.27.199.24  0.684 ms
@@ -279,11 +357,20 @@ The GUI does not manage NAT: you add the rules by hand in `/etc/network/interfac
 
 5. Unlike with masquerading, whoever receives the traffic sees the container's real address. Start the capture on `vmbr0` and, from a second terminal, send a ping from the container (`pct exec 403 -- ping -c1 172.27.199.20`):
 
-   ```console
-   root@desopve04:~# tcpdump -ni vmbr0 icmp and host 172.27.199.20
+   ```bash title="root@desopve04"
+   tcpdump -ni vmbr0 icmp and host 172.27.199.20
+   ```
+
+   ``` { .text .no-copy title="Output" }
    20:00:13.717794 IP 10.99.99.2 > 172.27.199.20: ICMP echo request, id 344, seq 1, length 64
    20:00:13.718992 IP 172.27.199.20 > 10.99.99.2: ICMP echo reply, id 344, seq 1, length 64
-   root@desopve04:~# ip route | grep -E "vmbr8|vmbr9"
+   ```
+
+   ```bash title="root@desopve04"
+   ip route | grep -E "vmbr8|vmbr9"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    10.99.99.0/28 dev vmbr8 proto kernel scope link src 10.99.99.1
    192.168.100.0/24 dev vmbr9 proto kernel scope link src 192.168.100.1
    ```

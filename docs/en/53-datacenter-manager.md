@@ -89,7 +89,7 @@ System clock synchronized: yes
 cat /etc/sysctl.d/90-ipv6-host.conf
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 # Indirizzi IPv6 del nodo solo statici: nessuna interfaccia accetta gli RA o si autoconfigura (SLAAC).
 # Il carattere * vale anche per le schede che compaiono dopo l'avvio (systemd le applica a ogni nuova interfaccia).
 net.ipv6.conf.*.accept_ra = 0
@@ -142,7 +142,7 @@ The same for `desopve04` (a single-node PVE remote) and, with **Add → Proxmox 
 proxmox-datacenter-manager-admin remote list
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Proxmox VE node deso-cluster:
     auth id: pdm@pve!pdm
     nodes:

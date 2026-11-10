@@ -74,7 +74,7 @@ qm start 350
 qm showcmd 350 --pretty
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 /usr/bin/kvm \
   -id 350 \
   -name kvm-350 \
@@ -109,7 +109,7 @@ ps -o pid,ppid,user,nlwp,rss,etime,comm -p $PID
 ps -T -o spid,comm -p $PID
 ```
 
-```text
+``` { .text .no-copy title="Output" }
     PID    PPID USER     NLWP   RSS     ELAPSED COMMAND
  263691       1 root       36 1097572     02:17 kvm
 
@@ -149,17 +149,44 @@ Il monitor è la console di controllo di QEMU. Dalla GUI: **VM → Monitor**; da
 
 ![Scheda Monitor della VM 350 con info status, info cpus, info kvm e info balloon](../images/35/02-monitor-qemu.png)
 
-```text
-qm> info status
+```text title="qm monitor"
+info status
+```
+
+``` { .text .no-copy title="Output" }
 VM status: running
-qm> info cpus
+```
+
+```text title="qm monitor"
+info cpus
+```
+
+``` { .text .no-copy title="Output" }
 * CPU #0: thread_id=263758 model=host
   CPU #1: thread_id=263759 model=host
-qm> info kvm
+```
+
+```text title="qm monitor"
+info kvm
+```
+
+``` { .text .no-copy title="Output" }
 kvm support: enabled
-qm> info balloon
+```
+
+```text title="qm monitor"
+info balloon
+```
+
+``` { .text .no-copy title="Output" }
 balloon: actual=2048 max_mem=2048 total_mem=1974 free_mem=1111 ...
-qm> info version
+```
+
+```text title="qm monitor"
+info version
+```
+
+``` { .text .no-copy title="Output" }
 11.1.3pve-qemu-kvm_11.1.3-1
 ```
 
@@ -240,7 +267,7 @@ I tre nodi del cluster hanno lo stesso processore, quindi `host` si può migrare
 qm migrate 350 desopve02 --online
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-09 23:16:09 starting migration of VM 350 to node 'desopve02' (10.100.10.22)
 2026-11-09 23:16:14 starting online/live migration on unix:/run/qemu-server/350.migrate
 2026-11-09 23:16:14 migration downtime limit: 100 ms
@@ -312,7 +339,7 @@ QEMU elenca le versioni disponibili: `pc` e `q35` sono alias dell'ultima.
 kvm -machine help | grep -E "^pc-q35-1[0-9]|^q35 |^pc "
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 pc                   Standard PC (i440FX + PIIX, 1996) (alias of pc-i440fx-11.1)
 q35                  Standard PC (Q35 + ICH9, 2009) (alias of pc-q35-11.1)
 pc-q35-11.1          Standard PC (Q35 + ICH9, 2009)
@@ -329,7 +356,7 @@ qm set 350 --machine q35 --bios ovmf --efidisk0 rbd-vm:1,efitype=4m,pre-enrolled
 qm stop 350 && qm start 350
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 efidisk0: successfully created disk 'rbd-vm:vm-350-disk-1,efitype=4m,ms-cert=2023k,pre-enrolled-keys=1,size=1M'
   -blockdev '{"driver":"raw","file":{"driver":"file","filename":"/usr/share/pve-edk2-firmware//OVMF_CODE_4M.secboot.fd"},"node-name":"pflash0","read-only":true}' \
   -machine 'pflash0=pflash0,pflash1=drive-efidisk0,hpet=off,type=q35+pve0'
@@ -366,7 +393,7 @@ Con la CPU `host` il guest vede l'istruzione `vmx` (Intel VT-x) e può caricare 
 cat /sys/module/kvm_intel/parameters/nested   # sul nodo
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Y
 ```
 
@@ -376,7 +403,7 @@ ls -l /dev/kvm
 cat /sys/module/kvm_intel/parameters/nested
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 crw-rw---- 1 root kvm 10, 232 Nov  9 22:15 /dev/kvm
 Y
 ```

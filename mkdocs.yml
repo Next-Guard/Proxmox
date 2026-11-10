@@ -7,6 +7,7 @@ repo_name: Next-Guard/Proxmox
 edit_uri: edit/main/docs/
 copyright: >-
   &copy; 2026 Nicola Marco Decandia &middot; Content licensed under CC BY-SA 4.0, code under MIT.<br>
+  Content created by <a href="https://www.nextguard.it">NextGuard</a><br>
   Proxmox&reg; is a registered trademark of Proxmox Server Solutions GmbH.
   This project is independent and is not affiliated with, sponsored or endorsed by Proxmox Server Solutions GmbH.
 
@@ -80,6 +81,7 @@ plugins:
           site_description: Laboratori pratici su Proxmox VE 9, passo per passo, su un laboratorio reale.
           copyright: >-
             &copy; 2026 Nicola Marco Decandia &middot; Contenuti con licenza CC BY-SA 4.0, codice con licenza MIT.<br>
+            Materiale creato da <a href="https://www.nextguard.it">NextGuard</a><br>
             Proxmox&reg; è un marchio registrato di Proxmox Server Solutions GmbH.
             Questo progetto è indipendente e non è affiliato, sponsorizzato o approvato da Proxmox Server Solutions GmbH.
           nav_translations:

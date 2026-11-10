@@ -77,7 +77,7 @@ qm create 9000 --name debian13-cloud --ostype l26 --memory 2048 --cores 2 --cpu 
 qm resize 9000 scsi0 8G
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 transferred 3.0 GiB of 3.0 GiB (100.00%)
 scsi0: successfully created disk 'rbd-vm:vm-9000-disk-0,discard=on,iothread=1,size=3G,ssd=1'
 Resizing image: 100% complete...done.
@@ -124,7 +124,7 @@ rbd info rbd-vm/vm-102-disk-0 | grep -E "parent|size"
 rbd du -p rbd-vm
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 	size 8 GiB in 2048 objects
 	parent: rbd-vm/base-9000-disk-0@__base__
 NAME                       PROVISIONED  USED
@@ -145,21 +145,48 @@ qm start 102
 
 After less than a minute you can log in with the DC's key:
 
-```text
-labuser@linked01:~$ hostname -f
+```bash title="labuser@linked01"
+hostname -f
+```
+
+``` { .text .no-copy title="Output" }
 linked01.proxmox.community
-labuser@linked01:~$ cloud-init status --long
+```
+
+```bash title="labuser@linked01"
+cloud-init status --long
+```
+
+``` { .text .no-copy title="Output" }
 status: done
 extended_status: degraded done
 ...
 recoverable_errors:
 DEPRECATED:
 	- 'user' of type string is deprecated in 22.2 and scheduled to be removed in 27.2. Use 'users' list instead.
-labuser@linked01:~$ ip -br -4 a | grep -v "^lo"
+```
+
+```bash title="labuser@linked01"
+ip -br -4 a | grep -v "^lo"
+```
+
+``` { .text .no-copy title="Output" }
 eth0             UP             172.27.199.102/24
-labuser@linked01:~$ df -h / | tail -1
+```
+
+```bash title="labuser@linked01"
+df -h / | tail -1
+```
+
+``` { .text .no-copy title="Output" }
 /dev/sda1       7.7G  596M  6.8G   8% /
-labuser@linked01:~$ sudo -n true && echo "sudo senza password: ok"
+```
+
+```bash title="labuser@linked01"
+sudo -n true && echo "sudo senza password: ok"
+```
+
+``` { .text .no-copy title="Output" }
 sudo senza password: ok
 ```
 
@@ -176,7 +203,7 @@ A full clone to another node, on local storage:
 qm clone 9000 103 --name full01 --full --storage local-zfs --target desopve02
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 can't clone to non-shared storage 'local-zfs'
 ```
 
@@ -186,13 +213,13 @@ To clone **to another node**, the target storage must be **shared**. On the same
 time qm clone 9000 103 --name full01 --full --storage local-zfs
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 transferred 8.0 GiB of 8.0 GiB (100.00%)
 
 real	0m11.967s
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 NAME                       USED  REFER
 rpool/data/vm-103-disk-0   542M   542M
 ```
@@ -208,7 +235,7 @@ qm set 103 --net0 virtio,bridge=vnsimp1 --ipconfig0 ip=dhcp
 qm cloudinit dump 103 network
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 version: 1
 config:
     - type: physical
@@ -241,7 +268,7 @@ The user-data that Proxmox VE generates for the template:
 qm cloudinit dump 9000 user
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 #cloud-config
 hostname: debian13-cloud
 manage_etc_hosts: true
@@ -317,7 +344,7 @@ The linked clone to another node works because `rbd-vm` is shared. After about a
 for id in 104 105 106; do curl -s http://172.27.199.$id/; done
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 <h1>web01 - creata dal template 9000</h1>
 <h1>web02 - creata dal template 9000</h1>
 <h1>web03 - creata dal template 9000</h1>
@@ -330,7 +357,7 @@ for p in "desopve01 104" "desopve02 105" "desopve03 106"; do set -- $p
   pvesh create /nodes/$1/qemu/$2/agent/ping && echo "agent VM $2 su $1: ok"; done
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 agent VM 104 su desopve01: ok
 agent VM 105 su desopve02: ok
 agent VM 106 su desopve03: ok
@@ -343,7 +370,7 @@ and cloud-init has finished:
 qm guest exec 105 -- cloud-init status
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 status: done
 ```
 

@@ -53,8 +53,11 @@ Sono storage **locali**: una ISO scaricata su `desopve01` non si vede su `desopv
 
 1. Leggi l'impronta della ISO *netinst* corrente dal file `SHA256SUMS` pubblicato da Debian. Dal domain controller il browser non esce su Internet, quindi scaricalo dal nodo tramite il proxy, nella **Shell** di `desopve01` o in SSH:
 
-   ```console
-   root@desopve01:~# curl -s -x http://proxy.proxmox.community:3128 https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | grep netinst
+   ```bash title="root@desopve01"
+   curl -s -x http://proxy.proxmox.community:3128 https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS | grep netinst
+   ```
+
+   ``` { .text .no-copy title="Output" }
    a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6167e355  debian-13.7.0-amd64-netinst.iso
    d33ed0c64bde5ff43445c0c530f9da599954d8585771c55345cb840d7997d4a7  debian-edu-13.7.0-amd64-netinst.iso
    d6d4e0d038936230229a66b7c1765452e73c72a962e79dbb99544882295271e8  debian-mac-13.7.0-amd64-netinst.iso
@@ -109,8 +112,11 @@ Premi **Create VM** in alto a destra. La procedura guidata ha otto schede.
 
 La VM `100 (debian01)` compare nell'albero sotto `desopve01`. La sua configurazione è un semplice file di testo, `/etc/pve/qemu-server/100.conf`, condiviso nel cluster:
 
-```console
-root@desopve01:~# qm config 100
+```bash title="root@desopve01"
+qm config 100
+```
+
+``` { .text .no-copy title="Output" }
 boot: order=scsi0;ide2;net0
 cores: 2
 cpu: x86-64-v2-AES
@@ -175,8 +181,11 @@ L'ordine di avvio (`boot`) prova prima il disco e poi il CD: finché il disco è
 
 4. Scollega la ISO dalla VM. La stessa impostazione, nella GUI, è in **Hardware** → **CD/DVD Drive** → **Do not use any media**:
 
-   ```console
-   root@desopve01:~# qm set 100 --ide2 none,media=cdrom
+   ```bash title="root@desopve01"
+   qm set 100 --ide2 none,media=cdrom
+   ```
+
+   ``` { .text .no-copy title="Output" }
    update VM 100: -ide2 none,media=cdrom
    ```
 
@@ -238,8 +247,11 @@ TASK OK
 
 Il disco del container è un dataset ZFS (`subvol-101-disk-0`), non un disco virtuale: il container vede direttamente un file system.
 
-```console
-root@desopve02:~# pct config 101
+```bash title="root@desopve02"
+pct config 101
+```
+
+``` { .text .no-copy title="Output" }
 arch: amd64
 cores: 1
 features: nesting=1
@@ -256,25 +268,70 @@ unprivileged: 1
 
 1. **La VM.** Dal DC collegati in SSH a `labuser@172.27.199.100` e controlla nome, rete, DNS, gateway e proxy configurato dall'installer:
 
-   ```console
-   labuser@debian01:~$ hostname -f
+   ```bash title="labuser@debian01"
+   hostname -f
+   ```
+
+   ``` { .text .no-copy title="Output" }
    debian01.proxmox.community
-   labuser@debian01:~$ ip -br -4 addr
+   ```
+
+   ```bash title="labuser@debian01"
+   ip -br -4 addr
+   ```
+
+   ``` { .text .no-copy title="Output" }
    lo               UNKNOWN        127.0.0.1/8
    ens18            UP             172.27.199.100/24
-   labuser@debian01:~$ ip route
+   ```
+
+   ```bash title="labuser@debian01"
+   ip route
+   ```
+
+   ``` { .text .no-copy title="Output" }
    default via 172.27.199.1 dev ens18 onlink
    172.27.199.0/24 dev ens18 proto kernel scope link src 172.27.199.100
-   labuser@debian01:~$ cat /etc/resolv.conf
+   ```
+
+   ```bash title="labuser@debian01"
+   cat /etc/resolv.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    search proxmox.community
    nameserver 172.27.199.20
-   labuser@debian01:~$ ping -c2 172.27.199.1 | grep loss
+   ```
+
+   ```bash title="labuser@debian01"
+   ping -c2 172.27.199.1 | grep loss
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1001ms
-   labuser@debian01:~$ cat /etc/apt/apt.conf
+   ```
+
+   ```bash title="labuser@debian01"
+   cat /etc/apt/apt.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Acquire::http::Proxy "http://proxy.proxmox.community:3128";
-   labuser@debian01:~$ cat /etc/debian_version
+   ```
+
+   ```bash title="labuser@debian01"
+   cat /etc/debian_version
+   ```
+
+   ``` { .text .no-copy title="Output" }
    13.7
-   labuser@debian01:~$ timedatectl | grep "Time zone"
+   ```
+
+   ```bash title="labuser@debian01"
+   timedatectl | grep "Time zone"
+   ```
+
+   ``` { .text .no-copy title="Output" }
                    Time zone: Europe/Rome (CET, +0100)
    ```
 
@@ -282,19 +339,40 @@ unprivileged: 1
 
 2. **Il container.** `pct exec` esegue un comando nel container dal nodo, senza password né rete. Il DNS è quello del nodo, scritto da Proxmox VE tra i marcatori `PVE`:
 
-   ```console
-   root@desopve02:~# pct list
+   ```bash title="root@desopve02"
+   pct list
+   ```
+
+   ``` { .text .no-copy title="Output" }
    VMID       Status     Lock         Name
    101        running                 debian-ct01
-   root@desopve02:~# pct exec 101 -- ip -br -4 addr
+   ```
+
+   ```bash title="root@desopve02"
+   pct exec 101 -- ip -br -4 addr
+   ```
+
+   ``` { .text .no-copy title="Output" }
    lo               UNKNOWN        127.0.0.1/8
    eth0@if6         UP             172.27.199.101/24
-   root@desopve02:~# pct exec 101 -- cat /etc/resolv.conf
+   ```
+
+   ```bash title="root@desopve02"
+   pct exec 101 -- cat /etc/resolv.conf
+   ```
+
+   ``` { .text .no-copy title="Output" }
    # --- BEGIN PVE ---
    search proxmox.community
    nameserver 172.27.199.20
    # --- END PVE ---
-   root@desopve02:~# pct exec 101 -- ping -c2 172.27.199.1 | grep loss
+   ```
+
+   ```bash title="root@desopve02"
+   pct exec 101 -- ping -c2 172.27.199.1 | grep loss
+   ```
+
+   ``` { .text .no-copy title="Output" }
    2 packets transmitted, 2 received, 0% packet loss, time 1002ms
    ```
 
@@ -302,8 +380,11 @@ unprivileged: 1
 
 3. **Il proxy nel container.** Il template non conosce il proxy del laboratorio: configuralo e aggiorna l'elenco dei pacchetti.
 
-   ```console
-   root@desopve02:~# pct exec 101 -- sh -c "echo 'Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";' > /etc/apt/apt.conf.d/80proxy; apt-get update" | tail -3
+   ```bash title="root@desopve02"
+   pct exec 101 -- sh -c "echo 'Acquire::http::Proxy \"http://proxy.proxmox.community:3128\";' > /etc/apt/apt.conf.d/80proxy; apt-get update" | tail -3
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Get:14 http://deb.debian.org/debian trixie-updates/main amd64 Packages T-2026-11-05-1401.10-F-2026-07-18-0800.33.pdiff [1038 B]
    Fetched 17.0 MB in 2s (7736 kB/s)
    Reading package lists...
@@ -311,8 +392,11 @@ unprivileged: 1
 
 4. **La vista del cluster.** Da qualsiasi nodo vedi tutti i guest del cluster:
 
-   ```console
-   root@desopve01:~# pvesh get /cluster/resources --type vm --output-format yaml | grep -E "^- |id:|name:|node:|status:|type:"
+   ```bash title="root@desopve01"
+   pvesh get /cluster/resources --type vm --output-format yaml | grep -E "^- |id:|name:|node:|status:|type:"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    - cpu: 0.00447667643448901
      id: qemu/100
      name: debian01

@@ -79,8 +79,11 @@ Prima dell'unione al dominio servono DNS e orario corretti sul NAS (lab 12): Ker
 
 Da un nodo controlla che l'utente veda la condivisione:
 
-```console
-root@desopve01:~# pvesm scan cifs 172.27.199.10 --username svc-pve --password '<password-lab>'
+```bash title="root@desopve01"
+pvesm scan cifs 172.27.199.10 --username svc-pve --password '<password-lab>'
+```
+
+``` { .text .no-copy title="Output" }
 pve Storage
 ```
 
@@ -104,10 +107,13 @@ pve Storage
 
 Il dialogo non ha un campo per la versione del protocollo: senza indicazioni il client negozia la più alta supportata da entrambi. Fissarla evita che un server mal configurato faccia scendere il collegamento a una versione vecchia. Si imposta da riga di comando, e vale dal mount successivo:
 
-```console
-root@desopve01:~# pvesm set nas-smb --smbversion 3.11
-root@desopve01:~# umount /mnt/pve/nas-smb        # su ogni nodo: pvestatd lo rimonta da solo
-root@desopve01:~# grep -A8 "cifs: nas-smb" /etc/pve/storage.cfg
+```bash title="root@desopve01"
+pvesm set nas-smb --smbversion 3.11
+umount /mnt/pve/nas-smb        # su ogni nodo: pvestatd lo rimonta da solo
+grep -A8 "cifs: nas-smb" /etc/pve/storage.cfg
+```
+
+``` { .text .no-copy title="Output" }
 cifs: nas-smb
 	path /mnt/pve/nas-smb
 	server 172.27.199.10
@@ -116,9 +122,21 @@ cifs: nas-smb
 	prune-backups keep-all=1
 	smbversion 3.11
 	username svc-pve
-root@desopve01:~# ls -l /etc/pve/priv/storage/
+```
+
+```bash title="root@desopve01"
+ls -l /etc/pve/priv/storage/
+```
+
+``` { .text .no-copy title="Output" }
 -rw------- 1 root www-data 30 Nov  9 15:49 nas-smb.pw
-root@desopve01:~# mount | grep nas-smb
+```
+
+```bash title="root@desopve01"
+mount | grep nas-smb
+```
+
+``` { .text .no-copy title="Output" }
 //172.27.199.10/pve on /mnt/pve/nas-smb type cifs (rw,relatime,vers=3.1.1,cache=strict,upcall_target=app,username=svc-pve,uid=0,noforceuid,gid=0,noforcegid,addr=172.27.199.10,file_mode=0755,dir_mode=0755,soft,nounix,serverino,mapposix,reparse=nfs,nativesocket,symlink=native,rsize=4194304,wsize=4194304,bsize=1048576,echo_interval=60,actimeo=1,closetimeo=1)
 ```
 
@@ -130,9 +148,15 @@ root@desopve01:~# mount | grep nas-smb
 
 Copia sulla condivisione la ISO di Debian scaricata nel lab 07 e guardala da un altro nodo:
 
-```console
-root@desopve01:~# cp /var/lib/vz/template/iso/debian-13.7.0-amd64-netinst.iso /mnt/pve/nas-smb/template/iso/
-root@desopve03:~# pvesm list nas-smb
+```bash title="root@desopve01"
+cp /var/lib/vz/template/iso/debian-13.7.0-amd64-netinst.iso /mnt/pve/nas-smb/template/iso/
+```
+
+```bash title="root@desopve03"
+pvesm list nas-smb
+```
+
+``` { .text .no-copy title="Output" }
 Volid                                       Format  Type           Size VMID
 nas-smb:iso/debian-13.7.0-amd64-netinst.iso iso     iso       792723456
 ```
@@ -141,8 +165,11 @@ nas-smb:iso/debian-13.7.0-amd64-netinst.iso iso     iso       792723456
 
 Fai un backup del container 101 sulla condivisione (i backup sono l'argomento del lab 46):
 
-```console
-root@desopve02:~# vzdump 101 --storage nas-smb --mode snapshot --compress zstd
+```bash title="root@desopve02"
+vzdump 101 --storage nas-smb --mode snapshot --compress zstd
+```
+
+``` { .text .no-copy title="Output" }
 INFO: Starting Backup of VM 101 (lxc)
 INFO: creating vzdump archive '/mnt/pve/nas-smb/dump/vzdump-lxc-101-2026_11_09-15_52_15.tar.zst'
 INFO: Total bytes written: 706631680 (674MiB, 87MiB/s)
@@ -158,8 +185,11 @@ INFO: Finished Backup of VM 101 (00:00:09)
 
 Con una password errata il server rifiuta l'accesso. È lo stesso errore che vedresti se la password di `svc-pve` cambiasse sul NAS senza aggiornare lo storage:
 
-```console
-root@desopve01:~# pvesm scan cifs 172.27.199.10 --username svc-pve --password sbagliata
+```bash title="root@desopve01"
+pvesm scan cifs 172.27.199.10 --username svc-pve --password sbagliata
+```
+
+``` { .text .no-copy title="Output" }
 unexpected status: NT_STATUS_ACCESS_DENIED
 ```
 
@@ -167,10 +197,19 @@ Per aggiornare la password: **Datacenter** → **Storage** → `nas-smb` → **E
 
 ### Test 2 – I permessi Unix non esistono
 
-```console
-root@desopve01:/mnt/pve/nas-smb# touch prova.txt; chmod 600 prova.txt; chown 1000:1000 prova.txt; echo $?
+```bash title="root@desopve01:/mnt/pve/nas-smb"
+touch prova.txt; chmod 600 prova.txt; chown 1000:1000 prova.txt; echo $?
+```
+
+``` { .text .no-copy title="Output" }
 0
-root@desopve01:/mnt/pve/nas-smb# ls -l prova.txt
+```
+
+```bash title="root@desopve01:/mnt/pve/nas-smb"
+ls -l prova.txt
+```
+
+``` { .text .no-copy title="Output" }
 -rwxr-xr-x 1 root root 0 Nov  9 15:51 prova.txt
 ```
 
@@ -180,21 +219,36 @@ root@desopve01:/mnt/pve/nas-smb# ls -l prova.txt
 
 Sul nodo `desopve01` avvia un «battito» che ogni 2 secondi scrive l'ora sulla condivisione e registra l'esito:
 
-```console
-root@desopve01:~# nohup sh -c 'while true; do if date +%T > /mnt/pve/nas-smb/battito.txt; then echo "$(date +%T) ok"; else echo "$(date +%T) ERRORE"; fi >> /root/smb-battito.log; sleep 2; done' >/dev/null 2>&1 &
+```bash title="root@desopve01"
+nohup sh -c 'while true; do if date +%T > /mnt/pve/nas-smb/battito.txt; then echo "$(date +%T) ok"; else echo "$(date +%T) ERRORE"; fi >> /root/smb-battito.log; sleep 2; done' >/dev/null 2>&1 &
 ```
 
 Sul NAS ferma il servizio SMB (**System** → **Services** → **SMB** → **Stop Service**). Le scritture si bloccano per una decina di secondi, poi falliscono, e così ogni tentativo successivo:
 
-```console
-root@desopve01:~# tail -4 /root/smb-battito.log
+```bash title="root@desopve01"
+tail -4 /root/smb-battito.log
+```
+
+``` { .text .no-copy title="Output" }
 15:55:33 ok
 15:55:35 ok
 15:55:47 ERRORE
 15:55:59 ERRORE
-root@desopve01:~# bash -c 'echo x > /mnt/pve/nas-smb/prova.txt'
+```
+
+```bash title="root@desopve01"
+bash -c 'echo x > /mnt/pve/nas-smb/prova.txt'
+```
+
+``` { .text .no-copy title="Output" }
 bash: line 1: /mnt/pve/nas-smb/prova.txt: Host is down
-root@desopve01:~# pvesm status | grep nas-smb
+```
+
+```bash title="root@desopve01"
+pvesm status | grep nas-smb
+```
+
+``` { .text .no-copy title="Output" }
 nas-smb          cifs   inactive               0               0               0    0.00%
 ```
 
@@ -202,60 +256,96 @@ nas-smb          cifs   inactive               0               0               0
 
 Riavvia il servizio SMB: dopo pochi secondi il client si riconnette da solo e le scritture riprendono:
 
-```console
-root@desopve01:~# tail -3 /root/smb-battito.log
+```bash title="root@desopve01"
+tail -3 /root/smb-battito.log
+```
+
+``` { .text .no-copy title="Output" }
 15:57:38 ok
 15:57:40 ok
 15:57:42 ok
-root@desopve01:~# pvesm status | grep nas-smb
+```
+
+```bash title="root@desopve01"
+pvesm status | grep nas-smb
+```
+
+``` { .text .no-copy title="Output" }
 nas-smb          cifs     active       100069248          977024        99092224    0.98%
 ```
 
 Ferma il battito e cancella i file di prova:
 
-```console
-root@desopve01:~# pkill -f "^sh -c while true"; rm -f /mnt/pve/nas-smb/battito.txt /mnt/pve/nas-smb/prova.txt /root/smb-battito.log
+```bash title="root@desopve01"
+pkill -f "^sh -c while true"; rm -f /mnt/pve/nas-smb/battito.txt /mnt/pve/nas-smb/prova.txt /root/smb-battito.log
 ```
 
 ### Test 4 – SMB contro NFS
 
 Dal nodo `desopve01` misura con `fio` le stesse scritture sui due storage del NAS (stesso pool, stessa rete):
 
-```console
-root@desopve01:~# fio --name=t --directory=/mnt/pve/nas-smb --rw=randwrite --bs=4k --size=1G \
+```bash title="root@desopve01"
+fio --name=t --directory=/mnt/pve/nas-smb --rw=randwrite --bs=4k --size=1G \
       --iodepth=16 --ioengine=libaio --direct=1 --runtime=20 --time_based --group_reporting
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=5430, BW=21.2MiB/s (22.2MB/s)(425MiB/20017msec); 0 zone resets
-root@desopve01:~# fio --name=t --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
+```
+
+```bash title="root@desopve01"
+fio --name=t --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
       --iodepth=16 --ioengine=libaio --direct=1 --runtime=20 --time_based --group_reporting
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=962, BW=3851KiB/s (3943kB/s)(75.9MiB/20179msec); 0 zone resets
 ```
 
 SMB sembra cinque volte più veloce. Ripeti forzando il salvataggio sicuro di ogni scrittura (`--fsync=1`, come fa un database):
 
-```console
-root@desopve01:~# fio --name=t --directory=/mnt/pve/nas-smb --rw=randwrite --bs=4k --size=1G \
+```bash title="root@desopve01"
+fio --name=t --directory=/mnt/pve/nas-smb --rw=randwrite --bs=4k --size=1G \
       --iodepth=1 --ioengine=psync --direct=1 --fsync=1 --runtime=20 --time_based
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=185, BW=741KiB/s (759kB/s)(14.9MiB/20557msec); 0 zone resets
-root@desopve01:~# fio --name=t --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
+```
+
+```bash title="root@desopve01"
+fio --name=t --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
       --iodepth=1 --ioengine=psync --direct=1 --fsync=1 --runtime=20 --time_based
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=339, BW=1358KiB/s (1391kB/s)(26.5MiB/20001msec); 0 zone resets
 ```
 
 Infine la scrittura sequenziale a blocchi da 1 MiB, quella tipica di ISO e backup:
 
-```console
-root@desopve01:~# fio --name=t --directory=/mnt/pve/nas-smb --rw=write --bs=1M --size=1G \
+```bash title="root@desopve01"
+fio --name=t --directory=/mnt/pve/nas-smb --rw=write --bs=1M --size=1G \
       --iodepth=4 --ioengine=libaio --direct=1 --runtime=20 --time_based --group_reporting
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=688, BW=688MiB/s (722MB/s)(13.6GiB/20292msec); 0 zone resets
-root@desopve01:~# fio --name=t --directory=/mnt/pve/nas-nfs --rw=write --bs=1M --size=1G \
+```
+
+```bash title="root@desopve01"
+fio --name=t --directory=/mnt/pve/nas-nfs --rw=write --bs=1M --size=1G \
       --iodepth=4 --ioengine=libaio --direct=1 --runtime=20 --time_based --group_reporting
+```
+
+``` { .text .no-copy title="Output" }
   write: IOPS=33, BW=33.3MiB/s (34.9MB/s)(673MiB/20201msec); 0 zone resets
 ```
 
 Cancella i file di prova creati da `fio`:
 
-```console
-root@desopve01:~# rm -f /mnt/pve/nas-smb/t.0.0 /mnt/pve/nas-nfs/t.0.0
+```bash title="root@desopve01"
+rm -f /mnt/pve/nas-smb/t.0.0 /mnt/pve/nas-nfs/t.0.0
 ```
 
 | Test (dal nodo, `fio`) | NFS | SMB |

@@ -70,7 +70,7 @@ pvesh create /nodes/desopve02/storage/cephfs/download-url --content iso \
   --url https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.302-1/virtio-win-0.1.302.iso
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 2026-11-10 01:03:01 (12.8 MB/s) - '/mnt/pve/cephfs/template/iso/virtio-win-0.1.302.iso.tmp_dwnl.261762' saved [877373440/877373440]
 ```
 
@@ -248,7 +248,7 @@ qm guest cmd 390 get-host-name
 qm guest cmd 390 network-get-interfaces    # riassunto: solo IPv4
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 {
    "host-name" : "WIN2025"
 }
@@ -264,7 +264,7 @@ qm guest exec 390 --timeout 90 -- powershell -NoProfile -Command \
   Get-Service QEMU-GA,BalloonService | Format-Table -AutoSize Status,Name,DisplayName | Out-String -Width 120"
 ```
 
-```text
+``` { .text .no-copy title="Output" }
 Status Class       FriendlyName
 ------ -----       ------------
 OK     CDROM       QEMU QEMU DVD-ROM

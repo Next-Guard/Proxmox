@@ -44,7 +44,7 @@ Per non ripetere l'installazione guidata del [Lab 03](03-install-proxmox-ve.md),
    grep proxmox-ve_8.4-1.iso SHA256SUMS; sha256sum proxmox-ve_8.4-1.iso
    ```
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    d237d70ca48a9f6eb47f95fd4fd337722c3f69f8106393844d027d28c26523d8  proxmox-ve_8.4-1.iso
    ```
 
@@ -71,12 +71,21 @@ Per non ripetere l'installazione guidata del [Lab 03](03-install-proxmox-ve.md),
    disk-list = ["sda"]
    ```
 
-   ```text
-   root@desopve04:~# apt install proxmox-auto-install-assistant
-   root@desopve04:~# proxmox-auto-install-assistant validate-answer /dev/shm/answer.toml
+   ```bash title="root@desopve04"
+   apt install proxmox-auto-install-assistant
+   proxmox-auto-install-assistant validate-answer /dev/shm/answer.toml
+   ```
+
+   ``` { .text .no-copy title="Output" }
    The answer file was parsed successfully, no errors found!
-   root@desopve04:~# proxmox-auto-install-assistant prepare-iso proxmox-ve_8.4-1.iso --fetch-from iso \
+   ```
+
+   ```bash title="root@desopve04"
+   proxmox-auto-install-assistant prepare-iso proxmox-ve_8.4-1.iso --fetch-from iso \
          --answer-file /dev/shm/answer.toml --output /var/lib/vz/template/iso/pve84-auto.iso
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Checking provided answer file...
    Copying source ISO to temporary location...
    Preparing ISO...
@@ -88,18 +97,21 @@ Per non ripetere l'installazione guidata del [Lab 03](03-install-proxmox-ve.md),
 
 3. Crea la VM con il disco su `tank` e avviala. L'ordine di avvio mette prima il disco: al primo avvio è vuoto e parte la ISO, dopo l'installazione parte il sistema installato, senza ripetere l'installazione.
 
-   ```text
-   root@desopve04:~# qm create 800 --name pve8-test --memory 4096 --cores 2 --cpu host --machine q35 \
+   ```bash title="root@desopve04"
+   qm create 800 --name pve8-test --memory 4096 --cores 2 --cpu host --machine q35 \
          --bios ovmf --efidisk0 tank:1,efitype=4m,pre-enrolled-keys=0 --scsihw virtio-scsi-single \
          --scsi0 tank:32,discard=on,iothread=1 --net0 virtio,bridge=vmbr0 \
          --ide2 local:iso/pve84-auto.iso,media=cdrom --boot "order=scsi0;ide2" --ostype l26
-   root@desopve04:~# qm start 800
+   qm start 800
    ```
 
 4. Pochi minuti dopo il nodo risponde in SSH:
 
-   ```text
-   root@pve8-test:~# hostname -f; pveversion
+   ```bash title="root@pve8-test"
+   hostname -f; pveversion
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pve8-test.proxmox.community
    pve-manager/8.4.0/ec58e45e1bcdf2ac (running kernel: 6.8.12-9-pve)
    ```
@@ -122,28 +134,55 @@ La guida ufficiale richiede come punto di partenza l'**ultima** 8.4. Il nodo app
 
 2. Aggiorna e riavvia nel nuovo kernel:
 
-   ```text
-   root@pve8-test:~# apt update && apt dist-upgrade
+   ```bash title="root@pve8-test"
+   apt update && apt dist-upgrade
+   ```
+
+   ``` { .text .no-copy title="Output" }
    232 upgraded, 8 newly installed, 0 to remove and 0 not upgraded.
-   root@pve8-test:~# reboot
+   ```
+
+   ```bash title="root@pve8-test"
+   reboot
+   ```
+
+   ``` { .text .no-copy title="Output" }
    …
-   root@pve8-test:~# pveversion
+   ```
+
+   ```bash title="root@pve8-test"
+   pveversion
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pve-manager/8.4.21/2606ac850d46da29 (running kernel: 6.8.12-43-pve)
    ```
 
 3. Per avere un guest da "portare" attraverso l'aggiornamento, crea un container Debian 12. Il primo `pveam update` fallisce: `apt` usa il proxy del suo file di configurazione, mentre `pveam` usa quello del **datacenter**.
 
-   ```text
-   root@pve8-test:~# pveam update
+   ```bash title="root@pve8-test"
+   pveam update
+   ```
+
+   ``` { .text .no-copy title="Output" }
    update failed - see /var/log/pveam.log for details
-   root@pve8-test:~# pvesh set /cluster/options --http_proxy http://proxy.proxmox.community:3128
-   root@pve8-test:~# pveam update
+   ```
+
+   ```bash title="root@pve8-test"
+   pvesh set /cluster/options --http_proxy http://proxy.proxmox.community:3128
+   pveam update
+   ```
+
+   ``` { .text .no-copy title="Output" }
    update successful
-   root@pve8-test:~# pveam download local debian-12-standard_12.12-1_amd64.tar.zst
-   root@pve8-test:~# pct create 100 local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst --hostname ct-test \
+   ```
+
+   ```bash title="root@pve8-test"
+   pveam download local debian-12-standard_12.12-1_amd64.tar.zst
+   pct create 100 local:vztmpl/debian-12-standard_12.12-1_amd64.tar.zst --hostname ct-test \
          --unprivileged 1 --memory 512 --rootfs local-lvm:4 \
          --net0 name=eth0,bridge=vmbr0,ip=172.27.199.81/24,gw=172.27.199.1 --onboot 1
-   root@pve8-test:~# pct start 100
+   pct start 100
    ```
 
 ### 3. Il controllo con `pve8to9`
@@ -185,30 +224,48 @@ Ogni voce si affronta così:
 
 1. **`FAIL: systemd-boot meta-package installed`.** Prima controlla quale bootloader usa il nodo. Qui è UEFI con GRUB, e `proxmox-boot-tool` non è in uso (gestisce le partizioni ESP delle installazioni con root su ZFS, in BIOS e in UEFI; `systemd-boot` si usa solo con ZFS e UEFI senza Secure Boot):
 
-   ```text
-   root@pve8-test:~# proxmox-boot-tool status
+   ```bash title="root@pve8-test"
+   proxmox-boot-tool status
+   ```
+
+   ``` { .text .no-copy title="Output" }
    E: /etc/kernel/proxmox-boot-uuids does not exist.
-   root@pve8-test:~# dpkg -l | grep -E "^ii  (grub-efi-amd64 |systemd-boot)"
+   ```
+
+   ```bash title="root@pve8-test"
+   dpkg -l | grep -E "^ii  (grub-efi-amd64 |systemd-boot)"
+   ```
+
+   ``` { .text .no-copy title="Output" }
    ii  grub-efi-amd64          2.06-13+pmx7
    ii  systemd-boot            252.39-1~deb12u2
    ii  systemd-boot-efi:amd64  252.39-1~deb12u2
-   root@pve8-test:~# apt remove systemd-boot
+   ```
+
+   ```bash title="root@pve8-test"
+   apt remove systemd-boot
    ```
 
    Il meta-pacchetto si può rimuovere senza rischi: il nodo continua ad avviarsi con GRUB.
 
 2. **`NOTICE … autoactivation enabled`.** Da Proxmox VE 9 i volumi LVM dei guest non si attivano più da soli all'avvio: li attiva Proxmox VE quando servono. Su storage LVM **condivisi** (iSCSI, FC) è fortemente consigliato convertire anche i volumi esistenti; su storage locali è facoltativo. Lo script, senza opzioni, chiede conferma e in un contesto non interattivo risponde no; con `--assume-yes` esegue:
 
-   ```text
-   root@pve8-test:~# /usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation --assume-yes
+   ```bash title="root@pve8-test"
+   /usr/share/pve-manager/migrations/pve-lvm-disable-autoactivation --assume-yes
+   ```
+
+   ``` { .text .no-copy title="Output" }
      Logical volume pve/vm-100-disk-0 changed.
    PASS: all guest volumes on storage 'local-lvm' now have autoactivation disabled
    ```
 
 3. **Nomi delle schede di rete.** Il kernel nuovo può cambiare i nomi delle schede derivati dall'indirizzo PCI: se `enp6s18` diventasse un altro nome, il bridge `vmbr0` resterebbe senza porta e il nodo **senza rete**. Lo strumento `pve-network-interface-pinning`, già presente nell'ultima 8.4, fissa i nomi a `nicN` legandoli al MAC:
 
-   ```text
-   root@pve8-test:~# pve-network-interface-pinning generate
+   ```bash title="root@pve8-test"
+   pve-network-interface-pinning generate
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Name for link 'enp6s18' will change to 'nic0'
    Generating link files
    Successfully generated .link files in '/usr/local/lib/systemd/network/'
@@ -268,8 +325,11 @@ FAILURES: 0
 
 3. Verifica che `apt` veda **solo** i repository di trixie:
 
-   ```text
-   root@pve8-test:~# apt update && apt policy
+   ```bash title="root@pve8-test"
+   apt update && apt policy
+   ```
+
+   ``` { .text .no-copy title="Output" }
    …
     500 http://deb.debian.org/debian trixie/contrib amd64 Packages
     500 http://deb.debian.org/debian trixie/main amd64 Packages
@@ -298,10 +358,13 @@ La guida ufficiale raccomanda di eseguirlo dalla console del server, o da SSH de
 
 Nel laboratorio l'aggiornamento è stato lanciato in modo non interattivo dentro un'unità di systemd, così una disconnessione SSH non lo interrompe. È stata tenuta la versione installata di tutti i file, e le differenze si controllano dopo:
 
-```text
-root@pve8-test:~# systemd-run --unit=pve-upgrade89 --setenv=DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::=--force-confdef \
+```bash title="root@pve8-test"
+systemd-run --unit=pve-upgrade89 --setenv=DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Options::=--force-confdef \
       -o Dpkg::Options::=--force-confold dist-upgrade
-root@pve8-test:~# journalctl -fu pve-upgrade89
+journalctl -fu pve-upgrade89
+```
+
+``` { .text .no-copy title="Output" }
 …
 593 upgraded, 155 newly installed, 59 to remove and 0 not upgraded.
 ```
@@ -311,11 +374,20 @@ root@pve8-test:~# journalctl -fu pve-upgrade89
 
 Al termine `apt` ha lasciato due versioni nuove da valutare:
 
-```text
-root@pve8-test:~# find /etc -name "*.dpkg-dist"
+```bash title="root@pve8-test"
+find /etc -name "*.dpkg-dist"
+```
+
+``` { .text .no-copy title="Output" }
 /etc/issue.dpkg-dist
 /etc/lvm/lvm.conf.dpkg-dist
-root@pve8-test:~# diff <(grep -vE '^\s*#|^\s*$' /etc/lvm/lvm.conf) <(grep -vE '^\s*#|^\s*$' /etc/lvm/lvm.conf.dpkg-dist)
+```
+
+```bash title="root@pve8-test"
+diff <(grep -vE '^\s*#|^\s*$' /etc/lvm/lvm.conf) <(grep -vE '^\s*#|^\s*$' /etc/lvm/lvm.conf.dpkg-dist)
+```
+
+``` { .text .no-copy title="Output" }
 …
 < devices {
 <      global_filter=["r|/dev/zd.*|","r|/dev/rbd.*|"]
@@ -342,13 +414,28 @@ Il nuovo `chronyd` parla con il `systemd` di bookworm, ancora in esecuzione fino
 
 ### 6. Il riavvio e le verifiche
 
-```text
-root@pve8-test:~# reboot
+```bash title="root@pve8-test"
+reboot
+```
+
+``` { .text .no-copy title="Output" }
 …
-root@pve8-test:~# uname -r; pveversion
+```
+
+```bash title="root@pve8-test"
+uname -r; pveversion
+```
+
+``` { .text .no-copy title="Output" }
 7.0.14-28-pve
 pve-manager/9.2.26/41a0e2e09b9e6f9d (running kernel: 7.0.14-28-pve)
-root@pve8-test:~# pveversion -v | grep -E "^(proxmox-ve|pve-qemu-kvm|qemu-server|lxc-pve|zfsutils-linux|corosync|ifupdown2)"
+```
+
+```bash title="root@pve8-test"
+pveversion -v | grep -E "^(proxmox-ve|pve-qemu-kvm|qemu-server|lxc-pve|zfsutils-linux|corosync|ifupdown2)"
+```
+
+``` { .text .no-copy title="Output" }
 proxmox-ve: 9.2.0 (running kernel: 7.0.14-28-pve)
 corosync: 3.2.0-pve1
 ifupdown2: 3.3.0-1+pmx13
@@ -356,15 +443,27 @@ lxc-pve: 7.0.0-2
 pve-qemu-kvm: 11.1.3-1
 qemu-server: 9.2.15
 zfsutils-linux: 2.4.4-pve1
-root@pve8-test:~# systemctl is-active chrony pveproxy pvedaemon pvestatd pve-cluster pve-firewall
+```
+
+```bash title="root@pve8-test"
+systemctl is-active chrony pveproxy pvedaemon pvestatd pve-cluster pve-firewall
+```
+
+``` { .text .no-copy title="Output" }
 active
 active
 active
 active
 active
 active
-root@pve8-test:~# systemctl --failed --no-legend
-root@pve8-test:~# ip -br link | grep -v lo
+```
+
+```bash title="root@pve8-test"
+systemctl --failed --no-legend
+ip -br link | grep -v lo
+```
+
+``` { .text .no-copy title="Output" }
 nic0             UP             …
 vmbr0            UP             …
 ```
@@ -378,12 +477,21 @@ vmbr0            UP             …
 
 Il container è ripartito da solo (`onboot`), ma il task di avvio riporta un avviso:
 
-```text
-root@pve8-test:~# pvenode task log <UPID dell'avvio del CT 100>
+```bash title="root@pve8-test"
+pvenode task log <UPID dell'avvio del CT 100>
+```
+
+``` { .text .no-copy title="Output" }
 WARN: Systemd 252 detected. You may need to enable nesting.
 TASK WARNINGS: 1
-root@pve8-test:~# pct set 100 --features nesting=1 && pct reboot 100
-root@pve8-test:~# pct exec 100 -- systemctl is-system-running
+```
+
+```bash title="root@pve8-test"
+pct set 100 --features nesting=1 && pct reboot 100
+pct exec 100 -- systemctl is-system-running
+```
+
+``` { .text .no-copy title="Output" }
 running
 ```
 
@@ -405,8 +513,11 @@ Il `FAIL` residuo è `unable to determine installed intel-microcode version`: su
 
 1. Converti anche il `sources.list` di Debian nel formato deb822:
 
-   ```text
-   root@pve8-test:~# apt modernize-sources
+   ```bash title="root@pve8-test"
+   apt modernize-sources
+   ```
+
+   ``` { .text .no-copy title="Output" }
    Rewrite 1 sources? [Y/n] Y
    Modernizing /etc/apt/sources.list...
    - Writing /etc/apt/sources.list.d/debian.sources
@@ -416,9 +527,15 @@ Il `FAIL` residuo è `unable to determine installed intel-microcode version`: su
 
 2. **Il repository enterprise ricompare.** Il pacchetto `pve-manager` di Proxmox VE 9 installa il file `pve-enterprise.sources`, e senza sottoscrizione `apt update` fallisce:
 
-   ```text
+   ``` { .text .no-copy title="Output" }
    E: The repository 'https://enterprise.proxmox.com/debian/pve trixie InRelease' is not signed.
-   root@pve8-test:~# dpkg -S /etc/apt/sources.list.d/pve-enterprise.sources
+   ```
+
+   ```bash title="root@pve8-test"
+   dpkg -S /etc/apt/sources.list.d/pve-enterprise.sources
+   ```
+
+   ``` { .text .no-copy title="Output" }
    pve-manager: /etc/apt/sources.list.d/pve-enterprise.sources
    ```
 
