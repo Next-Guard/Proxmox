@@ -52,9 +52,9 @@ flowchart LR
   G1[Gruppo AD<br/>pve-admins] -->|Administrator su /| R[(Datacenter)]
   G3[Gruppo AD<br/>pve-auditors] -->|PVEAuditor su /| R
   G2[Gruppo AD<br/>pve-operators] -->|PVEVMUser + PVEDatastoreUser<br/>+ OperatoreRete su /pool/web| P[Pool web<br/>VM 104-106, nas-nfs]
-  G2 -->|PVESDNUser| B[/sdn/zones/localnetwork/vmbr1/]
-  U[automazione@pve] -->|PVEVMUser su /pool/web| P
-  T[token automazione@pve!ci] -->|∩ con le ACL dell'utente| P
+  G2 -->|PVESDNUser| B["/sdn/zones/localnetwork/vmbr1"]
+  U["automazione@pve"] -->|PVEVMUser su /pool/web| P
+  T["token automazione@pve!ci"] -->|∩ con le ACL dell'utente| P
 ```
 
 ## Procedura

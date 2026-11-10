@@ -67,18 +67,13 @@ plugins:
       docs_structure: folder
       fallback_to_default: true
       reconfigure_material: true
-      reconfigure_search: true
+      # false: no deduplication, tools/i18n_hooks.py splits the search index by language
+      reconfigure_search: false
       languages:
         - locale: en
           default: true
           name: English
           build: true
-          # The labs are being translated: until the English edition is complete the
-          # English navigation lists only the pages that already exist in English.
-          nav:
-            - Home: index.md
-            - Contribute: contributing.md
-            - About: about.md
         - locale: it
           name: Italiano
           build: true
@@ -156,6 +151,9 @@ plugins:
             "B Credentials and addresses": "B Credenziali e indirizzi"
             "C Troubleshooting": "C Risoluzione dei problemi"
             "D Rebuilding the lab as virtual": "D Ricostruire il lab in virtuale"
+
+hooks:
+  - tools/i18n_hooks.py
 
 markdown_extensions:
   - abbr

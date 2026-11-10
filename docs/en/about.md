@@ -14,10 +14,10 @@ The project is maintained by **Nicola Marco Decandia** ([@ndecandia](https://git
 
 Reports, questions and proposals are welcome as *issues* or *pull requests* in the [project repository](https://github.com/ndecandia/NextGuard).
 
-## Licences
+## Licenses
 
-- **Content** (text, images, diagrams): [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/). You may copy, adapt and redistribute it, also commercially, as long as you credit the source and keep the same licence.
-- **Code** (scripts and configuration files published in the `files` folder, code snippets): [MIT](https://opensource.org/license/mit) licence.
+- **Content** (text, images, diagrams): [Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)](https://creativecommons.org/licenses/by-sa/4.0/). You may copy, adapt and redistribute it, also commercially, as long as you credit the source and keep the same license.
+- **Code** (scripts and configuration files published in the `files` folder, code snippets): [MIT](https://opensource.org/license/mit) license.
 
 ## Trademarks
 

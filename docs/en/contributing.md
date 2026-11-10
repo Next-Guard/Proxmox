@@ -39,7 +39,7 @@ Every lab and every guide follows the same structure. Copy this template:
 - **Previous labs or guides:** …
 - **Machines and services:** … and the state they must be in
 - **Software and images:** …
-- **Credentials:** `<password-lab>`
+- **Credentials:** `<lab-password>`
 
 ## Objectives
 
@@ -75,11 +75,11 @@ What stays configured at the end, for whoever continues with other guides.
 
 - **Real tests.** Only publish procedures you actually ran: commands, output and screenshots must come from your system. State the Proxmox VE version you used.
 - **Screenshots.** PNG format, only the relevant ones, one for every meaningful action. Put them in `docs/images/<guide-name>/` and link them with a relative path, for example `../images/<guide-name>/01-screen.png`.
-- **No sensitive data.** Never passwords, tokens, keys, public IP addresses or real names of people and companies. Use placeholders such as `<password-lab>` and obscure serial numbers and MAC addresses in the screenshots.
+- **No sensitive data.** Never passwords, tokens, keys, public IP addresses or real names of people and companies. Use placeholders such as `<lab-password>` and obscure serial numbers and MAC addresses in the screenshots.
 - **Language.** You can write in English, in Italian or both. A translated page must have **the same file name** in the two folders (`docs/en/…` and `docs/it/…`): this is how the language selector links them.
 - **File names.** Lowercase, words separated by hyphens, in English: for example `ceph-pool-encryption.md`.
 - **Style.** Short, clear sentences, numbered steps, one idea per paragraph. Explain the *why*, not only the *how*.
 
-## Licence of contributions
+## License of contributions
 
-By submitting a contribution you agree that it is published under the project licences: **CC BY-SA 4.0** for content and **MIT** for code. See [About](about.md#licences).
+By submitting a contribution you agree that it is published under the project licenses: **CC BY-SA 4.0** for content and **MIT** for code. See [About](about.md#licenses).

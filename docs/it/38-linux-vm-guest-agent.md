@@ -65,7 +65,7 @@ usermod -aG sudo labuser; id labuser; dpkg -l sudo qemu-guest-agent
 - `id labuser` ora mostra il gruppo `27(sudo)`.
 - `qemu-guest-agent` risulta **già installato** (`ii`): apt ha installato solo `sudo`. Nella VM manca ancora solo l'attivazione dal lato Proxmox.
 
-> La console noVNC trasmette i **tasti**, non i caratteri: con un layout diverso tra client e guest i simboli escono sbagliati. Per digitare comandi lunghi conviene la console seriale (sezione 4) o SSH.
+> La console noVNC trasmette i **tasti**, non i caratteri: con un layout diverso tra client e guest i simboli escono sbagliati. Per digitare comandi lunghi conviene la console seriale (sezione 5) o SSH.
 
 ### 2. Attivare l'agent nella VM
 
@@ -75,7 +75,7 @@ usermod -aG sudo labuser; id labuser; dpkg -l sudo qemu-guest-agent
 
 - **Use QEMU Guest Agent:** aggiunge il canale virtio-serial e fa usare l'agent a Proxmox VE.
 - **Run guest-trim after a disk move or VM migration:** dopo *Move disk* o migrazione lancia `fstrim` nel guest.
-- **Freeze/thaw guest filesystems… for consistency:** attivo di default, è il freeze usato da backup e snapshot (sezione 7).
+- **Freeze/thaw guest filesystems… for consistency:** attivo di default, è il freeze usato da backup e snapshot (sezione 6).
 
 Da CLI:
 
