@@ -1,0 +1,39 @@
+/* Proxmox Community – palette e piccoli ritocchi */
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #1b3a5c;
+  --md-primary-fg-color--light: #2b5683;
+  --md-primary-fg-color--dark: #10263f;
+  --md-accent-fg-color: #0f9488;
+  --md-accent-fg-color--transparent: rgba(15, 148, 136, 0.1);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #1b3a5c;
+  --md-primary-fg-color--light: #2b5683;
+  --md-primary-fg-color--dark: #10263f;
+  --md-accent-fg-color: #2dd4bf;
+  --md-accent-fg-color--transparent: rgba(45, 212, 191, 0.12);
+  --md-default-bg-color: #111a26;
+}
+
+/* Home: hero */
+.pc-hero {
+  padding: 1.6rem 1.4rem;
+  margin: 0 0 1.6rem;
+  border-radius: 0.6rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, #1b3a5c 0%, #10263f 55%, #0f9488 140%);
+}
+.pc-hero h1 { color: #ffffff; margin: 0 0 0.6rem; font-weight: 700; }
+.pc-hero p { margin: 0.4rem 0; font-size: 0.85rem; opacity: 0.95; }
+.pc-hero .md-button { margin: 0.8rem 0.4rem 0 0; }
+.pc-hero .md-button { color: #ffffff; border-color: #ffffff; }
+.pc-hero .md-button--primary { background: #2dd4bf; border-color: #2dd4bf; color: #0b1b2b; }
+
+/* Numeri dei lab nelle card */
+.pc-count { font-size: 0.7rem; opacity: 0.7; }
+
+/* Immagini dei lab: bordo leggero */
+.md-typeset img { border-radius: 0.2rem; }
+.md-typeset p > img { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08); }
