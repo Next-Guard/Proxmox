@@ -12,7 +12,7 @@ Il progetto è pensato per crescere: oltre al percorso dei lab, chiunque può pr
 
 Il progetto è curato da **Nicola Marco Decandia** ([@ndecandia](https://github.com/ndecandia) su GitHub).
 
-Segnalazioni, domande e proposte sono benvenute come *issue* o *pull request* nel [repository del progetto](https://github.com/ndecandia/NextGuard).
+Segnalazioni, domande e proposte sono benvenute come *issue* o *pull request* nel [repository del progetto](https://github.com/Next-Guard/Proxmox).
 
 ## Licenze
 

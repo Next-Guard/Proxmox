@@ -4,9 +4,9 @@ Proxmox Community is open to everyone: you can fix a mistake, improve a lab, tra
 
 ## How to contribute
 
-- **Found a mistake or have a question?** Open an [issue](https://github.com/ndecandia/NextGuard/issues) describing the page, the step and what you observed.
+- **Found a mistake or have a question?** Open an [issue](https://github.com/Next-Guard/Proxmox/issues) describing the page, the step and what you observed.
 - **Want to propose a change or a guide?** Use a *pull request*:
-  1. *fork* the [repository](https://github.com/ndecandia/NextGuard) and create a branch;
+  1. *fork* the [repository](https://github.com/Next-Guard/Proxmox) and create a branch;
   2. edit or add the Markdown files in `docs/en/` (English) and/or `docs/it/` (Italian);
   3. check the preview locally (see below);
   4. open the pull request explaining what changes and on which Proxmox version you tested it.

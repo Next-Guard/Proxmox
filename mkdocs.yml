@@ -2,8 +2,8 @@ site_name: Proxmox Community
 site_url: https://proxmox.community/
 site_description: Practical, step-by-step Proxmox VE 9 labs on a real lab, from zero to hero.
 site_author: Nicola Marco Decandia
-repo_url: https://github.com/ndecandia/NextGuard
-repo_name: ndecandia/NextGuard
+repo_url: https://github.com/Next-Guard/Proxmox
+repo_name: Next-Guard/Proxmox
 edit_uri: edit/main/docs/
 copyright: >-
   &copy; 2026 Nicola Marco Decandia &middot; Content licensed under CC BY-SA 4.0, code under MIT.<br>
@@ -55,7 +55,7 @@ extra_css:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/ndecandia/NextGuard
+      link: https://github.com/Next-Guard/Proxmox
       name: Proxmox Community on GitHub
 
 plugins:

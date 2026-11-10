@@ -12,7 +12,7 @@ The project is designed to grow: besides the lab path, anyone can propose new gu
 
 The project is maintained by **Nicola Marco Decandia** ([@ndecandia](https://github.com/ndecandia) on GitHub).
 
-Reports, questions and proposals are welcome as *issues* or *pull requests* in the [project repository](https://github.com/ndecandia/NextGuard).
+Reports, questions and proposals are welcome as *issues* or *pull requests* in the [project repository](https://github.com/Next-Guard/Proxmox).
 
 ## Licenses
 
