@@ -18,11 +18,11 @@ duration: 2 hours
 
 ## Objectives
 
-- Understand where Proxmox VE notifications end up with the default configuration, and why they sometimes never arrive.
-- Configure the **notification system**: SMTP, Gotify and sendmail targets, matchers by severity and event type.
-- Send the cluster **metrics** to InfluxDB 2 and visualize them in Grafana.
-- Read the **logs** of the Proxmox VE services and of the tasks, and centralize them with rsyslog.
-- Protect the new services with the firewall without interrupting metrics and logs.
+- The notifications of the previous labs found and delivered: the Postfix queue empty on all three nodes, the messages visible in a test mail server (Mailpit).
+- An SMTP target, a Gotify target and the default `sendmail` target, routed by two matchers: a failed backup notified through all three, with priority 9 in Gotify.
+- The cluster **metrics** in an InfluxDB 2 bucket, written with a write-only token and shown in Grafana through a read-only token.
+- The **logs** of the three nodes collected by a central rsyslog server, one file per node and program, with times that match those of the nodes.
+- The monitoring container behind its own firewall: only the nodes write metrics and logs, only the management network reaches Grafana, and a guest that is not a node is blocked.
 
 ## How it works
 
@@ -30,13 +30,28 @@ duration: 2 hours
 
 - A **target** is a destination: `sendmail` (uses the local MTA, that is, Postfix), `smtp` (talks directly to a mail server), `gotify` (push notifications) and `webhook` (an HTTP request with a customizable body).
 - A **matcher** decides which notifications go to which targets. Its rules look at the **severity** (`info`, `notice`, `warning`, `error`), at the **fields** of the event (for example `type=vzdump`, `type=fencing`, `type=replication`, `type=package-updates`, `hostname`, `job-id`) and at the **calendar**. Mode `all` requires all rules to match, mode `any` requires just one.
-- Every notification is evaluated by **all** matchers: if two matchers send it to the same recipient, it arrives twice.
+- A notification is checked against **every** matcher and goes to the targets of all the matchers that match. Each target receives it at most once, even when several matchers name it; two different targets that deliver to the same mailbox, however, produce two copies (step 6).
 
-The default configuration has a single target, `mail-to-root`, which uses `sendmail` to send to the email address of `root@pam`, and a matcher, `default-matcher`, that sends everything to it.
+The default configuration has a single target, `mail-to-root`, which uses `sendmail` to send to the email address of `root@pam`, and a matcher, `default-matcher`, that sends everything to it. Mail that local services such as `smartd` send to the `root` user also enters the notification system, as events of type `system-mail`.
 
-**Metrics.** Every node periodically sends the statistics of nodes, guests and storages to one or more **metric servers**: Graphite or InfluxDB. With InfluxDB 2 you use the HTTP(S) protocol with an organization, a bucket and a token. Proxmox VE keeps no history beyond its RRD graphs: for long-term history, alerts and dashboards you use an external database such as InfluxDB and a tool such as Grafana.
+**Metrics.** Every node periodically sends the statistics of nodes, guests and storages to one or more **metric servers**: Graphite or InfluxDB (the current documentation also lists OpenTelemetry). With InfluxDB 2 you use the HTTP(S) protocol with an organization, a bucket and a token. Proxmox VE keeps no history beyond its RRD graphs: for long-term history, alerts and dashboards you use an external database such as InfluxDB and a tool such as Grafana.
 
 **Logs.** The Proxmox VE services write to the systemd journal: `pveproxy` (web interface and API), `pvedaemon` (privileged operations), `pve-cluster` (the `/etc/pve` file system), `corosync`, `pve-ha-crm` and `pve-ha-lrm` (high availability), `pvestatd` (statistics). Every operation started from the interface or the API is a **task** with an identifier (UPID) and its own log in `/var/log/pve/tasks/`. To have the logs of all nodes in one place, and to keep them even if a node fails, you forward them to a central server.
+
+### Test environment and versions
+
+The outputs in this lab come from a run on 10 November 2026, the date in the logs and in the tasks, with the configuration below. Some of the behaviours described depend on versions and defaults, for example which targets use the proxy, or the timestamp format of forwarded logs: on a different system, check them again.
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve`, three-node cluster `deso-cluster`, nodes in the `Europe/Rome` time zone ([Lab 03](/03-install-proxmox-ve/), [Lab 04](/04-first-access-repositories-updates/)) |
+| Mail on the nodes | Postfix as installed by Proxmox VE, with no `relayhost` until step 6 |
+| Lab proxy | filter on a list of domains ([Lab 01](/01-lab-architecture/)), set as the Datacenter HTTP proxy ([Lab 04](/04-first-access-repositories-updates/)) |
+| CT 151 and CT 152 | OCI images `axllent/mailpit:latest` and `gotify/server:latest`, downloaded on 10 November 2026; the Gotify web interface shows version 3.1.1, the Mailpit version was not recorded |
+| CT 153 `monitor` | Debian 13 (template `debian-13-standard_13.6-1`), InfluxDB 2.9.1, Grafana 13.3.0, rsyslog 8.2504.0; time zone UTC when created |
+| Log forwarding | rsyslog installed on the nodes from the Debian repositories, `omfwd` over TCP with its default template |
+
+**What the test shows, and what it does not.** Each path (email, push, metrics, logs) is checked with at least one real message, in this configuration. The test does not cover delivery while the mail server is down (the SMTP target does not retry), the `critici-push` rule on fencing (no fencing happened after the matcher was created), the rsyslog queue during an outage of the central server, how long data takes to arrive, or behaviour under load.
 
 ## Procedure
 
@@ -62,7 +77,7 @@ C321B2A7B8     7395 Tue Nov 10 05:09:22  root@desopve01.proxmox.community
                                          admin@proxmox.community
 ```
 
-Across the three nodes there are **31 stuck messages**, including the very fencing notifications of [Lab 49](/49-high-availability/):
+Across the three nodes, **31 messages** are waiting in the queue, among them the fencing notifications of [Lab 49](/49-high-availability/):
 
 ```text
 desopve01 7A1F02D550 | Subject: Trying to fence node 'desopve03'
@@ -72,7 +87,13 @@ desopve01 4339E298E9 | Subject: vzdump backup status (desopve01.proxmox.communit
 …
 ```
 
-The reason: the `proxmox.community` domain has no MX record in the lab DNS, so Postfix tries to deliver directly to the address of the domain, that is, to the domain controller, on port 25. There is no mail server there, and the messages stay in the queue for days. **A notification that nobody receives is as good as no notification.** The first check after installing a cluster is to verify that the emails actually arrive.
+Why they had not been delivered:
+
+- **Observed:** for the second message, Postfix records the reason `connect to proxmox.community[fd27:199::20]:25: Connection timed out`; `fd27:199::20` is the IPv6 address of the domain controller ([Lab 25](/25-ipv6/)). The two messages shown entered the queue at 04:37 and 05:09 on 10 November, the day of the test.
+- **Interpretation:** this is consistent with a domain that has no MX record in the lab DNS. Without one, an SMTP client delivers to the addresses of the domain itself (the *implicit MX* of RFC 5321), and here those belong to the domain controller, which runs no mail service ([Lab 02](/02-domain-controller/)). Postfix keeps retrying a deferred message, by default for up to five days (`maximal_queue_lifetime`), and only then treats it as undeliverable: until then, nothing visible happens. A timeout, unlike a refused connection, does not tell you whether nothing listens on port 25 or a filter drops the connection.
+- **How to check:** on the domain controller, `Resolve-DnsName proxmox.community -Type MX -DnsOnly` should return no MX record, while `Resolve-DnsName proxmox.community -DnsOnly` lists the addresses Postfix tries. On a node, `journalctl -t postfix/smtp | grep deferred` shows every failed attempt with its reason, and `postqueue -p` the arrival time of each message still waiting.
+
+**A notification that nobody receives is as good as no notification.** The first check after installing a cluster is to verify that the emails actually arrive.
 
 ### 2. A test mail server: Mailpit
 
@@ -107,7 +128,7 @@ Proxmox VE takes the process to start from the image (`entrypoint: /mailpit`). M
 
 In production you use the company mail server or an external service with **STARTTLS** or **TLS** and a dedicated user. The password ends up in `/etc/pve/priv/notifications.cfg`, readable only by root.
 
-Unlike `sendmail`, the SMTP target **does not go through Postfix**: Proxmox VE talks directly to the server, so a full local queue does not block it. The **Test** button sends a test message, which shows up in Mailpit immediately.
+Unlike `sendmail`, the SMTP target **does not go through Postfix**: Proxmox VE connects to the mail server itself, so the messages waiting in the local queue do not hold it up. The flip side, according to the documentation, is that the SMTP target has no queue and does not retry: a notification sent while the mail server is unreachable is lost. This lab does not test that case. The **Test** button sends a test message, which shows up in Mailpit immediately.
 
 ### 4. Gotify target and a trap: the Datacenter proxy
 
@@ -119,7 +140,7 @@ pct create 152 cephfs:vztmpl/gotify_server_latest.tar --hostname gotify --unpriv
 pct start 152
 ```
 
- At first start the user is `admin`/`admin`: you change the password and create an **application**, which provides the token for sending messages:
+At first start the user is `admin`/`admin`: you change the password and create an **application**, which provides the token for sending messages:
 
 ```bash
 curl -s -u admin:admin -X POST http://172.27.199.152/current/user/password \
@@ -132,7 +153,9 @@ The token goes into the **Gotify** target (Endpoint Name `gotify`):
 
 ![Gotify target with the application token](../../assets/images/51/03-target-gotify.png)
 
-The test, however, fails:
+**Configuration tried.** The Gotify target points to `http://172.27.199.152`, while the Datacenter HTTP proxy of [Lab 04](/04-first-access-repositories-updates/) is still set.
+
+**Error observed.** The test fails:
 
 ```bash
 pvesh create /cluster/notifications/targets/gotify/test
@@ -142,14 +165,18 @@ pvesh create /cluster/notifications/targets/gotify/test
 500 Could not test target: could not notify via endpoint(s): gotify: CONNECT proxy failed: proxy server responded 403/403
 ```
 
-The **Gotify** and **Webhook** targets use the **Datacenter HTTP proxy** set in [Lab 04](/04-first-access-repositories-updates/), even toward an internal address. The proxy log confirms it:
+The proxy log shows the request to the internal address, refused by the filter:
 
 ```text
 CONNECT   Nov 10 07:49:34.599 [91799]: Request (file descriptor 5): CONNECT 172.27.199.152:80 HTTP/1.1
 NOTICE    Nov 10 07:49:34.603 [91799]: Proxying refused on filtered domain "172.27.199.152"
 ```
 
-The lab proxy accepts only a list of external domains. The solution is to let the internal destinations of the management network (`172.27.199.0/24` and `*.proxmox.community`) through the proxy as well. In a company, you ask whoever manages the proxy for the same exception. After the change:
+So the Gotify target sent its request through the **Datacenter HTTP proxy**, although the destination is an internal address. The documentation states this for the Gotify target. For the **Webhook** target it says nothing, but in the current source code that target builds its HTTP client with the same proxy setting. This lab tested only Gotify; to check the Webhook target, test one and look for its request in the proxy log.
+
+**Decision.** The lab proxy accepts only a list of external domains: let the internal destinations of the management network (`172.27.199.0/24` and `*.proxmox.community`) through as well, as described in [Lab 01](/01-lab-architecture/). In a company, you ask whoever manages the proxy for the same exception.
+
+**Result.** The test message arrives in Gotify:
 
 ```text
 Test notification  | 1 | ``` This is a test of the notification target 'gotify'.  ```
@@ -187,13 +214,13 @@ matcher: critici-push
 
 ![Configured targets and matchers](../../assets/images/51/04-target-e-matcher.png)
 
-In the `critici-push` matcher, mode **any** fires the rule on an error **or** on a fencing event: the rule on the `type` field catches fencing notifications whatever their severity, including the one for a successful fencing.
+In the `critici-push` matcher, mode **any** makes it match an error **or** a fencing event: the rule on the `type` field catches fencing notifications whatever their severity, including the one for a successful fencing. No fencing happened in this lab after the matcher was created, so the rule on `type=fencing` was not exercised. At the next fencing, for example by repeating the test of [Lab 49](/49-high-availability/), the messages should show up in Gotify, and the journal of `pve-ha-crm` should record `` notified via target `gotify` ``.
 
 ![Rules of the critici-push matcher: at least one rule must match, type fencing or severity error](../../assets/images/51/05-matcher-critici-regole.png)
 
 ### 6. Unblocking the Postfix queue and testing a real error
 
-The `sendmail` target (`mail-to-root`) is still useful: other system programs use it too, for example cron and `smartd`. Have Postfix deliver to the lab mail server, on every node:
+Postfix is still needed: the `sendmail` target (`mail-to-root`) hands its messages to it, and local services such as `smartd` and cron send their mail to `root` through it, mail that Proxmox VE then feeds into the notification system as `system-mail`. Have Postfix deliver to the lab mail server, on every node:
 
 ```bash
 postconf -e 'relayhost = [172.27.199.151]:1025'
@@ -206,7 +233,7 @@ postqueue -p | tail -1
 Mail queue is empty
 ```
 
-The square brackets tell Postfix not to look up the MX record and to use that address directly. All 31 stuck messages arrive in Mailpit:
+The square brackets tell Postfix not to look up MX records and to use that address directly. The 31 messages that were waiting arrive in Mailpit, together with the test message of step 3:
 
 ```text
 totale 32
@@ -217,7 +244,7 @@ totale 32
 1 Test notification
 ```
 
-![Mailpit with the notifications that had been stuck in the queue for days](../../assets/images/51/06-mailpit-posta-arrivata.png)
+![Mailpit with the notifications that had been waiting in the Postfix queue](../../assets/images/51/06-mailpit-posta-arrivata.png)
 
 The fencing notification of Lab 49 describes what happened and which HA resources were recovered:
 
@@ -236,7 +263,7 @@ INFO: notified via target `gotify`
 could not activate storage 'backup-guasto': storage 'backup-guasto' does not exist could not get storage information for 'backup-guasto': storage 'backup-guasto' does not exist
 ```
 
-The same notification went through three targets. It arrives in Mailpit **twice**: once through `mail-to-root` (Postfix) and once through the SMTP target. In Gotify it arrives with priority 9, the highest, because the severity is `error`:
+The task log names three targets, and the notification arrives in Mailpit **twice**. That is consistent with the two paths that now end in Mailpit: `mail-to-root` through Postfix and its `relayhost`, and the SMTP target directly. To check it, compare the headers of the two copies: only the one that went through Postfix carries a `Received` header added by the node's Postfix. In Gotify the message has priority 9. The Gotify target derives the priority from the severity: in the source code of the notification library, `error` becomes 9, the highest value it uses (`warning` 5, `notice` 3, `info` 1):
 
 ![Gotify: the failed backup with high priority and the test message](../../assets/images/51/08-gotify-messaggi.png)
 
@@ -312,7 +339,7 @@ ballooninfo blockstat cpustat memory nics proxmox-support system
              desopve03                        0.2536
 ```
 
-In Grafana (`http://172.27.199.153:3000`) you add a data source of type **InfluxDB** with the **Flux** query language, organization `proxmox`, bucket `pve` and the read-only token. The test answers `datasource is working. 1 buckets found`. Then you import the public dashboard "Proxmox Cluster [Flux]" (ID 15356 on grafana.com). Import by ID is done by the `grafana-server` service, which does not use the proxy: behind a proxy, download the JSON from the container (the proxy must allow the `grafana.com` domain) and upload it with **Dashboards → New → Import → Upload dashboard JSON file**, associating it with this data source:
+In Grafana (`http://172.27.199.153:3000`) you add a data source of type **InfluxDB** with the **Flux** query language, organization `proxmox`, bucket `pve` and the read-only token. The test answers `datasource is working. 1 buckets found`. Then you import the public dashboard "Proxmox Cluster [Flux]" (ID 15356 on grafana.com). An import by ID is downloaded by the `grafana-server` service, not by the browser, and in this lab the service has no proxy: the `https_proxy` variable exported earlier applies only to that shell. So download the JSON from the container, through the proxy (which must allow the `grafana.com` domain), and upload it with **Dashboards → New → Import → Upload dashboard JSON file**, associating it with this data source:
 
 ```bash
 curl -x http://proxy.proxmox.community:3128 -fsS -o /root/proxmox-flux.json \
@@ -340,13 +367,15 @@ journalctl -u pve-ha-crm --since "2026-11-10 06:35" --until "2026-11-10 06:40" -
 2026-11-10T06:37:44+01:00 desopve01 pve-ha-crm[1679]: recover service 'vm:106' from fenced node 'desopve03' to node 'desopve02'
 ```
 
-And Corosync, a few seconds earlier, when the node disappeared:
+Corosync, on the same node, had logged the loss of both links to host 3, that is `desopve03`, 16 seconds earlier:
 
 ```text
 2026-11-10T06:35:38+01:00 desopve01 corosync[120106]:   [KNET  ] link: host: 3 link: 0 is down
 2026-11-10T06:35:38+01:00 desopve01 corosync[120106]:   [KNET  ] link: host: 3 link: 1 is down
 2026-11-10T06:35:38+01:00 desopve01 corosync[120106]:   [KNET  ] host: host: 3 has no active links
 ```
+
+The two services record different events: Corosync the loss of the links, the HA manager its change of state, the fence and the recovery. [Lab 49](/49-high-availability/) discusses the time between them.
 
 The tasks of the node, with the failed backup of step 6:
 
@@ -385,7 +414,9 @@ systemctl restart rsyslog
 logger -t lab51 "prova di inoltro da $(hostname)"
 ```
 
-The disk queue (`queue.filename`) keeps the messages if the central server is unreachable and sends them when it comes back. The test messages arrive on CT 153 and, when you restart CT 101 on `desopve02`, so do the real tasks:
+With `queue.filename`, the forwarding queue becomes *disk-assisted*: while the central server is unreachable, rsyslog keeps the messages and retries indefinitely (`action.resumeRetryCount="-1"`). According to the rsyslog documentation, the messages stay in memory and are written to disk only when the in-memory queue fills up or at an orderly shutdown (`queue.saveOnShutdown`): a crash or a power loss of the node loses what was still in memory. This lab did not test an outage of the central server. To check it, stop rsyslog on CT 153, send a few messages with `logger` from a node, start rsyslog again and look for them in `/var/log/remote/`.
+
+The test messages arrive on CT 153 and, when you restart CT 101 on `desopve02`, so do the real tasks:
 
 ```text
 2026-11-10T08:57:33+00:00 desopve01 lab51: prova di inoltro da desopve01
@@ -395,11 +426,19 @@ The disk queue (`queue.filename`) keeps the messages if the central server is un
 2026-11-10T08:58:07+00:00 desopve02 pct[632503]: <root@pam> end task UPID:desopve02:0009A6D8:0053F113:6AF2CE8C:vzstart:101:root@pam: OK
 ```
 
-The timestamps were in UTC because the container is created with that time zone: after `timedatectl set-timezone Europe/Rome` they match those of the nodes.
+**Configuration tried.** The nodes forward with `omfwd` and its default template; CT 153 keeps the time zone it was created with, UTC.
+
+**Behaviour observed.** On CT 153 the lines carry the offset `+00:00`, while the journal of the nodes shows `+01:00`. The UPID of each task holds its start time in hexadecimal (`date -u -d @$((16#6AF2CE89))` decodes it): `vzstop` starts at 07:58:01 UTC, the following `vzstart` at 07:58:04 UTC. CT 153 records the end of `vzstop` at 08:58:03+00:00. Read as UTC, the stop would have lasted an hour and ended after the next task had started; read with the nodes' offset, it ends at 07:58:03 UTC, two seconds after it began. The times on CT 153 are therefore the nodes' local times, labelled as UTC.
+
+**Interpretation.** This is consistent with the nodes sending their local time without a time zone, and with CT 153 attaching its own, UTC. The default template of `omfwd`, `RSYSLOG_TraditionalForwardFormat`, uses the traditional timestamp, which carries neither a time zone nor fractions of a second, just like the lines received. To check it, send a message with `logger` from a node and compare the line received with `date -u` on the node, or look at the forwarded messages with `tcpdump -A -i vmbr0 tcp port 514` on the node.
+
+**Decision.** Bring CT 153 to the nodes' time zone with `timedatectl set-timezone Europe/Rome`.
+
+**Result.** The times match those of the nodes. This works because nodes and server share the same time zone. A forwarding format that carries the offset, such as `RSYSLOG_ForwardFormat` (`template="RSYSLOG_ForwardFormat"` in the `omfwd` action), would make the timestamps independent of the server's time zone; it was not tested in this lab.
 
 ### 9. Firewall for the new services
 
-The host firewall of the nodes ([Lab 33](/33-firewall-2/)) filters only **incoming** traffic to the nodes: metrics, logs and notifications are **outgoing** connections, and the outbound policy is `ACCEPT`. The `monitor` container, on the other hand, exposes three services and must be protected. An IPSet with the nodes, and the rules of the container:
+In the configuration of [Lab 33](/33-firewall-2/), the host firewall of the nodes has no outbound rules and keeps the default outbound policy, `ACCEPT`: metrics, logs and notifications leave the nodes as **outgoing** connections, so they are not affected. The `monitor` container, on the other hand, exposes three services and must be protected. An IPSet with the nodes, and the rules of the container:
 
 ```bash
 pvesh create /cluster/firewall/ipset --name nodi-pve --comment "Nodi Proxmox VE del laboratorio"
@@ -426,19 +465,21 @@ Finally, set `firewall=1` on the network device of the container (`pct set 153 -
 
 ## Verification and tests
 
-| Test | Result |
-|---|---|
-| Postfix queue with the default target | 31 notifications stuck for days, fencing included |
-| Test of the SMTP target | message in Mailpit |
-| Test of the Gotify target with the filtering proxy | error `CONNECT proxy failed: 403` |
-| Test of the Gotify target after the proxy exception | message in Gotify |
-| `postqueue -f` with `relayhost` pointing to Mailpit | empty queue, 31 messages delivered |
-| Failed backup (`vzdump` to a nonexistent storage) | three targets, two copies in Mailpit, priority 9 in Gotify |
-| Metrics in InfluxDB | measurements `system`, `cpustat`, `memory`, `nics`, `blockstat`, `ballooninfo` |
-| Grafana | dashboard with the data of the three nodes |
-| `logger` on the nodes and restart of CT 101 | lines in `/var/log/remote/<nodo>/` on CT 153 |
-| Port 8086 from CT 101 (not a node), with the CT 153 firewall | blocked |
-| Port 8086 from `desopve01`, Grafana from the management network, logs after the firewall | allowed |
+The lab has succeeded when every path delivers at least one real message: a notification in Mailpit and in Gotify, data in the InfluxDB bucket and in Grafana, a line from every node in `/var/log/remote/` on CT 153. The firewall of CT 153 must then block a connection from a guest that is not a node, without stopping metrics and logs.
+
+| Check | Success criterion | Observed in the lab |
+|---|---|---|
+| Postfix queue before step 6 (`postqueue -p` on every node) | diagnosis: are there notifications that were never delivered? | 31 notifications waiting, fencing included |
+| Test of the SMTP target | message in Mailpit | message in Mailpit |
+| Test of the Gotify target with the filtering proxy | diagnosis: the proxy log shows the refused request | error `CONNECT proxy failed: 403`; `Proxying refused on filtered domain` in the proxy log |
+| Test of the Gotify target after the proxy exception | message in Gotify | message in Gotify |
+| `postqueue -f` with `relayhost` pointing to Mailpit | empty queue on every node | empty queue, 31 messages delivered |
+| Failed backup (`vzdump` to a nonexistent storage) | a notification on every target, severity `error` | three targets, two copies in Mailpit, priority 9 in Gotify |
+| Metrics in InfluxDB | the measurements sent by the nodes in the `pve` bucket | measurements `system`, `cpustat`, `memory`, `nics`, `blockstat`, `ballooninfo`, `proxmox-support` |
+| Grafana | data source test passed, dashboard with the three nodes | `datasource is working. 1 buckets found`; dashboard with the data of the three nodes |
+| `logger` on the nodes and restart of CT 101 | one file per node and program in `/var/log/remote/<node>/`, times consistent with the nodes | lines from all three nodes; times aligned after setting the time zone of CT 153 |
+| Port 8086 from CT 101 (not a node), with the CT 153 firewall | blocked | blocked |
+| Port 8086 from `desopve01`, Grafana from the management network, logs after the firewall | allowed | allowed |
 
 ## Final lab state
 
@@ -449,7 +490,7 @@ Finally, set `firewall=1` on the network device of the container (`pct set 153 -
 - **Lab proxy:** the internal destinations `172.27.199.0/24` and `*.proxmox.community` are allowed as well.
 - **CT 151 `mailpit`** on `desopve03`, running (OCI image, 172.27.199.151, SMTP 1025, web 8025). The messages are kept in memory: they are lost when the container restarts.
 - **CT 152 `gotify`** on `desopve03`, running (OCI image, 172.27.199.152, user `admin`, application "Proxmox VE").
-- **CT 153 `monitor`** on `desopve03`, running (Debian 13, 172.27.199.153): InfluxDB 2.9 (organization `proxmox`, bucket `pve`, 30 days, tokens `pve-scrittura` and `grafana-lettura`), Grafana 13.3 (`admin`, dashboard "Proxmox Cluster [Flux]"), rsyslog listening on TCP 514; firewall enabled with the rules of step 9.
+- **CT 153 `monitor`** on `desopve03`, running (Debian 13, 172.27.199.153, time zone `Europe/Rome`): InfluxDB 2.9 (organization `proxmox`, bucket `pve`, 30 days, tokens `pve-scrittura` and `grafana-lettura`), Grafana 13.3 (`admin`, dashboard "Proxmox Cluster [Flux]"), rsyslog listening on TCP 514; firewall enabled with the rules of step 9.
 - **Metric server** `influx-monitor` in the Datacenter.
 - **rsyslog** installed on nodes 01-03 with `/etc/rsyslog.d/90-remoto.conf`.
 - **IPSet** `nodi-pve` (172.27.199.21-24) in the Datacenter firewall.
@@ -457,20 +498,23 @@ Finally, set `firewall=1` on the network device of the container (`pct set 153 -
 
 ## What you learned
 
-- With the default configuration, notifications leave via Postfix for the email address of `root@pam`: if the domain has no reachable mail server, they stay **in the queue** and nobody notices.
-- An **SMTP** target talks directly to the mail server and does not depend on the local queue; `relayhost` fixes `sendmail` too.
-- The **Gotify** and **Webhook** targets go through the **Datacenter proxy**, even toward internal addresses.
-- **Matchers** add up: every notification is evaluated by all of them, and overlapping recipients receive duplicates.
-- The InfluxDB **metric server** receives the statistics of all nodes; with separate tokens for writing and reading, Grafana cannot modify the data.
-- Service logs live in the **journal**, operation logs in the **tasks**; rsyslog with a disk queue centralizes them without losing anything if the server is down.
-- A monitoring service must be protected like any other: only the nodes write, only the management network reads.
+- **Checking that notifications actually leave the cluster.** With the default configuration they depend on Postfix delivering to the address of `root@pam`. If the domain has no reachable mail server, they wait **in the queue** with no visible error: after an installation, the first check is `postqueue -p` on every node, and the fix is a `relayhost` or an SMTP target.
+- **Choosing between the `sendmail` and SMTP targets.** The **SMTP** target does not depend on the local queue, but it has no queue of its own and does not retry; `sendmail` hands the message to Postfix, which retries. Using both, as in this lab, costs a duplicate when they deliver to the same mailbox.
+- **Planning for the proxy.** The **Gotify** target, and according to the source code the **Webhook** target too, goes through the **Datacenter proxy** even toward internal addresses: with a filtering proxy, plan an exception for the internal destinations. The SMTP target and the InfluxDB metric server connect directly.
+- **Designing matchers.** A target receives a notification at most once, but two targets that deliver to the same mailbox produce two copies. A rule on a field such as `type=fencing`, in mode `any`, catches that event whatever its severity.
+- **Separating write and read access to the metrics.** A write-only token for Proxmox VE and a read-only token for Grafana: whoever reads the dashboards cannot alter the data.
+- **Centralizing logs with reliable timestamps.** Service logs live in the **journal**, operation logs in the **tasks**. When you forward them, use a format that carries the time zone or keep the server in the nodes' time zone, and check the times against a known event, such as the start of a task encoded in its UPID. A disk-assisted queue rides out an outage of the server and an orderly restart, not a crash of the node.
+- **Protecting the monitoring services.** Only the nodes write, only the management network reads.
 
 ## References
 
-- [Proxmox VE – Notifications](https://pve.proxmox.com/pve-docs/chapter-notifications.html)
+- Proxmox VE – [Notifications](https://pve.proxmox.com/pve-docs/chapter-notifications.html): [SMTP target](https://pve.proxmox.com/pve-docs/chapter-notifications.html#notification_targets_smtp) (no queue or retries), [Gotify target](https://pve.proxmox.com/pve-docs/chapter-notifications.html#notification_targets_gotify) (Datacenter proxy), [matchers](https://pve.proxmox.com/pve-docs/chapter-notifications.html#notification_matchers) (each target at most once), [system mail forwarding](https://pve.proxmox.com/pve-docs/chapter-notifications.html#_system_mail_forwarding)
+- Proxmox – source code of the [Gotify target](https://git.proxmox.com/?p=proxmox.git;a=blob;f=proxmox-notify/src/endpoints/gotify.rs;hb=HEAD) (proxy, priority from the severity) and of the [Webhook target](https://git.proxmox.com/?p=proxmox.git;a=blob;f=proxmox-notify/src/endpoints/webhook.rs;hb=HEAD) (proxy)
 - [Proxmox VE – External Metric Server](https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#external_metric_server)
-- [InfluxDB 2 – Install on Linux](https://docs.influxdata.com/influxdb/v2/install/)
+- Postfix – [`relayhost`](https://www.postfix.org/postconf.5.html#relayhost) (square brackets) and [`maximal_queue_lifetime`](https://www.postfix.org/postconf.5.html#maximal_queue_lifetime)
+- [RFC 5321, section 5.1 – delivery without an MX record (implicit MX)](https://www.rfc-editor.org/rfc/rfc5321.html#section-5.1)
+- [InfluxDB OSS v2 – Install](https://docs.influxdata.com/influxdb/v2/install/)
 - [Grafana – Install on Debian or Ubuntu](https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/)
 - [Grafana – dashboard "Proxmox Cluster [Flux]"](https://grafana.com/grafana/dashboards/15356)
 - [Mailpit](https://mailpit.axllent.org/) and [Gotify](https://gotify.net/docs/)
-- [rsyslog – omfwd](https://www.rsyslog.com/doc/configuration/modules/omfwd.html)
+- rsyslog – [omfwd](https://docs.rsyslog.com/doc/configuration/modules/omfwd.html) and its [default template](https://docs.rsyslog.com/doc/configuration/modules/omfwd/parameters/module.html#template), [reserved templates](https://docs.rsyslog.com/doc/reference/templates/templates-reserved-names.html) (`RSYSLOG_TraditionalForwardFormat`, `RSYSLOG_ForwardFormat`), [disk-assisted queues](https://docs.rsyslog.com/doc/concepts/queues.html#disk-assisted-memory-queues)

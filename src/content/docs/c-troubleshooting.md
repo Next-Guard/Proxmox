@@ -34,7 +34,7 @@ When you face a problem, it pays to always proceed the same way:
 
 | Symptom | Cause | Solution | Lab |
 |---|---|---|---|
-| iSCSI session on the second path dropping every 10 s, VM stalled for up to 85 s | **ARP flux**: two network cards of the same node on the same network (same subnet), and Linux answers ARP from the wrong one | `arp_ignore=1` and `arp_announce=2` in `/etc/sysctl.d/`; better still, separate networks on VLANs | [15](/15-iscsi-lvm-multipath/) |
+| iSCSI session on the second path dropping every 10 s, VM stalled for up to 85 s | Consistent with **ARP flux**: two network cards of the same node on the same Ethernet segment (same switch and VLAN, here with different subnets), with Linux answering ARP from the wrong one; `ip neigh` on the NAS shows which MAC address it uses | `arp_ignore=1` and `arp_announce=2` in `/etc/sysctl.d/`; better still, separate networks on VLANs | [15](/15-iscsi-lvm-multipath/) |
 | NAT or SNAT rules duplicated at every `ifreload` | The `post-up` commands run again at every network reload | Make the rules idempotent: `iptables -C … \|\| iptables -A …` | [24](/24-routing-nat/), [34](/34-network-performance-troubleshooting/) |
 | Corosync configuration changed, but the link stays the old one | Reloading the configuration is not enough to move a link | Restart Corosync **one node at a time**, checking the quorum between one node and the next | [22](/22-dedicated-networks/) |
 | 802.3ad bond with a single active link (Linux) or bond completely down (OVS) | No LACP partner: the switch does not negotiate the aggregation | Configure LACP on the switch; with OVS, `lacp-fallback-ab` keeps the bond from going down | [21](/21-bonding/), [23](/23-open-vswitch/) |
@@ -59,7 +59,7 @@ When you face a problem, it pays to always proceed the same way:
 | With the VNet firewall enabled, the guests no longer get an IP address from DHCP or resolve names | The VNet firewall also filters the traffic to the gateway on the node | Explicitly allow DHCP and DNS to the VNet gateway | [33](/33-firewall-2/) |
 | The VNet firewall does not block outbound traffic | It filters the traffic between guests and to the node, not the traffic routed out of the VNet | Filter outbound traffic on the guest firewall or on a router | [33](/33-firewall-2/) |
 | With nftables, SNAT traffic from a Simple zone to a CT with its firewall enabled on the **same** node is dropped | Conntrack drops the connection (`insert_failed`) | Open issue: avoid the combination, or disable the firewall of the destination CT | [33](/33-firewall-2/) |
-| Gotify/webhook notifications to an internal address rejected with 403 | The targets go through the datacenter proxy even for internal IPs | Allow the internal destinations on the proxy | [51](/51-notifications-metrics-logs/) |
+| Gotify notifications to an internal address rejected with `CONNECT proxy failed: 403` | The Gotify target uses the Datacenter proxy even for internal IPs (documented; in the source code the Webhook target uses the same setting, not tested) | Allow the internal destinations on the proxy; the proxy log shows the refused request | [51](/51-notifications-metrics-logs/) |
 
 ### Storage
 
@@ -71,7 +71,7 @@ When you face a problem, it pays to always proceed the same way:
 | SMB down: `Host is down` error after about 10 s | The CIFS mount is `soft` | Writes fail instead of waiting: decide which behavior you prefer for VM disks | [14](/14-smb-cifs/) |
 | `dd` with zeros gives unrealistic performance | Compression and zero detection on the NAS | Measure with random data or with `fio` | [13](/13-nfs/), [19](/19-fio-benchmark/) |
 | NFS/SMB free space dropped after creating an iSCSI LUN | The zvol is thick and reserves all its space immediately | Account for the reservation when sizing, or consider a *sparse* (thin) zvol | [15](/15-iscsi-lvm-multipath/) |
-| I/O pause of about 11 s when an iSCSI path fails | Multipath detection and failover time | Expected; tune `replacement_timeout` and the multipath timers | [15](/15-iscsi-lvm-multipath/) |
+| I/O pause of about 15 s when an iSCSI path fails | In the test: about 10 s to detect the failure (unanswered NOP-Out, error 1022) plus a 5 s session recovery timeout, consistent with multipathd's `fast_io_fail_tmo` rather than the 15 s of `replacement_timeout` | Expected with these timers; read the values in effect (`/sys/class/iscsi_session/*/recovery_tmo`) before tuning them | [15](/15-iscsi-lvm-multipath/) |
 | Rollback refused (`not most recent`) | ZFS and the volume chain only allow a rollback to the latest snapshot | Delete the more recent snapshots, or use qcow2/LVM-thin for snapshot trees | [16](/16-snapshots/) |
 | `snapshot feature is not available` on LVM | Thick LVM does not support classic snapshots | Enable the volume chain (each snapshot takes as much space as the disk) or use LVM-thin | [16](/16-snapshots/) |
 | fio measurements on the wrong disk inside a VM | The `sdX` names swap from one boot to the next when SATA and SCSI controllers are used together | Always use `/dev/disk/by-id/…` | [37](/37-virtual-disks-controllers/) |
@@ -92,7 +92,7 @@ When you face a problem, it pays to always proceed the same way:
 | Symptom | Cause | Solution | Lab |
 |---|---|---|---|
 | `/etc/pve` read-only on a node | The node has lost quorum | Restore Corosync communication; do not force `pvecm expected` unless you know what you are doing | [06](/06-cluster-corosync/) |
-| After a failure the replicated VM must be recovered manually | ZFS replication is not HA | Move the VM configuration to the node holding the replica; the data written since the last replication is lost | [11](/11-zfs-replication/) |
+| After a failure the replicated VM must be recovered manually | ZFS replication is not HA | Move the VM configuration to the node holding the replica; the data written after the snapshot of the last successful run is lost. If you need the writes left on the failed node, disable the job before powering it back on | [11](/11-zfs-replication/) |
 | Creating an HA group is rejected | In PVE 9, groups have been replaced by HA rules | Use **node affinity rules** | [49](/49-high-availability/) |
 | A resource affinity rule is rejected | The resource is already in a node affinity rule with multiple priorities | Simplify the node affinity or do without the resource affinity | [49](/49-high-availability/) |
 | Maintenance mode cannot evacuate a node | A *Keep Separate* rule on 3 VMs with 3 nodes leaves no room | Reduce the rule or add nodes | [49](/49-high-availability/) |
@@ -127,7 +127,7 @@ When you face a problem, it pays to always proceed the same way:
 | Live-restore not available | It requires Proxmox Backup Server | Use a PBS storage | [46](/46-vzdump-backup/) |
 | Encrypted restore: `missing key` | The encryption key is not available | Without the key the backup cannot be recovered: keep the key outside the cluster | [47](/47-proxmox-backup-server/) |
 | PBS GC does not free space immediately | Chunks are removed only after 24 hours | Expected | [47](/47-proxmox-backup-server/) |
-| Backup and fencing notifications do not arrive | Without an MX record, Postfix cannot deliver them and leaves them in the queue | Configure an SMTP relay or a notification target | [51](/51-notifications-metrics-logs/) |
+| Backup and fencing notifications do not arrive | In the lab: messages deferred in the Postfix queue, the connection to port 25 of the domain's own address timed out; consistent with a domain without an MX record | Check `postqueue -p` and the reason for the deferral; set a `relayhost` or an SMTP target | [51](/51-notifications-metrics-logs/) |
 
 ### Importing from VMware ESXi
 

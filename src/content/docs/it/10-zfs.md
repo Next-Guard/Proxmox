@@ -15,13 +15,12 @@ duration: 2 ore
 
 ## Obiettivi
 
-- Capire come è fatto un pool ZFS: vdev, mirror, RAIDZ, dataset e zvol.
-- Creare un pool dall'interfaccia web e da riga di comando, con i nomi stabili dei dischi.
-- Vedere l'autoriparazione di ZFS: un disco del mirror corrotto e riparato da uno scrub.
-- Confrontare gli algoritmi di compressione e capire lo spazio reale di un RAIDZ.
-- Usare snapshot, rollback e `zfs send`/`receive`, anche verso un altro nodo.
-- Dimensionare l'ARC, la cache di ZFS in RAM.
-- Gestire il guasto reale di un disco: pool degradato, sostituzione e resilver.
+- Un pool `tank` su `desopve04`, creato prima come mirror dall'interfaccia web e poi ricostruito da riga di comando come RAIDZ1 su tre dischi con i nomi stabili `by-path`, e registrato come storage `tank`: `zpool status` lo mostra ONLINE e `pvesm status` mostra lo storage attivo.
+- Un disco del mirror corrotto di proposito e riparato da uno scrub, con l'impronta del file di prova invariata e il pool di nuovo integro.
+- Spazio grezzo, spazio utilizzabile e rapporto di compressione del RAIDZ1 letti con `zpool list` e `zfs list`, per tre dataset con compressione diversa.
+- Un dataset ripristinato con un rollback e copiato con `zfs send`/`receive`, per intero e in modo incrementale, nello stesso pool e verso `desopve01`, con i dati ricevuti verificati.
+- L'ARC di `desopve04` limitato a 2 GiB, a caldo e in `/etc/modprobe.d/zfs.conf`.
+- Un disco estratto dal RAIDZ1 in funzione: il pool, DEGRADED, continua a servire il container e torna ONLINE dopo `zpool replace`; poi al pool si aggiunge un disco di riserva.
 
 ## Come funziona
 
@@ -48,7 +47,7 @@ In Proxmox VE uno storage `zfspool` mette i dischi delle VM in **zvol** e quelli
 
 ### Perché ZFS non perde i dati in silenzio
 
-- **Copy-on-write:** ZFS non sovrascrive mai un blocco, ne scrive uno nuovo e poi aggiorna i puntatori. Una scrittura interrotta non lascia il file system a metà, e gli snapshot sono istantanei e gratuiti.
+- **Copy-on-write:** ZFS non sovrascrive mai un blocco, ne scrive uno nuovo e poi aggiorna i puntatori. Una scrittura interrotta non lascia il file system a metà, e gli snapshot sono istantanei e, appena creati, non occupano spazio.
 - **Checksum di ogni blocco**, conservati nel blocco padre: ZFS si accorge se un disco restituisce dati sbagliati, anche senza errori di I/O.
 - **Autoriparazione:** se il vdev è ridondante, ZFS legge la copia buona e riscrive quella rovinata. Lo **scrub** rilegge tutto il pool per scovare e correggere gli errori latenti.
 
@@ -58,10 +57,10 @@ In Proxmox VE uno storage `zfspool` mette i dischi delle VM in **zvol** e quelli
 |---|---|---|---|
 | Spazio utile | 50% | circa 66% | circa 50% con 4 dischi, di più con molti dischi |
 | Dischi persi senza danni | 1 per mirror | 1 | 2 |
-| Prestazioni casuali (IOPS) | alte, crescono con il numero di mirror | quelle di circa un disco per vdev | quelle di circa un disco per vdev |
+| Prestazioni casuali (IOPS) | in scrittura circa quelle di un disco per mirror, in lettura di più, secondo i dischi del mirror; in entrambi i casi crescono con il numero di mirror | quelle di circa un disco per vdev | quelle di circa un disco per vdev |
 | Ricostruzione (resilver) | copia da un solo disco | ricalcolo dalla parità su tutti i dischi | ricalcolo dalla parità |
 
-Per i dischi delle VM la documentazione di Proxmox VE consiglia **mirror** o mirror in striping (RAID10): più IOPS e ricostruzioni più rapide. RAIDZ conviene per backup e archivi, dove conta lo spazio.
+La documentazione di Proxmox VE ricorda che per le VM in esecuzione la misura che conta di più è in genere quella degli IOPS, e che un vdev RAIDZ offre all'incirca gli IOPS di un disco singolo. Per i dischi delle VM questo porta a scegliere **mirror** o mirror in striping (RAID10); RAIDZ conviene per backup e archivi, dove conta di più lo spazio. Su RAIDZ, inoltre, i blocchi piccoli occupano più spazio di quanto dica il rapporto nominale di parità, perché ognuno richiede almeno un settore di parità: il passo 5 ne mostra l'effetto.
 
 :::note
 ZFS deve vedere i dischi direttamente: niente controller RAID hardware sotto, al massimo un HBA in modalità IT/passthrough.
@@ -69,7 +68,25 @@ ZFS deve vedere i dischi direttamente: niente controller RAID hardware sotto, al
 
 ### ARC
 
-L'**ARC** è la cache di lettura di ZFS in RAM. Più è grande, più letture evita ai dischi, ma la RAM che usa non va alle VM. Dalla versione 8.1 l'installazione di Proxmox VE limita l'ARC al **10% della RAM**, con un massimo di 16 GiB, scrivendo il limite in `/etc/modprobe.d/zfs.conf`.
+L'**ARC** è la cache di lettura di ZFS in RAM. Più è grande, più letture può servire senza toccare i dischi, ma la RAM che occupa non è disponibile per le VM finché ZFS non la restituisce. Dalla versione 8.1 l'installazione di Proxmox VE limita l'ARC al **10% della RAM**, con un massimo di 16 GiB, scrivendo il limite in `/etc/modprobe.d/zfs.conf`.
+
+### Ambiente e versioni della prova
+
+Gli output di questo lab vengono da una prova del 9 novembre 2026, la data che compare nei log, nella configurazione descritta qui sotto. I valori di spazio, compressione e durata dipendono da questa configurazione: con altre versioni, altri dischi o altri dati cambiano.
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)) |
+| ZFS | la versione distribuita per quel kernel. Durante la prova non è stata annotata su `desopve04`: la mostra `zfs version`. Come riferimento, l'[Appendice A](/it/a-upgrade-8-to-9/) riporta `zfsutils-linux 2.4.4-pve1` su un nodo di prova con lo stesso kernel |
+| Nodo di prova | `desopve04`: 4 core, 16 GB di RAM (15,6 GiB secondo `arc_summary`), sistema su ext4/LVM in un disco da 50 GB, quattro dischi da 20 GB in vani hot-swap sullo stesso controller (`pci-0000:02:00.0`), più un quinto disco da 20 GB per il Test 2 ([Lab 01](/it/01-lab-architecture/#hardware-del-laboratorio)) |
+| `tank` | prima un mirror su due dischi (`compression=on`, cioè LZ4, `ashift=12`), poi un RAIDZ1 su tre dischi con `ashift=12`, `compression=lz4` e `atime=off`; storage `zfspool` con `sparse 1` |
+| ARC di `desopve04` | massimo di 1,6 GiB impostato dall'installazione, portato a 2 GiB nel passo 9 |
+| Nodo remoto | `desopve01`, pool di sistema `rpool`: un mirror ZFS su due dischi da 50 GB ([Lab 03](/it/03-install-proxmox-ve/)) |
+| Dati di prova | 1500 MiB di dati casuali per lo scrub; una copia di `/usr/share/doc` e `/usr/lib/python3` del nodo (112 MiB di dati logici) per compressione, snapshot e send/receive |
+
+I modelli di dischi e controller sono oscurati, come indicato nelle [convenzioni del manuale](/it/the-lab/#convenzioni).
+
+**Cosa mostrano le prove e cosa no.** Mostrano come si comporta ZFS su un pool piccolo e quasi vuoto, in un solo nodo: rilevamento e riparazione dei danni, conteggio dello spazio, ripristino dopo il guasto di un disco. Le durate (uno scrub di 5 secondi, un resilver di 12) e i valori di spazio valgono per queste quantità di dati, da un centinaio di megabyte a 1,5 GB, e per questa disposizione dei dischi. Non sono misure di prestazioni: non dicono quanto dura uno scrub o un resilver su dischi grandi e pieni o sotto carico, né quanto costa la compressione in CPU.
 
 ## Procedura
 
@@ -198,7 +215,9 @@ Questo passo **distrugge di proposito** una parte dei dati di un disco. Fallo so
    errors: No known data errors
    ```
 
-   ZFS ha trovato 7570 blocchi con il checksum sbagliato sul secondo disco (`CKSUM`) e ha riscritto 962 MB copiandoli dal primo. Nessun errore di I/O: senza checksum, nessuno se ne sarebbe accorto.
+   - **Misura:** lo scrub termina con `repaired 962M in 00:00:05 with 0 errors`. Sul secondo disco il contatore `CKSUM` segna 7.57K, mentre `READ` e `WRITE` restano a 0.
+   - **Interpretazione:** il disco ha restituito zeri al posto dei dati senza segnalare alcun errore di I/O, e solo i checksum dei blocchi lo hanno rivelato; ZFS ha riscritto i blocchi rovinati con la copia buona del primo disco. I 962 MiB riparati sono meno dei 3000 MiB sovrascritti: è compatibile con uno scrub che legge solo i blocchi allocati, per cui gli zeri scritti sullo spazio libero passano inosservati e non fanno danni.
+   - **Verifica:** `zpool list tank` prima della prova mostra quanto spazio è allocato; `zpool events -v` elenca gli eventi di errore di checksum, con il disco e le posizioni coinvolte.
 
 4. Il file è intatto. Azzera i contatori:
 
@@ -219,7 +238,7 @@ Questo passo **distrugge di proposito** una parte dei dati di un disco. Fallo so
    pool 'tank' is healthy
    ```
 
-   In produzione, un disco con errori di checksum va tenuto d'occhio: se gli errori si ripetono, va sostituito. Il pacchetto `zfsutils-linux` programma uno scrub mensile di tutti i pool (`/etc/cron.d/zfsutils-linux`), e `zfs-zed` manda una mail a `root` quando trova problemi (lab 51).
+   In produzione, un disco con errori di checksum va tenuto d'occhio, e sostituito se gli errori si ripetono. Il pacchetto `zfsutils-linux` programma uno scrub mensile di tutti i pool (`/etc/cron.d/zfsutils-linux`), e `zfs-zed` può segnalare i problemi con una mail a `root`: che la mail arrivi davvero dipende dalla configurazione della posta del nodo, trattata nel [Lab 51](/it/51-notifications-metrics-logs/).
 
 ### 4. Creare un RAIDZ1 da riga di comando
 
@@ -285,7 +304,7 @@ tank   512K  38.4G   128K  /tank
 
 - `-o ashift=12` è una proprietà del **pool**, fissata per sempre alla creazione; `-O` imposta le proprietà del **dataset** radice, che i figli ereditano.
 - `atime=off` evita una scrittura a ogni lettura di file.
-- `zpool list` mostra lo spazio **grezzo**, parità compresa (3 × 20 GB = 59,5 GiB); `zfs list` quello **utilizzabile** (38,4 GiB): un terzo va alla parità.
+- `zpool list` mostra lo spazio **grezzo** dei tre dischi, parità compresa: 59,5 GiB. `zfs list` mostra quello **utilizzabile**, cioè quanto i dataset possono davvero riempire: 38,4 GiB. I due terzi di 59,5 GiB sarebbero 39,7 GiB: l'equivalente di un disco va alla parità, e la differenza che resta è compatibile con la piccola quota del pool (1/32 per impostazione predefinita, lo *slop space*) che ZFS tiene di riserva e non mostra mai come disponibile. La quota è fissata dal parametro del modulo `spa_slop_shift` (`cat /sys/module/zfs/parameters/spa_slop_shift`).
 
 Aggiungi lo storage, con l'opzione `sparse` come `local-zfs`:
 
@@ -317,8 +336,11 @@ tank/comp-off   off              157M   112M  1.00x
 tank/comp-zstd  zstd             103M   112M  1.83x
 ```
 
-- **RATIO** è il guadagno della compressione: zstd comprime più di LZ4 (1,83x contro 1,63x) e consuma un po' più di CPU. LZ4 resta il default più equilibrato, perché rinuncia subito ai dati che non si comprimono.
-- **USED** è lo spazio occupato nel pool. Senza compressione è **più** dei dati logici (157 MB contro 112): su RAIDZ ogni blocco porta con sé la parità e il riempimento a multipli di settore, e con tanti file piccoli questo sovraccarico si vede. La compressione lo riassorbe in parte.
+- **Misura:** sugli stessi 112 MiB di dati logici (`LUSED`), il rapporto di compressione (`compressratio`, colonna `RATIO`) è 1,83x con zstd e 1,63x con LZ4. Senza compressione è 1,00x, e lo spazio occupato nel pool (`USED`) è di 157 MiB: **più** dei dati logici.
+- **Interpretazione:**
+  - su questi file, testo e codice, zstd comprime più di LZ4. La prova non misura quanto costano i due algoritmi in CPU o in tempo. `compression=on`, che su questo pool vuol dire LZ4, è il predefinito che la documentazione di OpenZFS descrive come un equilibrio tra velocità e rapporto di compressione;
+  - lo spazio in più senza compressione è compatibile con il sovraccarico di allocazione dei blocchi piccoli: ogni blocco occupa un numero intero di settori da 4 KiB (`ashift=12`) e su RAIDZ1 richiede anche almeno un settore di parità. Con tanti file piccoli, come qui, questo sovraccarico si vede in `USED`, e la compressione ne riassorbe una parte. È compatibile anche con il fatto che con LZ4 `USED` (111 MiB) sia vicino a `LUSED` (112 MiB) nonostante un rapporto di 1,63x: il rapporto descrive la sola compressione, `USED` comprende anche il sovraccarico di allocazione. La prova non separa la quota dovuta all'arrotondamento ai settori da quella dovuta al RAIDZ.
+- **Verifica:** per confrontare il costo degli algoritmi, cronometra la stessa copia in ciascun dataset (`time cp -a …`) con il nodo altrimenti scarico. Per separare le due quote, copia gli stessi file in un dataset senza compressione su un mirror con lo stesso `ashift` e confronta `used` con `logicalused`: quello che resta è la quota dovuta all'arrotondamento ai settori.
 
 ### 6. Zvol e subvol: i dischi dei guest
 
@@ -391,7 +413,7 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
    tank/snapdemo  37.5G  64.7M     64.6M    128K             0B         0B
    ```
 
-   Appena creato, uno snapshot non occupa nulla. Quando i file vengono cancellati, i loro blocchi restano allo snapshot: ora il dataset occupa 128 KiB (`USEDDS`) e lo snapshot 64,6 MiB (`USEDSNAP`). La colonna `USED` di uno snapshot conta solo i blocchi che appartengono a **lui solo**: se più snapshot condividono gli stessi blocchi, ciascuno mostra `0B` e lo spazio compare solo in `USEDSNAP`.
+   Appena creato, uno snapshot condivide tutti i suoi blocchi con il dataset e non occupa spazio proprio. Quando i file vengono cancellati, i loro blocchi restano allo snapshot: ora il dataset occupa 128 KiB (`USEDDS`) e lo snapshot 64,6 MiB (`USEDSNAP`). La colonna `USED` di uno snapshot conta solo i blocchi che appartengono a **lui solo**: se più snapshot condividono gli stessi blocchi, ciascuno mostra `0B` e lo spazio compare solo in `USEDSNAP`.
 
 2. I file dello snapshot si leggono, in sola lettura, nella cartella nascosta `.zfs/snapshot`. Con `zfs rollback` il dataset torna esattamente com'era. Lo provi su `tank/comp-zstd`:
 
@@ -471,7 +493,9 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
    Mon Nov  9 02:07:58 PM CET 2026
    ```
 
-   L'invio incrementale (`-i @s1`) trasferisce solo le differenze tra i due snapshot: 49 KB invece di 100 MB.
+   L'invio incrementale (`-i @s1`) porta solo i blocchi cambiati tra i due snapshot: `zfs send -v` stima il flusso in 49,1 KiB, mentre il dataset referenzia 103 MiB. È una stima stampata prima del trasferimento, e la dimensione del flusso completo inviato per primo non è stata misurata: `zfs send -nvP tank/comp-zstd@s1` (una prova a vuoto) la stampa senza inviare nulla.
+
+   `tank/copia` referenzia 111 MiB, più dei 103 MiB dell'origine. È compatibile con un flusso inviato senza `-c`: i dati viaggiano non compressi e vengono compressi di nuovo all'arrivo, con la proprietà che `tank/copia` eredita da `tank` (LZ4, gli stessi 111 MiB di `tank/comp-lz4`). Per verificarlo: `zfs get compression,compressratio tank/copia`.
 
 2. **Verso un altro nodo, attraverso SSH.** `desopve04` non fa parte del cluster, quindi prima gli serve una chiave autorizzata su `desopve01`. `ssh-copy-id` chiede una volta la password di `root` di `desopve01`:
 
@@ -499,10 +523,10 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
    rpool/lab10-copia@s2     0B  93.5M
    ```
 
-   Il dataset arriva su `desopve01` con il suo snapshot. Occupa meno spazio che su `tank` perché lì non c'è il sovraccarico del RAIDZ.
+   Il dataset arriva su `desopve01` con il suo snapshot, e lì occupa 93,5 MiB, contro i 111 MiB della copia ricevuta su `tank`. La differenza è compatibile con l'assenza del sovraccarico del RAIDZ su `rpool`, che è un mirror, ma la prova non esclude altre differenze tra i due pool, come la proprietà di compressione ereditata da `rpool` o il suo `ashift`. Per verificarlo: `zfs get compression,compressratio,logicalreferenced rpool/lab10-copia` su `desopve01`, e `zpool get ashift` sui due pool.
 
    :::note
-   Sui nodi del cluster `/root/.ssh/authorized_keys` è un collegamento a `/etc/pve/priv/authorized_keys`, condiviso: la chiave di `desopve04` ora apre **tutti** i nodi del cluster. A fine lab va tolta (vedi *Pulizia*).
+   Sui nodi del cluster `/root/.ssh/authorized_keys` è un collegamento a `/etc/pve/priv/authorized_keys`, condiviso ([Lab 05](/it/05-ssh-shell-cli/)): la chiave di `desopve04` ora apre **tutti** i nodi del cluster. A fine lab va tolta (vedi *Pulizia*).
    :::
 
 ### 9. Dimensionare l'ARC
@@ -530,7 +554,7 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
            Current size:                                  44.1 %  705.3 MiB
    ```
 
-   1.676.673.024 byte sono 1,6 GiB, il 10% dei 15,6 GiB del nodo. `desopve01`, con 32 GB di RAM, ha un limite di 3,1 GiB.
+   1.676.673.024 byte sono 1,6 GiB, il 10% dei 15,6 GiB di RAM che ZFS vede sul nodo. Su `desopve01`, con 32 GB di RAM, la stessa regola dà circa 3,1 GiB: il valore esatto è nel file `/etc/modprobe.d/zfs.conf` di quel nodo.
 
 2. Porta il limite a 2 GiB a caldo, scrivendo nel parametro del modulo, e rendilo permanente in `zfs.conf`:
 
@@ -559,15 +583,31 @@ tank/subvol-941-disk-0  4.0G  351M  3.7G   9% /
    14:08:40     0       0     0       0     0      0    0   680M   1.6G  12.2G
    ```
 
-   Sui nodi con il **sistema su ZFS** (come `desopve01-03`) il modulo si carica dall'initramfs: dopo aver cambiato `zfs.conf` va lanciato `update-initramfs -u -k all`, altrimenti al riavvio vale il limite vecchio. `desopve04` ha il sistema su ext4, quindi non serve.
+   Il massimo ora è 2,0 GiB, ma l'obiettivo (`c` in `arcstat`, *Target size* in `arc_summary`) resta a 1,6 GiB e l'ARC occupa 680 MiB. Durante il campionamento non ci sono state letture (la colonna `read` è a 0): è compatibile con un ARC che cresce solo quando ci sono dati da tenere in cache, e il nuovo limite conta sotto carico. Per vederlo, osserva `arcstat 1` mentre leggi più dati di quanti l'ARC ne possa contenere.
+
+   Sui nodi con il **sistema su ZFS** (come `desopve01-03`) il modulo si carica dall'initramfs: dopo aver cambiato `zfs.conf` va lanciato `update-initramfs -u -k all`, altrimenti al riavvio vale il limite vecchio. `desopve04` ha il sistema su ext4, quindi non serve. Questo lab non riavvia `desopve04`: dopo il prossimo riavvio, `cat /sys/module/zfs/parameters/zfs_arc_max` deve restituire `2147483648`.
 
 ## Verifica e test
 
+Il lab è riuscito se ogni controllo della tabella dà il risultato atteso. L'ultima colonna riporta quanto osservato in questa prova.
+
+| Controllo | Vale come successo | Osservato in questa prova |
+|---|---|---|
+| Pool e storage `tank` | `zpool status tank` ONLINE con i tre dischi `by-path`; `tank` attivo in `pvesm status` | ONLINE; storage attivo |
+| Scrub dopo la corruzione di un disco del mirror | `scrub repaired … with 0 errors`, `md5sum` del file invariato, `pool 'tank' is healthy` dopo `zpool clear` | 962 MiB riparati in 5 secondi, `CKSUM` 7.57K sul disco corrotto, stesso `md5sum` |
+| Spazio del RAIDZ1 | lo spazio utilizzabile di `zfs list` è circa due terzi di quello grezzo di `zpool list`, o poco meno | 38,4 GiB utilizzabili su 59,5 GiB grezzi |
+| Compressione | `compressratio` sopra 1,00x sui dataset compressi | LZ4 1,63x, zstd 1,83x, off 1,00x |
+| Rollback | la cartella cancellata torna dopo `zfs rollback` | `doc` di nuovo in `tank/comp-zstd` |
+| `zfs send`/`receive` | i dataset ricevuti hanno i loro snapshot, e il file scritto dopo `@s1` è in `tank/copia` | `tank/copia@s1`, `@s2` e `nuovo.txt`; `rpool/lab10-copia@s2` su `desopve01` |
+| ARC | `arc_summary` mostra un *Max target size* di 2,0 GiB, e `zfs.conf` contiene `2147483648` | 2,0 GiB a caldo; tenuta dopo un riavvio non verificata in questo lab |
+| Guasto di un disco (Test 1) | pool DEGRADED ma scrivibile, ONLINE dopo `zpool replace`, resilver con 0 errori | scrittura riuscita durante il guasto; `resilvered 435M in 00:00:12 with 0 errors` |
+| Disco di riserva (Test 2) | il disco elencato sotto `spares` come `AVAIL`, `autoreplace=on` | `AVAIL`; attivazione automatica non provata |
+
 ### Test 1 – Si guasta un disco del RAIDZ
 
-Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. Il container `941` è acceso e ha il disco su `tank`.
+**Configurazione provata.** `tank` è un RAIDZ1 su tre dischi, indicati per vano (`by-path`), quindi sopporta la perdita di uno di essi. Il container `941` è acceso e ha il disco su `tank`. Il disco nel vano `scsi-0:0:3:0` viene estratto a nodo acceso.
 
-1. **Estrai a caldo** il disco nel vano `scsi-0:0:3:0` (`sdd`). Il disco sparisce dal sistema e ZFS se ne accorge subito:
+1. **Estrai a caldo** il disco nel vano `scsi-0:0:3:0` (`sdd`). **Comportamento osservato:** il disco sparisce dal sistema e il pool lo segna `REMOVED`:
 
    ```bash title="root@desopve04"
    lsblk -d -o NAME,SIZE | grep sd
@@ -613,9 +653,9 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
    Nov 09 14:09:19 zed[24927]: eid=247 class=removed pool='tank' vdev=pci-0000:02:00.0-scsi-0:0:3:0-part1 vdev_state=REMOVED
    ```
 
-   `zfs-zed`, il demone degli eventi di ZFS, registra il guasto e lo notifica per mail a `root` (`ZED_EMAIL_ADDR` in `/etc/zfs/zed.d/zed.rc`).
+   `zfs-zed`, il demone degli eventi di ZFS, registra la rimozione alle 14:09:18 e alle 14:09:19. La prova non annota il momento esatto dell'estrazione, quindi non misura quanto ZFS abbia impiegato ad accorgersene: il log del kernel (`journalctl -k`) mostra quando il disco è uscito dal bus SCSI. ZED può anche avvisare `root` per mail (`ZED_EMAIL_ADDR` in `/etc/zfs/zed.d/zed.rc`), ma questo lab non ne verifica la consegna: nel [Lab 51](/it/51-notifications-metrics-logs/) le notifiche dei lab precedenti risultano ferme nella coda di Postfix dei nodi del cluster, e `postqueue -p` su `desopve04` mostra se è ferma anche questa.
 
-2. Il pool è **DEGRADED** ma funziona: il container continua a leggere e scrivere.
+2. Il pool è **DEGRADED** ma resta in servizio: nel container una scrittura, un `sync` e una lettura vanno a buon fine.
 
    ```bash title="root@desopve04"
    pct exec 941 -- sh -c "date > /root/durante-il-guasto.txt; sync; cat /root/durante-il-guasto.txt"
@@ -625,11 +665,13 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
    Mon Nov  9 13:10:55 UTC 2026
    ```
 
+   L'orologio del container è in UTC: le 13:10:55 UTC sono le 14:10:55 del nodo, circa un minuto e mezzo dopo la rimozione registrata da ZED. Una scrittura è una verifica funzionale, non una prova di prestazioni: non dice quanto rallenti il pool mentre è degradato.
+
    In **Disks** → **ZFS** → **Detail** il pool e il vdev sono in giallo, con il disco `REMOVED`:
 
    ![Il pool degradato](../../../assets/images/10/03-tank-degraded.png)
 
-3. **Sostituisci** il disco perso con il disco libero `sde` (vano `scsi-0:0:4:0`). ZFS ricostruisce i dati mancanti dalla parità (**resilver**), copiando solo i blocchi in uso:
+3. **Decisione:** il disco estratto non torna nel nodo, quindi il disco mancante si **sostituisce** con il disco libero `sde` (vano `scsi-0:0:4:0`). ZFS ricostruisce i dati mancanti dalla parità (**resilver**), lavorando solo sui blocchi in uso:
 
    ```bash title="root@desopve04"
    zpool replace tank pci-0000:02:00.0-scsi-0:0:3:0 /dev/disk/by-path/pci-0000:02:00.0-scsi-0:0:4:0
@@ -663,7 +705,7 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
    zpool wait -t resilver tank
    ```
 
-4. Pochi secondi dopo la fine del resilver, ZFS stacca da solo il disco vecchio e il pool torna **ONLINE**:
+4. **Risultato:** alla fine del resilver ZFS stacca da solo il disco vecchio e il pool torna **ONLINE**:
 
    ```bash title="root@desopve04"
    zpool status tank
@@ -704,7 +746,9 @@ Il pool `tank` è un RAIDZ1 su tre dischi e sopporta la perdita di uno di essi. 
 
    ![Il pool di nuovo integro](../../../assets/images/10/04-tank-online.png)
 
-   Nessun dato perso, nemmeno quello scritto mentre il pool era degradato.
+   - **Misura:** `resilvered 435M in 00:00:12 with 0 errors`. Durante il resilver la riga di avanzamento indicava 1.22G da esaminare e, in quel momento, una velocità di 173M/s. Dopo il resilver le due copie di `nuovo.txt` hanno lo stesso `md5sum`, il file scritto durante il guasto si rilegge uguale e `zpool status` riporta `No known data errors`.
+   - **Interpretazione:** i controlli non mostrano perdite di dati, nemmeno per quelli scritti mentre il pool era degradato; coprono però i file controllati, non ogni blocco del pool. Il resilver ha esaminato 1,22 GiB, una piccola parte di un disco da 20 GB: è compatibile con un resilver che lavora solo sui blocchi allocati. I 12 secondi valgono per questa quantità di dati: con un pool più pieno, o sotto carico, il resilver dura di più, e questa prova non dice quanto.
+   - **Verifica:** uno scrub dopo il resilver (`zpool scrub -w tank`) rilegge tutti i blocchi e ne controlla i checksum. Per capire come cresce la durata, annota `ALLOC` di `zpool list tank` prima di estrarre il disco e ripeti la prova con più dati.
 
 ### Test 2 – Un disco di riserva
 
@@ -746,8 +790,9 @@ config:
 errors: No known data errors
 ```
 
-- Lo **spare** (`AVAIL`) resta inattivo. Se un disco del pool si guasta, `zfs-zed` lo attiva da solo e avvia il resilver, senza aspettare un intervento umano. Il disco guasto va poi sostituito, e lo spare torna disponibile.
-- **`autoreplace=on`** fa un'altra cosa: se nello **stesso vano** di un disco perso viene inserito un disco nuovo, ZFS lo usa subito per sostituirlo. Funziona bene proprio con i nomi `by-path`, che identificano lo slot.
+- Lo **spare** (`AVAIL`) resta inattivo. Secondo la documentazione di OpenZFS, se un disco del pool si guasta lo spare lo sostituisce da solo, senza aspettare un intervento umano; su Linux è `zfs-zed` ad avviare la sostituzione e il resilver. Il disco guasto va poi sostituito, e lo spare torna disponibile.
+- **`autoreplace=on`** fa un'altra cosa: un disco nuovo inserito nello **stesso vano**, cioè nella stessa posizione fisica di un disco che faceva parte del pool, viene formattato e usato da solo per sostituirlo. Anche questo richiede `zfs-zed` in funzione.
+- Questo lab non prova nessuno dei due comportamenti. Per vederli, estrai di nuovo un disco del pool e osserva `zpool status`: lo spare dovrebbe passare a `INUSE` e il resilver partire senza alcun `zpool replace`; poi inserisci un disco nuovo nel vano di quello estratto.
 
 ### Pulizia
 
@@ -788,12 +833,7 @@ ssh -o BatchMode=yes root@desopve01.proxmox.community true
 root@desopve01.proxmox.community: Permission denied (publickey,password).
 ```
 
-- [ ] Hai creato un mirror dall'interfaccia web e un RAIDZ1 da riga di comando con nomi `by-path`.
-- [ ] Lo scrub ha trovato e riparato i blocchi corrotti di un disco del mirror, senza perdere dati.
-- [ ] Sai leggere la differenza tra spazio grezzo e utilizzabile, e il rapporto di compressione.
-- [ ] Hai usato snapshot, rollback e `zfs send`/`receive`, completo, incrementale e verso un altro nodo.
-- [ ] Hai portato l'ARC di `desopve04` a 2 GiB, a caldo e in modo permanente.
-- [ ] Con un disco rimosso il pool è rimasto in servizio, e `zpool replace` lo ha riportato ONLINE.
+La connessione ora viene rifiutata: la chiave di `desopve04` non apre più `desopve01`.
 
 ## Stato finale del lab
 
@@ -807,17 +847,27 @@ root@desopve01.proxmox.community: Permission denied (publickey,password).
 
 ## Cosa hai imparato
 
-- Un pool ZFS è fatto di vdev; la ridondanza (mirror, RAIDZ) è dentro ogni vdev. Per le VM si preferiscono i mirror, per l'archivio i RAIDZ.
-- I checksum e la ridondanza permettono a ZFS di accorgersi dei dati corrotti e di ripararli; lo scrub lo fa su tutto il pool.
-- `zpool list` mostra lo spazio grezzo, `zfs list` quello utilizzabile; su RAIDZ parità e riempimento pesano soprattutto sui file piccoli.
-- La compressione (LZ4 o zstd) si sceglie per dataset; in Proxmox VE le VM usano zvol, i container dataset con quota.
-- Gli snapshot sono istantanei e occupano solo le differenze; `zfs send`/`receive` copia dataset e snapshot, anche in modo incrementale e verso altri nodi.
-- L'ARC si limita con `zfs_arc_max`, a caldo e in `/etc/modprobe.d/zfs.conf`.
-- Con un disco guasto il pool resta in servizio (DEGRADED); `zpool replace` ricostruisce la ridondanza, e uno spare permette a `zfs-zed` di farlo in automatico.
+- **Scegliere la disposizione dei vdev.** La ridondanza sta dentro ogni vdev, e perdere un vdev significa perdere il pool. Per i dischi delle VM, dove contano gli IOPS, scegli mirror o mirror in striping; scegli RAIDZ dove conta lo spazio, come per backup e archivi.
+- **Dare nomi ai dischi.** Costruisci i pool con nomi stabili (`by-id` o `by-path`), mai con `sdX`: nel Test 2 il disco nuovo ha preso il nome `sdd`, lo stesso del disco estratto nel Test 1.
+- **Pianificare lo spazio.** Ragiona sullo spazio utilizzabile di `zfs list`, non su quello grezzo di `zpool list`. Su RAIDZ i file piccoli costano più di quanto dica il rapporto di parità: senza compressione 112 MiB di dati ne hanno occupati 157.
+- **Attivare la compressione.** Tienila attiva per impostazione predefinita (LZ4 o zstd) e confronta gli algoritmi sui tuoi dati con `compressratio`; se conta la CPU, misurane il costo a parte, perché il rapporto non lo mostra.
+- **Reagire agli errori di checksum.** Errori `CKSUM` senza errori `READ` o `WRITE` vogliono dire che un disco ha restituito dati sbagliati senza segnalarlo: lancia uno scrub, tieni d'occhio il disco e sostituiscilo se gli errori tornano. Mantieni lo scrub mensile e verifica che le notifiche di ZED arrivino davvero ([Lab 51](/it/51-notifications-metrics-logs/)).
+- **Usare snapshot e send/receive.** Lo spazio trattenuto dagli snapshot si legge in `USEDSNAP`; il rollback torna solo all'ultimo snapshot; l'invio incrementale sposta solo le modifiche, come fa la replica ([Lab 11](/it/11-zfs-replication/)).
+- **Dimensionare l'ARC.** Imposta `zfs_arc_max` in base alla RAM che serve ai guest e alla dimensione dei pool (la documentazione di Proxmox VE suggerisce almeno 2 GiB più 1 GiB per TiB di spazio), a caldo e in `/etc/modprobe.d/zfs.conf`, con `update-initramfs -u -k all` sui nodi che si avviano da ZFS, e controlla il valore dopo il riavvio successivo.
+- **Gestire un disco guasto.** Un RAIDZ1 degradato funziona ma non ha più ridondanza: sostituisci subito il disco con `zpool replace`, conferma con uno scrub e valuta uno spare, così la ricostruzione parte senza aspettare un intervento umano. Valuta la durata del resilver sui tuoi dati: i 12 secondi visti qui valgono per 1,22 GiB.
 
 ## Riferimenti
 
 - [Proxmox VE – ZFS on Linux](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#chapter_zfs)
+- [Proxmox VE – Scelta del livello RAID ZFS: prestazioni, spazio e parità dei blocchi piccoli](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysadmin_zfs_raid_considerations)
+- [Proxmox VE – Notifiche via mail di ZED](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_configure_e_mail_notification)
 - [Proxmox VE – Limit ZFS Memory Usage](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysadmin_zfs_limit_memory_usage)
 - [Proxmox VE – Local ZFS Pool Backend](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#storage_zfspool)
-- [OpenZFS – documentazione di `zpool` e `zfs`](https://openzfs.github.io/openzfs-docs/man/master/index.html)
+- [OpenZFS 2.4 – `zpool scrub`: cosa esaminano scrub e resilver](https://openzfs.github.io/openzfs-docs/man/v2.4/8/zpool-scrub.8.html)
+- [OpenZFS 2.4 – `zpool replace`](https://openzfs.github.io/openzfs-docs/man/v2.4/8/zpool-replace.8.html)
+- [OpenZFS 2.4 – Dischi di riserva (hot spare)](https://openzfs.github.io/openzfs-docs/man/v2.4/7/zpoolconcepts.7.html#Hot_Spares) e [proprietà `autoreplace`](https://openzfs.github.io/openzfs-docs/man/v2.4/7/zpoolprops.7.html#autoreplace)
+- [OpenZFS 2.4 – Proprietà `compression` e arrotondamento a settori interi](https://openzfs.github.io/openzfs-docs/man/v2.4/7/zfsprops.7.html#compression)
+- [OpenZFS 2.4 – Conteggio dello spazio: `used`, `usedbysnapshots`, `logicalused`](https://openzfs.github.io/openzfs-docs/man/v2.4/7/zfsprops.7.html#used)
+- [OpenZFS 2.4 – `zfs send`: flussi incrementali, compressi e prove a vuoto](https://openzfs.github.io/openzfs-docs/man/v2.4/8/zfs-send.8.html)
+- [OpenZFS 2.4 – Parametri del modulo: `spa_slop_shift`](https://openzfs.github.io/openzfs-docs/man/v2.4/4/zfs.4.html#spa_slop_shift)
+- [OpenZFS 2.4 – Pagine di manuale di `zpool` e `zfs`](https://openzfs.github.io/openzfs-docs/man/v2.4/index.html)
