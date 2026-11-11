@@ -14,12 +14,11 @@ duration: 2 hours
 
 ## Objectives
 
-- Export a block volume (zvol) from TrueNAS over iSCSI, on two addresses.
-- Connect the nodes to the target and create a **shared LVM** storage on top of it.
-- Combine the two paths to the NAS into a single device with **multipath**.
-- Live-migrate a VM with its disk on shared storage, copying only the memory.
-- Cut a path while I/O is in progress and measure the effect on the VM.
-- Recognize a real-world problem that occurs when a node has two NICs on the same network (same switch, same VLAN).
+- A 40 GiB zvol exported by the NAS over iSCSI on two portals, `172.27.199.10` and `172.32.199.10`, and reachable only by the IQNs of the three nodes.
+- On every node, two iSCSI sessions combined by **multipath** into a single device, `nas-lun0`, with both paths `active ready running`, and the **shared LVM** storage `nas-lvm` on top of it.
+- VM 100 live-migrated between two nodes with its disk on `nas-lvm`, without copying the disk.
+- A path cut while the VM is writing, with three observations kept apart: the state of the paths on the node, the kernel timestamps of the failure and of the recovery, and the pause seen from inside the VM.
+- Nodes with two NICs on the same Ethernet segment answering ARP only from the right interface, and the symptoms of the opposite case recognized in the logs.
 
 ## How it works
 
@@ -60,9 +59,31 @@ The same iSCSI disk is seen by all nodes. On top of it you create **a single** L
 
 With two portals, each node opens **two iSCSI sessions** and sees the LUN twice (`sde`, `sdf`). Using them directly would be dangerous: LVM would find two copies of the same disk. The **multipathd** daemon recognizes that they have the same identifier (WWID) and combines them into a single device, `/dev/mapper/nas-lun0`:
 
-- with `path_grouping_policy multibus` and `round-robin`, I/O uses **both** paths;
-- if a path goes down, multipathd marks it `failed` and I/O carries on over the other one; when it comes back, multipathd reinstates it by itself (it checks every `polling_interval` seconds);
-- with `no_path_retry queue`, if **all** paths go down, I/O is queued (like with the NFS `hard` mount) instead of returning errors to the VM disk.
+- with `path_grouping_policy multibus` and `round-robin`, both paths belong to the same group and I/O is spread over **both**;
+- if a path goes down, multipath marks it `failed` and sends the I/O over the other one; when the path comes back, multipathd reinstates it by itself. Its path checker runs every `polling_interval` seconds, and the interval grows up to `max_polling_interval` (four times as long, by default) while the paths are healthy;
+- with `no_path_retry queue`, if **all** paths go down, I/O is queued (as with the NFS `hard` mount of lab 13) instead of returning errors to the VM disk. The VM then waits for as long as the outage lasts, and the `multipath.conf(5)` man page warns that processes waiting on that I/O can hang and cannot be killed. This lab cuts only one path: the case with all paths down is not tested.
+
+### Detecting a lost path
+
+How long the I/O waits when a path fails depends on two layers:
+
+1. **Detection, in open-iscsi.** Each session is checked with an iSCSI ping (*NOP-Out*). With the values of the `iscsid.conf` shipped with open-iscsi, a ping is sent every 5 seconds and its answer is awaited for 5 seconds; this lab does not change them. A ping without an answer marks the connection as failed.
+2. **Recovery timeout.** From that moment open-iscsi tries to restore the session, and the I/O waits. When the session recovery timeout expires, the pending I/O is handed back to multipath, which retries it on another path. In `iscsid.conf` this timeout is `node.session.timeo.replacement_timeout`: 120 seconds by default, lowered to 15 in step 3. For the sessions that belong to its paths, however, multipathd writes its own value into the session's `recovery_tmo`: its `fast_io_fail_tmo`, 5 seconds by default. The failure test shows which value was in effect in the lab.
+
+### Test environment and versions
+
+The times reported in this lab come from a run on 9 November 2026, with the configuration below. With other versions, timers or hardware, the same steps can give different times.
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/04-first-access-repositories-updates/)); `open-iscsi` and `multipath-tools` as installed on the nodes, versions not recorded in this lab (`dpkg -l open-iscsi multipath-tools` shows them) |
+| iSCSI initiator | `node.session.timeo.replacement_timeout = 15` (step 3); every other parameter as in the package's `iscsid.conf`; no CHAP |
+| Multipath | the `/etc/multipath.conf` of step 5: `multibus`, `round-robin 0`, `polling_interval 2`, `failback immediate`, `no_path_retry queue`; `fast_io_fail_tmo` not set, so the multipath-tools default applies |
+| NAS | TrueNAS SCALE 25.10 ([Lab 12](/12-truenas-nas/)), one network card with two addresses (`172.27.199.10` and the alias `172.32.199.10`); thick 40 GiB zvol `dati/iscsi/pve`, *Modern OS* platform (4 KiB blocks), on the `dati` pool, a two-disk mirror |
+| Network | `vmbr0` (on `nic0`) and `nic1` of each node on the same switch and in the same VLAN, MTU 1500 |
+| Test VM | VM 100 `debian01` ([Lab 07](/07-first-vm-and-container/)): Debian 13, 2 cores, 2 GiB of RAM, 16 GiB `scsi0` disk with `iothread=1`, moved to `nas-lvm` as a raw LV |
+
+**What the tests measure, and what they do not.** The failure test cuts one path, on one node (`desopve02`), by taking its interface down with `ip link set nic1 down`: it simulates the failure on the node side. An unplugged cable, a failed switch port or a fault on the NAS side were not tested, and they may be detected after different times. The test runs once, with a light load: one short write followed by `sync` every second. The kernel log (`dmesg -T`) has a resolution of one second, and so, roughly, does the heartbeat in the VM, whose clock was not synchronized with the node's. The migration times are task durations from individual runs, not repeated measurements.
 
 ## Procedure
 
@@ -101,11 +122,11 @@ The NAS has a single network card: add the second address as an alias, on the `1
 The initiator group restricts access to the IQNs of the nodes, but an IQN can be spoofed. On networks that are not dedicated, add CHAP (**Authorized Access** on the NAS, and user name and password in the `/etc/iscsi/iscsid.conf` file of the nodes). In the lab the network is isolated and we do not use it.
 :::
 
-The zvol is **thick** (it reserves the 40 GiB right away): the free space seen by the NFS and SMB storages drops from about 95 to 56 GiB.
+The zvol is **thick**: it reserves its 40 GiB right away, and in the lab the free space seen by the NFS and SMB storages dropped from about 95 to 56 GiB. On the NAS, `zfs get volsize,refreservation dati/iscsi/pve` shows the reservation.
 
 ### 3. Connect the nodes to the target
 
-On **all three nodes**, before the first connection, reduce the time after which a lost path is considered failed (the default is 120 seconds):
+On **all three nodes**, before the first connection, lower the session recovery timeout from the default 120 seconds to the 15 seconds recommended by the Proxmox VE multipath guide. Once multipath manages the paths, multipathd may apply a value of its own: see [Detecting a lost path](#detecting-a-lost-path).
 
 ```bash title="root@desopve01"
 sed -i 's/^node.session.timeo.replacement_timeout = 120/node.session.timeo.replacement_timeout = 15/' /etc/iscsi/iscsid.conf
@@ -159,10 +180,11 @@ iscsiadm -m session -P3 | grep -E 'Current Portal|Attached scsi disk'
 
 ### 4. Two NICs on the same network: ARP
 
-In this lab `vmbr0` and `nic1` are connected to the same switch, in the same VLAN. By default, Linux answers ARP requests for **any** of its addresses on **any** interface (*ARP flux*): the NAS can therefore learn that `172.32.199.22` sits behind the `vmbr0` interface, and send the traffic of the second path there.
+In this lab `vmbr0` and `nic1` are connected to the same switch, in the same VLAN: the `172.27.199.0/24` and `172.32.199.0/24` subnets share one Ethernet segment. By default Linux answers an ARP request for **any** of its addresses on **any** interface (`arp_ignore=0`, a behaviour known as *ARP flux*). The NAS can therefore associate `172.32.199.22` with the MAC address of `vmbr0` and send the traffic of the second path there. This is most likely after one of the two NICs has been down: while `nic1` is down only `vmbr0` answers, and the NAS can keep that association after `nic1` comes back.
 
-:::note[How to recognize it]
-The problem usually shows up after an outage of one of the two NICs, for example `nic1`. The replies from the NAS arrive on the wrong interface, the session of the second path drops every 10 seconds and the I/O of the VM can stall for a long time (it happened in this lab, with pauses of up to 85 seconds). The log shows repeated connection errors, and traffic from the `172.32.199.10` portal, which should arrive only on `nic1`, shows up on `vmbr0`. An example from `desopve02`:
+**Configuration tried.** `vmbr0` and `nic1` of every node on the same switch and VLAN, with the default ARP settings.
+
+**Behaviour observed.** On `desopve02` the session of the second path kept dropping, every 10 seconds, and the VM's I/O stalled, with pauses of up to 85 seconds (the lab does not reproduce the output of that measurement). The kernel log shows the repeated connection errors (code 1022, an unanswered NOP-Out), and a capture on `vmbr0` shows traffic from the `172.32.199.10` portal, which should arrive only on `nic1`:
 
 ```bash title="root@desopve02"
 dmesg -T | grep "conn error" | tail -2
@@ -181,11 +203,12 @@ tcpdump -ni vmbr0 -c 2 host 172.32.199.10
 16:28:46.780034 IP 172.32.199.10.3260 > 172.32.199.22.36180: Flags [S.], seq 2256764707, ack 4002835344, win 65160, options [mss 1460,sackOK,TS val 675916009 ecr 343433178,nop,wscale 7], length 0
 16:28:46.781033 IP 172.32.199.10.3260 > 172.32.199.22.36180: Flags [.], ack 49, win 509, options [nop,nop,TS val 675916010 ecr 343433179], length 0
 ```
-:::
 
-So it is best to prevent it right away, before configuring multipath.
+**Interpretation.** The symptoms are consistent with ARP flux, that is, with the NAS sending the second path's traffic to the MAC address of `vmbr0`. The capture, however, shows only that those packets reach `vmbr0`, not which MAC address the NAS used: on its own it does not prove the cause.
 
-The solution, on **all** nodes with more than one NIC on the same network: each interface answers only for its own addresses (`arp_ignore=1`) and always announces the right address (`arp_announce=2`).
+**How to check.** On the NAS (TrueNAS shell), `ip neigh show 172.32.199.22` shows the MAC address associated with the node's second address: compare it with the output of `ip link show nic1` and `ip link show vmbr0` on the node. `tcpdump -eni vmbr0 host 172.32.199.10` adds the MAC addresses to the capture.
+
+**Decision.** On **all** the nodes with more than one NIC on the same segment, restrict ARP to the right interface, before configuring multipath: each interface answers only for its own addresses (`arp_ignore=1`), and ARP requests use a source address from the target's subnet on the outgoing interface (`arp_announce=2`):
 
 ```bash title="root@desopve01"
 printf 'net.ipv4.conf.all.arp_ignore = 1\nnet.ipv4.conf.all.arp_announce = 2\n' > /etc/sysctl.d/90-arp-multihomed.conf
@@ -197,14 +220,16 @@ net.ipv4.conf.all.arp_ignore = 1
 net.ipv4.conf.all.arp_announce = 2
 ```
 
-If the NAS has already learned the wrong mapping, correct it with an ARP announcement from the right interface:
+If the NAS has already learned the wrong association, update it with an unsolicited ARP announcement from the right interface:
 
 ```bash title="root@desopve02"
 apt install iputils-arping
 arping -c 3 -U -I nic1 -s 172.32.199.22 172.32.199.22
 ```
 
-In production networks the storage network is kept separate (dedicated switches or VLANs) and the problem does not arise.
+**Result.** The path-failure test at the end of this lab, run later on the same node, shows a single connection error and the path coming back by itself (see [Verification and tests](#verification-and-tests)). This is consistent with the fix, but the lab did not record the NAS's ARP table before and after the change: the check above would confirm it.
+
+A storage network on its own segment (a dedicated switch or VLAN) avoids the situation altogether, because each node then has a single interface on that network.
 
 ### 5. Multipath
 
@@ -247,7 +272,7 @@ On **all three nodes**:
    }
    ```
 
-3. Register the WWID (recent versions of multipath-tools create the device only for known WWIDs), then reload:
+3. Register the WWID: with the default `find_multipaths strict`, multipath-tools builds a device only for WWIDs it already knows. Then reload:
 
    ```bash title="root@desopve01"
    multipath -a 36589cfc000000580bcccfa017f51b957
@@ -351,25 +376,29 @@ qm migrate 100 desopve02 --online
 2026-11-09 16:22:58 migration finished successfully (duration 00:00:10)
 ```
 
-The disk does not move: the destination node activates the same LV. Only the memory in use is copied (274 MiB).
+The disk is not copied: the target node activates the same LV. The task transferred 274.2 MiB of VM state (the memory pages and the state of the virtual devices) and took 10 seconds in all; the return trip in the cleanup also took 10 seconds.
 
-| Live migration of VM 100 | Duration |
+| Live migration of VM 100 | Task duration (`duration` in the log) |
 |---|---|
 | Local disk, no replication (lab 11) | 1 min 13 s |
 | Local disk with ZFS replication (lab 11) | 20 s |
 | Disk on shared storage (LVM on iSCSI) | 10 s |
 
+The values are those of the individual migrations reported in lab 11 and in this lab, run on the same day with the same VM. The differences are consistent with how much disk data each migration has to copy: the whole disk without replication, only the changes since the last replication with it, nothing with shared storage. The table compares the total duration of the task, not the VM's downtime, which is a different measurement: lab 11's logs report 10 and 20 ms, while for the migration to shared storage this lab did not record it (the full task log reports it on the `average migration speed … downtime … ms` line).
+
 ## Verification and tests
+
+The lab has succeeded when the checks at the end of this section pass. The core is the path-failure test, which looks at the loss of a path from two sides: the node, with the state of the paths and the kernel log, and the VM, with the pause its writes see. The two sides measure different things and are kept apart.
 
 ### Test – A path goes down while I/O is in progress
 
-1. In VM 100, now on `desopve02`, start a "heartbeat" that every second writes the time, down to hundredths of a second, and forces it to disk:
+1. In VM 100, now on `desopve02`, start a "heartbeat": a loop that appends the time, to the millisecond, to a file, flushes it to disk with `sync` and waits one second. A write that stalls shows up as a gap between two consecutive entries.
 
    ```bash title="labuser@debian01"
    nohup sh -c 'while true; do date +%T.%N | cut -c1-12 >> $HOME/battito.log; sync; sleep 1; done' >/dev/null 2>&1 &
    ```
 
-2. On `desopve02`, take down the NIC of the second path, as if a cable had been unplugged:
+2. On `desopve02`, take down the NIC of the second path, noting the time (node clock). This simulates the failure on the node side:
 
    ```bash title="root@desopve02"
    date +%T.%N | cut -c1-12; ip link set nic1 down
@@ -379,7 +408,7 @@ The disk does not move: the destination node activates the same LV. Only the mem
    16:32:14.282
    ```
 
-3. After about 15 seconds the path is marked as failed and I/O continues over the first one:
+3. About 15 seconds later, look at the paths and at the kernel log on the node:
 
    ```bash title="root@desopve02"
    multipath -ll nas-lun0 | tail -2
@@ -400,8 +429,9 @@ The disk does not move: the destination node activates the same LV. Only the mem
    [Mon Nov  9 16:32:29 2026] device-mapper: multipath: 252:0: Failing path 8:96.
    ```
 
-   - 10 seconds after the disconnection, the periodic session check (*NOP-Out*, 5 seconds plus a 5-second timeout) detects the error.
-   - After another 5 seconds the session is declared lost: multipathd sets a 5-second timeout (`fast_io_fail_tmo`) on the iSCSI sessions, shorter than the 15 seconds in `iscsid.conf`. The path is `failed`.
+   - **Measured** (node clock, kernel log with a resolution of one second): `nic1` goes down at 16:32:14.282. The first connection error on the second path's session (`connection3`) comes at 16:32:24, about 10 seconds later, with code 1022, which the kernel uses for an unanswered NOP-Out (`ISCSI_ERR_NOP_TIMEDOUT`); `session recovery timed out after 5 secs` and `Failing path 8:96` come at 16:32:29, about 15 seconds after the disconnection. `multipath -ll` then shows `sdg` as `failed faulty offline` and `sde` still `active ready running`.
+   - **Interpretation:** the two intervals fit the two layers described in [Detecting a lost path](#detecting-a-lost-path): about 10 seconds of detection, compatible with the NOP-Out values of the shipped `iscsid.conf` (a ping every 5 seconds, 5 seconds to answer), then 5 seconds of recovery timeout. That timeout is not the 15 seconds set in step 3: the value is consistent with multipathd having applied its `fast_io_fail_tmo` to the session. The lab did not print the values in effect.
+   - **How to check:** `iscsiadm -m node -T iqn.2005-10.org.freenas.ctl:pve -p 172.32.199.10 | grep -E 'noop_out|replacement_timeout'` shows the values of the node record; `cat /sys/class/iscsi_session/session*/recovery_tmo` shows the timeout actually in effect for each session; `multipathd show config | grep fast_io_fail_tmo` shows the multipath value.
 
 4. Bring the NIC back up: the path comes back by itself.
 
@@ -430,7 +460,11 @@ The disk does not move: the destination node activates the same LV. Only the mem
      `- 35:0:0:0 sdg 8:96 active ready running
    ```
 
-   The path comes back with the same device: multipath recognizes it by its WWID, and nothing changes for LVM or for the VM. In this output the second path is called `sdg` instead of `sdf`, because on `desopve02` its session had already been recreated once during the ARP problem described in step 4, and the kernel had given it a new name. On your nodes it will probably be `sdf`.
+   - **Measured:** `nic1` comes back at 16:32:49.332 and the path is reinstated at 16:32:58, about 9 seconds later, as the same device (`sdg`, 8:96). Both paths are `active ready running` again.
+   - **Interpretation:** the session was restored and multipathd put the path back into the existing map: nothing changes for LVM or for the VM, which only see `nas-lun0`. The 9 seconds include the new iSCSI login and the time the path checker takes to notice it; the test does not separate the two.
+   - **How to check:** `journalctl -u iscsid` shows when the session became operational again; compare it with the time of `Reinstating path`.
+
+   In this output the second path is called `sdg` instead of `sdf` because on `desopve02` its session had already been recreated once, during the ARP problem described in step 4, and the kernel had given the disk a new name. The kernel log agrees: at 16:28 the second path was `connection2`, in this test it is `connection3`. On your nodes it will probably be `sdf`.
 
 5. In the VM, look for heartbeat pauses longer than 1.5 seconds:
 
@@ -445,12 +479,15 @@ The disk does not move: the destination node activates the same LV. Only the mem
    pausa di 1.6 s, da 16:32:46.123 a 16:32:47.678
    ```
 
-   - One write waited for 15.3 seconds: the time needed to detect the failure (10 seconds of *NOP-Out* plus 5 of `fast_io_fail_tmo`) and to resend the I/O over the healthy path. No errors in the VM, just a wait.
-   - The heartbeat times come from the VM clock, which here was a few seconds behind the node: to compare them with the `dmesg` of the node, first synchronize the VM with `ntp.proxmox.community`.
-   - The 1.6-1.8 second pauses are the `sleep 1` plus the `sync` with a single path.
-   - When the path comes back (16:32:58) there is no pause at all.
+   - **Measured** (VM clock; one entry about every second; the `awk` command prints only the gaps longer than 1.5 seconds): one gap of 15.3 seconds, from 16:32:09.700 to 16:32:25.034, and three gaps of 1.6-1.8 seconds between 16:32:40 and 16:32:48. No gap longer than 1.5 seconds around the return of the path.
+   - **Interpretation:**
+     - The 15.3-second gap is the pause seen by the guest, and it is a different observation from the node's timers (10 + 5 seconds in the kernel log). The two agree in duration, and with an offset of a few seconds between the clocks they would also coincide in time. The VM clock was indeed a few seconds behind the node's, but by an amount that was not measured, so the alignment of the two logs cannot be verified.
+     - The writes waited instead of failing: the heartbeat resumed by itself, over the remaining path.
+     - The three gaps of 1.6-1.8 seconds fall while only one path was active, but they are not explained by this test: they concern only three of the twenty or more iterations in that interval, and the others stayed under the 1.5-second threshold.
+     - The return of the path caused no gap above 1.5 seconds; a shorter pause would not show up with this method.
+   - **How to check:** synchronize the VM with `ntp.proxmox.community` before the test, so that its times can be compared with the node's `dmesg`; print every interval, without the 1.5-second threshold, to compare before, during and after the failure; `journalctl -k -p err` in the VM shows whether the guest kernel logged any I/O errors.
 
-On `desopve02`, Corosync link 1 (lab 06), which uses the same NIC, went down too: the cluster stayed quorate thanks to link 0.
+Taking `nic1` down also cut Corosync link 1 (lab 06) on `desopve02`, since it uses the same NIC: the cluster stayed quorate over link 0. `corosync-cfgtool -s` shows the state of each link.
 
 Stop the heartbeat:
 
@@ -479,12 +516,12 @@ mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 2m 30s, ready
 removing source volume 'nas-lvm:vm-100-disk-0' after successful copy
 ```
 
-- [ ] The NAS responds on `172.27.199.10` and `172.32.199.10`, and exports the `dati/iscsi/pve` zvol only to the IQNs of the nodes.
-- [ ] Each node has two iSCSI sessions and a single multipath device `nas-lun0` with two active paths.
-- [ ] The `nas-lvm` storage is shared, on the `vg_nas` volume group created on the multipath device.
-- [ ] Live migration with the disk on `nas-lvm` copies only the memory.
-- [ ] With a path unplugged, the I/O of the VM stops for a few seconds and then resumes; when the path comes back, nothing happens.
-- [ ] `arp_ignore=1` and `arp_announce=2` are active on the nodes.
+- [ ] The NAS answers on `172.27.199.10` and `172.32.199.10` (`pvesm scan iscsi` lists both portals) and exports the `dati/iscsi/pve` zvol only to the IQNs of the nodes.
+- [ ] Each node has two iSCSI sessions (`iscsiadm -m session`) and a single multipath device, `nas-lun0`, with both paths `active ready running` (`multipath -ll`).
+- [ ] The `nas-lvm` storage is shared (`shared 1` in `storage.cfg`), on the `vg_nas` volume group created on `/dev/mapper/nas-lun0`, and every node sees it (`pvs`).
+- [ ] A live migration with the disk on `nas-lvm` copies only the VM state: the log reports `transferred … VM-state` and no disk mirror.
+- [ ] With one path down, the VM's writes pause for about as long as the detection plus the recovery timeout in effect (15.3 seconds in the lab) and then resume on their own; the path goes `failed` and, once the NIC is back, `active ready running` again.
+- [ ] `arp_ignore=1` and `arp_announce=2` are active on the nodes (`sysctl net.ipv4.conf.all.arp_ignore net.ipv4.conf.all.arp_announce`).
 
 ## Final lab state
 
@@ -499,18 +536,20 @@ removing source volume 'nas-lvm:vm-100-disk-0' after successful copy
 
 ## What you learned
 
-- iSCSI exports block disks: target, LUN, portal and initiator; with TrueNAS the disk is a zvol, not a dataset.
-- On a shared LUN you create a single LVM volume group, marked as **Shared**: each VM disk is an LV, active on one node at a time.
-- With two portals each node sees the LUN twice; multipath combines them into one device with multiple paths, and that is where LVM must be created.
-- A VM on shared storage is migrated by copying only its memory.
-- When a path goes down, I/O stops for the time it takes to detect the failure (about 10-15 seconds with the defaults) and resumes over the other path, without errors.
-- Two NICs on the same network (same switch, same VLAN) require `arp_ignore` and `arp_announce`, otherwise traffic can come back on the wrong interface.
+- **How to export block storage from TrueNAS:** as a zvol, not a dataset. A thick zvol reserves its whole size at once, so take it out of the pool's free space when you size the other shares.
+- **Where to build LVM:** on the multipath device, never on the single paths, as a single volume group marked **Shared**. Each VM disk is then an LV active on one node at a time, and a live migration copies only the VM state.
+- **How long a VM waits when a path fails:** about the detection time (NOP-Out interval plus timeout) plus the session recovery timeout in effect, which with multipath can be multipathd's `fast_io_fail_tmo` rather than the `replacement_timeout` of `iscsid.conf`. Read the values in effect (`/sys/class/iscsi_session/*/recovery_tmo`) before relying on them, and measure the pause from inside the guest, separately from the node's logs.
+- **What to choose for the case with all paths down:** `no_path_retry queue` keeps the I/O waiting for as long as the outage lasts, so the VM's I/O hangs without errors, possibly with processes that cannot be killed; a finite number of retries returns errors after a bounded time. This lab tested only the loss of one path.
+- **How to lay out the network for two paths:** two interfaces on the same Ethernet segment need `arp_ignore=1` and `arp_announce=2`; a separate segment for each path avoids the problem. If one path keeps dropping every few seconds, check which MAC address the NAS associates with the node's address before blaming the storage.
 
 ## References
 
 - [Proxmox VE – Open-iSCSI initiator](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#storage_open_iscsi)
 - [Proxmox VE – LVM Backend](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#storage_lvm)
-- [Proxmox VE wiki – Multipath](https://pve.proxmox.com/wiki/Multipath)
-- [TrueNAS – Block (iSCSI) Shares Targets](https://www.truenas.com/docs/scale/scaletutorials/shares/iscsi/)
-- [`multipath.conf(5)`](https://man7.org/linux/man-pages/man5/multipath.conf.5.html)
+- [Proxmox VE wiki – Multipath: iSCSI paths, `multipath -a`, LVM on top, `replacement_timeout`](https://pve.proxmox.com/wiki/Multipath)
+- [TrueNAS 25.10 – Adding iSCSI Block Shares (the iSCSI wizard)](https://www.truenas.com/docs/scale/25.10/scaletutorials/shares/iscsi/addingiscsishares/)
+- [`multipath.conf(5)` for Debian 13 (multipath-tools 0.11): `no_path_retry`, `fast_io_fail_tmo`, `polling_interval`, `find_multipaths`](https://manpages.debian.org/trixie/multipath-tools/multipath.conf.5.en.html)
+- [multipath-tools 0.11.1 – `sysfs_set_session_tmo()`: `fast_io_fail_tmo` applied as the `recovery_tmo` of iSCSI sessions](https://github.com/opensvc/multipath-tools/blob/0.11.1/libmultipath/discovery.c#L778)
+- [open-iscsi – `iscsid.conf`: NOP-Out and `replacement_timeout` values](https://github.com/open-iscsi/open-iscsi/blob/master/etc/iscsid.conf)
+- [Linux kernel 7.0 – iSCSI error codes in `include/scsi/iscsi_if.h` (1022 is `ISCSI_ERR_NOP_TIMEDOUT`)](https://github.com/torvalds/linux/blob/v7.0/include/scsi/iscsi_if.h)
 - [Linux kernel – `arp_ignore` and `arp_announce`](https://docs.kernel.org/networking/ip-sysctl.html)
