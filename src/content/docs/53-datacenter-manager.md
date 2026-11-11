@@ -22,10 +22,10 @@ duration: 1 hour 30 minutes
 
 ## Objectives
 
-- Install Proxmox Datacenter Manager (PDM) and prepare it like a PVE node: repositories, updates, NTP.
-- Connect a PVE cluster, a standalone PVE node and a PBS as **remotes**, with dedicated tokens.
-- Use the dashboard, the global search, the updates view and the EVPN view.
-- Migrate a VM **between two different datacenters** from the PDM GUI, and run into its limits.
+- Proxmox Datacenter Manager (PDM) installed and up to date, with the no-subscription repository, the proxy and NTP in sync: the GUI shows the version.
+- A PVE cluster, a standalone PVE node and a PBS connected as **remotes**, each with a dedicated token and a verified certificate fingerprint.
+- Status, resources, search, updates and the EVPN view of every remote available from the PDM dashboard.
+- A VM migrated **between two different datacenters** from the PDM GUI and brought back, knowing why the first attempt failed and why the second one worked.
 
 ## How it works
 
@@ -197,9 +197,15 @@ qm set 157 --ipconfig0 ip=172.27.199.157/24,gw=172.27.199.1 --nameserver 172.27.
 qm start 157
 ```
 
-From the view of the `deso-cluster` remote, the VM's **Migrate** icon opens the migration dialog. When you choose `desopve04` as **Target Remote**, the remote migration options appear: endpoint, target VMID, deletion of the source, target storage and network.
+In the view of the `deso-cluster` remote, the VM's **Migrate** icon opens the migration dialog. Choosing `desopve04` as **Target Remote** reveals the remote-migration options: endpoint, target VMID, removal of the source, target storage and target network.
 
-**First attempt**, with the proposed storage (`local-lvm`). The task fails within 2 seconds, with the same error as in [Lab 48](/48-migrations/):
+During each migration a `ping` runs from the management network to the VM every 0.2 seconds. It shows whether the service stays reachable, but it does not have the resolution to measure the VM's downtime: the task reports that.
+
+#### First attempt: to `local-lvm`
+
+**Configuration tried.** Source `local-zfs` on `desopve01`, target `local-lvm` on `desopve04`, the storage the dialog offers first.
+
+**Error observed.** The task stops after 2 seconds:
 
 ```text
 2026-11-10 09:38:43 found generated disk 'local-zfs:vm-157-cloudinit' (in current VM config)
@@ -208,9 +214,17 @@ From the view of the `deso-cluster` remote, the VM's **Migrate** icon opens the 
 TASK ERROR: migration aborted
 ```
 
-The cloud-init disk cannot be migrated live: it is exported as a ZFS stream, and LVM-thin cannot import it. PDM does not detect this in advance. The VM stays running and intact on the source.
+The log tells the VM's two disks apart. The main disk (`vm-157-disk-0`) is attached to the running VM and is copied live by block mirroring. The cloud-init disk (`vm-157-cloudinit`) is instead transferred through a storage export and import. In this combination (PVE 9.2 with PDM 1.1.9, ZFS source, LVM-thin target), the source offered it only in the `zfs` format, which `local-lvm` cannot import. [Lab 48](/48-migrations/) hits the same error with `qm remote-migrate`. PDM's dialog did not flag the problem before starting the task, and the VM stayed running and untouched on the source.
 
-**Second attempt**, to `tank` (ZFS) on `desopve04`:
+This is not a general rule about cloud-init: it depends on which formats the source and target storages have in common. To check it on your own system:
+
+- look for the `export_formats` field in the task log and compare it with the formats the target storage accepts;
+- try a target storage of the same type as the source, as below;
+- or remove the cloud-init drive before the migration and recreate it on the target in the same slot: for example, if it sits on `ide2`, run `qm set 157 --delete ide2` on the source and `qm set 157 --ide2 local-lvm:cloudinit` on the target. Proxmox regenerates the contents of the cloud-init disk from the VM configuration.
+
+**Decision.** Repeat the migration to `tank`, the ZFS pool of `desopve04`: with ZFS on both sides, the `zfs` format is common to the two storages. The VM stays the same; only the target storage changes.
+
+#### Second attempt: to `tank`
 
 ![Migration to desopve04, storage tank, network vmbr0](../../assets/images/53/12-migrazione-dialogo.png)
 
@@ -222,15 +236,17 @@ mirror-scsi0: Completed successfully.
 2026-11-10 09:40:23 migration finished successfully (duration 00:00:31)
 ```
 
-31 seconds in total, with 35 ms of VM downtime. A ping every 0.2 seconds from the management network never had a gap longer than 0.21 seconds. The task carries the signature of the PDM token: `UPID:desopve01:…:qmigrate:157:pdm@pve!pdm:`.
+**Result.** The task completes in 31 seconds and reports 35 ms of VM downtime, as measured by QEMU during the final phase of the migration. The `ping` every 0.2 seconds never paused for more than 0.21 seconds: this confirms the VM stayed reachable, but at that interval it cannot confirm a 35 ms interruption. The task carries the signature of PDM's token: `UPID:desopve01:…:qmigrate:157:pdm@pve!pdm:`.
 
-The **Delete Source** option was off, so on the cluster VM 157 stays **stopped and locked** (`lock: migrate`), as with `qm remote-migrate` without `--delete`. After verifying the copy, delete it:
+**Delete Source** was off, so on the cluster VM 157 is left **stopped and locked** (`lock: migrate`), just as with `qm remote-migrate` without `--delete`. Once the copy has been checked, remove it:
 
 ```bash
 qm unlock 157 && qm destroy 157 --purge
 ```
 
-**Return trip** from `desopve04` to `deso-cluster`, to `local-zfs`, again from the PDM GUI:
+#### Back: from `desopve04` to `deso-cluster`
+
+Again from the PDM GUI, this time to `local-zfs`:
 
 ```text
 2026-11-10 09:42:04 average migration speed: 512.4 MiB/s - downtime 61 ms
@@ -239,35 +255,43 @@ mirror-scsi0: Completed successfully.
 2026-11-10 09:42:07 migration finished successfully (duration 00:00:32)
 ```
 
-32 seconds, 61 ms of downtime; maximum ping gap 2.70 seconds, probably the time the network takes to learn the VM's new location. Here too the source on `desopve04` stays locked and must be deleted by hand; at the end, also remove the VM that came back to the cluster:
+**Result.** 32 seconds, with 61 ms of downtime according to the task. The `ping`, on the other hand, paused for up to 2.70 seconds: the two observations measure different things and should be kept apart. One possible explanation is the time the network takes to learn the VM's new location, that is, which node and port its MAC address is now behind. This test does not prove it, though. To check it you would need:
+
+- a capture on the bridge of the target node during the migration (`tcpdump -eni vmbr0 arp or rarp`), to see when the VM announces its new location;
+- a much denser `ping` (for example every 10 ms, `ping -i 0.01`), to measure the pause with a resolution comparable to the task's downtime;
+- the bridge forwarding table on the nodes (`bridge fdb show br vmbr0 | grep <VM MAC>`) before and after the migration.
+
+Here too the source on `desopve04` stays locked and is removed by hand; at the end, also remove the VM that came back to the cluster:
 
 ```bash
 qm unlock 157 && qm destroy 157 --purge        # on desopve04
 qm stop 157 && qm destroy 157 --purge          # on desopve01
 ```
 
-**Limits observed in the lab:**
+**Limits seen in the lab:**
 
-- migration between remotes inherits the limits of `remote-migrate`, and PDM does not flag them before starting the task;
-- without **Delete Source**, the source stays locked and must be cleaned up by hand;
-- migrating, starting and stopping require a token with broad privileges on the remote;
+- migration between remotes relies on `remote-migrate`, so it inherits its limits, and PDM does not flag them before starting the task;
+- without **Delete Source** the source stays locked and has to be cleaned up by hand;
+- migrating, starting and stopping guests requires a token with broad privileges on the remote;
 - detailed operations (storage, network, HA, permissions) remain in the GUI of each remote;
 - without a subscription, PDM shows a warning at every login.
 
 ## Verification and tests
 
+The lab has succeeded when PDM shows every remote online, and when the migration to `tank` and the one back both end with `migration finished successfully` and the VM answers on the target. The source then has to be removed or unlocked deliberately.
+
 | Test | Result |
 |---|---|
 | PDM update | from 1.1.1 to 1.1.9 (UI 1.1.4) |
-| NTP | synchronized with `netsvc.proxmox.community` |
-| PVE remote `deso-cluster` | 3 endpoints with fingerprint, token `pdm@pve!pdm` |
-| PVE remote `desopve04` and PBS `desopbs01` | added, PBS with a read-only token (`Audit`) |
+| NTP | in sync with `netsvc.proxmox.community` |
+| PVE remote `deso-cluster` | 3 endpoints with fingerprints, token `pdm@pve!pdm` |
+| PVE remote `desopve04` and PBS `desopbs01` | added; the PBS with a read-only token (`Audit`) |
 | Dashboard | 4 PVE nodes and 1 PBS online, 2 datastores |
-| Remote updates | versions and repositories of all remotes in one table |
-| Migration to `local-lvm` | refused: the cloud-init disk cannot be imported on LVM-thin |
-| Migration to `tank` | 31 s, 35 ms of downtime, ping gap 0.21 s |
-| Return to `local-zfs` | 32 s, 61 ms of downtime, ping gap 2.70 s |
-| Source after the migration without "Delete Source" | stopped and locked (`lock: migrate`), deleted by hand |
+| Remote updates | versions and repositories of every remote in one table |
+| Migration from `local-zfs` to `local-lvm` | refused: in this combination the cloud-init disk was offered only in the `zfs` format, which LVM-thin cannot import |
+| Migration to `tank` | completed in 31 s; downtime reported by the task: 35 ms; longest `ping` pause (one every 0.2 s): 0.21 s |
+| Back to `local-zfs` | completed in 32 s; downtime reported by the task: 61 ms; longest `ping` pause: 2.70 s |
+| Source after a migration without "Delete Source" | stopped and locked (`lock: migrate`), removed by hand |
 
 ## Final lab state
 
@@ -281,11 +305,14 @@ qm stop 157 && qm destroy 157 --purge          # on desopve01
 
 ## What you learned
 
-- PDM is installed and updated like a PVE node, but it listens on port **8443** and does not replace the GUI of the clusters.
-- Each **remote** is a PVE cluster, a standalone node or a PBS, connected with a **token** and verified with the certificate **fingerprint**. A dedicated user makes PDM's actions recognizable in the tasks.
-- The dashboard, the global search and the **updates** view are the most useful part in the day-to-day management of several datacenters.
-- **Migration between remotes** from the GUI uses `remote-migrate`, so it inherits its limits: cloud-init disks and incompatible storages fail, and without "Delete Source" the source stays locked.
-- The VM downtime in a migration between datacenters is of the same order as within the cluster: tens of milliseconds.
+- **What to check before migrating between two remotes:**
+  - **storage:** the target storage must accept the format in which the source exports the disks that are not copied live, such as the cloud-init disk or the disks of a stopped VM. The `export_formats` field in the task log shows it; a target storage of the same type as the source avoids the problem;
+  - **network:** the bridge and VLAN chosen on the target must exist and carry the same network;
+  - **resources the configuration refers to:** `cicustom` snippets, attached ISOs and any storage named in the configuration must exist on the target too ([Lab 48](/48-migrations/));
+  - **permissions:** the token of the target remote must be able to create the VM, allocate storage and use the bridge;
+  - **afterwards:** without **Delete Source** the source stays locked; remove or unlock it once the copy has been checked.
+- **How to read the downtime of a migration:** the value in the task and the pause a client sees on the network are different measurements. Comparing them needs a tool with adequate resolution, and a gap such as the 2.70 s on the way back has to be checked before you attribute it to a cause.
+- **What PDM is for:** it installs and updates like a PVE node, listens on port **8443** and does not replace the clusters' own GUI. The dashboard, global search and updates view are the most useful parts for day-to-day work across several datacenters. A dedicated user with its own token makes PDM's actions easy to spot in the task logs.
 
 ## References
 

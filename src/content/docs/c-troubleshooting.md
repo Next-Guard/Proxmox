@@ -99,7 +99,7 @@ When you face a problem, it pays to always proceed the same way:
 | After a node failure, containers not under HA stay off | Only HA resources are restarted elsewhere | Put under HA whatever must restart on its own | [49](/49-high-availability/) |
 | HA recovery takes about 2 minutes | The failed node must be *fenced* before the recovery | Expected: it is the guarantee against running the same guest twice | [49](/49-high-availability/) |
 | Bulk migration moves more guests than expected | The *Bulk Migrate* window preselects **all** guests | Check the selection before confirming | [48](/48-migrations/) |
-| `qm remote-migrate` to an external node fails | Cloud-init disk that cannot be imported on the target storage; `cicustom` snippet missing on the target | Choose a compatible storage and prepare the snippets on the target | [48](/48-migrations/) |
+| `qm remote-migrate` (or a PDM migration) to an external node fails with `no matching import/export format` | In the test: the cloud-init disk, which is not copied live, was offered only in the `zfs` format, and the LVM-thin target cannot import it; in another attempt, a `cicustom` snippet missing on the target | Check `export_formats` in the log and pick a target storage with a format in common; prepare the snippets on the target | [48](/48-migrations/), [53](/53-datacenter-manager/) |
 | After a migration from PDM, the source keeps the `migrate` lock | Migration without *Delete Source* | Remove the source or the lock after verification | [53](/53-datacenter-manager/) |
 
 ### VMs and containers

@@ -243,7 +243,7 @@ ERROR: … failed to handle 'disk-import' command - no matching import/export fo
 migration aborted
 ```
 
-Il disco di **cloud-init** (`ide2`, su `local-zfs`) non si migra a caldo: viene **esportato** come stream ZFS, e LVM-thin non sa importarlo. Il disco principale, invece, passa con il mirror NBD su qualunque storage.
+Il log mostra che a fallire è il disco di **cloud-init** (`ide2`, su `local-zfs`). Il disco principale, collegato alla VM accesa, viene copiato a caldo con il mirror NBD; il disco di cloud-init invece passa da un **export/import** dello storage. In questa combinazione (origine ZFS, destinazione LVM-thin, PVE 9.2) l'origine lo offriva solo nel formato `zfs`, che LVM-thin non importa. Non è una regola generale: dipende dai formati che i due storage hanno in comune, ed è il motivo per cui il tentativo successivo usa uno storage ZFS anche sulla destinazione. Il [lab 53](/it/53-datacenter-manager/) incontra lo stesso errore dalla GUI di PDM e mostra come verificarlo.
 
 **Secondo tentativo**, verso `tank` (ZFS):
 

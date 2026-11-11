@@ -99,7 +99,7 @@ Davanti a un problema conviene procedere sempre allo stesso modo:
 | Dopo il guasto di un nodo i container non in HA restano spenti | Solo le risorse HA vengono riavviate altrove | Metti in HA ciò che deve ripartire da solo | [49](/it/49-high-availability/) |
 | Il recupero HA richiede circa 2 minuti | Il nodo guasto deve essere *fenced* prima del recupero | Atteso: è la garanzia contro la doppia esecuzione | [49](/it/49-high-availability/) |
 | La migrazione in blocco sposta più guest del previsto | La finestra *Bulk Migrate* preseleziona **tutti** i guest | Controlla la selezione prima di confermare | [48](/it/48-migrations/) |
-| `qm remote-migrate` fallisce verso un nodo esterno | Disco cloud-init non importabile sullo storage di destinazione; snippet `cicustom` inesistente sulla destinazione | Scegli uno storage compatibile e prepara gli snippet sulla destinazione | [48](/it/48-migrations/) |
+| `qm remote-migrate` (o la migrazione da PDM) fallisce verso un nodo esterno con `no matching import/export format` | Nella prova: il disco cloud-init, che non si copia a caldo, era offerto solo nel formato `zfs`, e la destinazione LVM-thin non lo importa; in un altro tentativo, uno snippet `cicustom` inesistente sulla destinazione | Controlla `export_formats` nel log e scegli uno storage di destinazione con un formato in comune; prepara gli snippet sulla destinazione | [48](/it/48-migrations/), [53](/it/53-datacenter-manager/) |
 | Dopo una migrazione da PDM l'origine resta con il lock `migrate` | Migrazione senza *Delete Source* | Rimuovi l'origine o il lock dopo la verifica | [53](/it/53-datacenter-manager/) |
 
 ### VM e container
