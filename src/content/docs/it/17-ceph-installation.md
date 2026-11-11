@@ -406,7 +406,7 @@ Separare il traffico di Ceph dalla gestione (172.27.199.0/24) evita che una repl
    2026-11-09 17:23:03 migration finished successfully (duration 00:00:15)
    ```
 
-   In 15 secondi passa solo la RAM della VM. Lo stesso disco da 16 GiB su storage locale richiederebbe minuti (lab 11).
+   Passa solo la RAM della VM: il disco resta su Ceph. I tre valori del log misurano cose diverse, come spiega il [Lab 48](/it/48-migrations/#come-funziona): il task è durato 15 secondi; i 130 ms sono il fermo che QEMU riporta per il passaggio finale, non la pausa vista da un client; e l'`average migration speed` non è una velocità misurata ma la RAM totale del guest divisa per la durata della fase di memoria in secondi interi, quindi con 2 GiB di RAM 1,0 GiB/s dice solo che questa fase è durata circa 2 secondi. Per confronto, nel [Lab 11](/it/11-zfs-replication/) la stessa VM, con il disco da 16 GiB su storage locale, ha richiesto 1 minuto e 13 secondi, di cui 57 per il mirror del disco.
 
 3. Riporta la VM su `desopve01`:
 
@@ -562,7 +562,7 @@ RBD offre dischi a blocchi per VM e container. Per i **file** (ISO, template, ba
 
    Ogni host ha circa un terzo dei dati: è l'effetto della regola CRUSH per host.
 
-4. **Migrazione:** la VM 100 si sposta tra i nodi in circa 15 secondi con 130 ms di interruzione, senza copiare il disco.
+4. **Migrazione:** la VM 100 si sposta tra i nodi senza copiare il disco: un task di 15 secondi, con 130 ms di fermo riportato da QEMU.
 
 ## Stato finale del lab
 

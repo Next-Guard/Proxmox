@@ -65,7 +65,7 @@ The results further down come from a run carried out in November 2026 with the c
 |---|---|
 | Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/04-first-access-repositories-updates/)) |
 | Test VM | Debian 13 from the cloud image, 2 vCPUs of type `host`, 2 GiB of RAM, fio 3.39 |
-| VM disks | VirtIO SCSI single, `iothread=1`, `cache=none`, default `aio` (`io_uring`), no `discard`; raw 8 GiB devices with a 2 GiB test area |
+| VM disks | VirtIO SCSI single, `iothread=1`, `cache=none`, `aio` left at its default, which depends on the storage (see below), no `discard`; raw 8 GiB devices with a 2 GiB test area |
 | `local-zfs` | ZFS mirror on the two system disks of `desopve01` ([Lab 03](/03-install-proxmox-ve/)), ARC with the limit set by the installer |
 | `local-lvm` | LVM-thin on the system disk of `desopve04` ([Lab 03](/03-install-proxmox-ve/), [Lab 09](/09-lvm-and-lvm-thin/)) |
 | `tank` | ZFS RAIDZ1 on the four 20 GB disks of `desopve04`, plus a hot spare; ARC capped at 2 GiB ([Lab 10](/10-zfs/)) |
@@ -75,6 +75,14 @@ The results further down come from a run carried out in November 2026 with the c
 | Network | MTU 1500 on every link ([Lab 21](/21-bonding/)) |
 
 Disk and controller models are redacted, as explained in the [manual's conventions](/the-lab/#conventions): read the numbers as properties of this configuration, not of a particular disk model.
+
+**The `aio` mode is not the same on every disk.** The disks were created without the `aio` option, so the qemu-server default applies, and qemu-server picks it per storage type (functions `storage_allows_io_uring_default` and `aio_cmdline_option` in the source, see the references):
+
+- `io_uring` on `local-zfs`, `local-lvm`, `tank` and `nas-nfs`;
+- `native` on `nas-lvm`: on plain LVM storages (type `lvm`) Proxmox VE does not use `io_uring` by default, and with `cache=none` it falls back to `native`;
+- no `aio` mode on `rbd-vm`: with `krbd 0` ([Lab 17](/17-ceph-installation/)) QEMU reaches the image through librbd, and qemu-server sets `aio` only for files and block devices.
+
+This list comes from the source code, not from the run, which did not record the command line of the VMs. `qm showcmd 190 --pretty` shows the mode each disk actually uses, as `"aio":…` in its `-blockdev` line.
 
 **What the test measures, and what it does not.** It measures the full path as a VM sees it: the guest kernel, the virtual controller, QEMU, the Proxmox storage layer and, for network storages, the network plus the NAS or the OSDs. It does not isolate the individual layers, so a high or low value does not tell you on its own which layer produced it. It does not measure many VMs working in parallel. With a 2 GiB test area, smaller than the RAM of the nodes and of the NAS, caches can affect the reads. Two 20-second runs give an idea of the variability, not a statistic.
 
@@ -295,12 +303,12 @@ Each point separates what the test measured from how we interpret it, and names 
      - for `local-lvm`, benchmark the physical disk directly from the node with fio in read-only mode (`--readonly --direct=1`); comparing it with the VM result shows how much the rest of the path costs.
 2. **Ceph and the single operation.**
    - **Measured:** QD1 writes on `rbd-vm` have a mean completion latency of 8.31 ms (±25%), against 0.21-1.70 ms on the local storages. With an `fsync` after every write the rate drops to 26 IOPS, at 38.53 ms per `fsync`.
-   - **Interpretation:** this is consistent with how Ceph acknowledges a write: the primary OSD forwards it to the other two replicas and replies only after they confirm, so every operation crosses the network several times. The test does not, however, separate the network's share from that of the OSD disks.
+   - **Interpretation:** this is consistent with how Ceph acknowledges a write: the primary OSD forwards it to the other two replicas and replies only after they confirm, so every operation crosses the network several times. The test does not, however, separate the network's share from that of the OSD disks, nor from the access path, which differs too: QEMU reaches `rbd-vm` through librbd, while the other disks are files or block devices on the node.
    - **How to check:** during the test, `ceph osd perf` shows the commit latency of each OSD; `rados bench -p rbd-vm 30 write -b 4096 -t 1` measures single-queue 4k writes without the VM in the way; a `ping` between nodes on the Ceph VLAN gives the latency of the network alone. With deeper queues and more clients, Ceph spreads the work across many OSDs, which is why it should also be measured in parallel (see below).
 3. **NFS and iSCSI on the same NAS.**
    - **Measured:** QD32 random writes reach 181 IOPS on `nas-nfs` and 4,182 on `nas-lvm`. With an `fsync` after every write the two get close: 194 and 138 IOPS.
-   - **Interpretation:** the gap is consistent with how the two protocols acknowledge writes. The NFS server would acknowledge the client's `O_DIRECT` writes only once they are on stable storage, whereas over iSCSI the NAS can acknowledge from RAM and write later, unless the client asks for a flush. The values converging with `fsync` points the same way, but this test does not prove it.
-   - **How to check:** on the NAS, `zfs get sync dati/nfs dati/iscsi/pve` shows how ZFS handles synchronous writes on the two volumes; on the node, `nfsstat -m` shows the effective NFS mount options. If the interpretation is right, repeating the test with `sync=always` on the iSCSI zvol should bring `nas-lvm` close to NFS.
+   - **Interpretation:** the gap is consistent with how the two protocols acknowledge writes. The NFS server would acknowledge the client's `O_DIRECT` writes only once they are on stable storage, whereas over iSCSI the NAS can acknowledge from RAM and write later, unless the client asks for a flush. The values converging with `fsync` points the same way, but this test does not prove it. The two disks also differ in their `aio` mode, `io_uring` on `nas-nfs` and `native` on `nas-lvm` (see [Test environment and versions](#test-environment-and-versions)), and the test does not separate that effect from the protocol's.
+   - **How to check:** on the NAS, `zfs get sync dati/nfs dati/iscsi/pve` shows how ZFS handles synchronous writes on the two volumes; on the node, `nfsstat -m` shows the effective NFS mount options. If the interpretation is right, repeating the test with `sync=always` on the iSCSI zvol should bring `nas-lvm` close to NFS. Setting `aio=native` on the `nas-nfs` disk as well removes the difference in `aio` mode from the comparison.
 4. **Variability.**
    - **Measured:** QD32 random writes and sequential writes vary by up to ±50% between the two runs (`local-zfs`), and by ±35-36% on `tank` and `nas-lvm`.
    - **Interpretation:** there is more than one possible cause: activity elsewhere in the lab (Ceph, the NAS, the shared network), and the periodic flushes with which ZFS commits data to disk every few seconds, which land differently in two 20-second windows. The test cannot tell them apart.
@@ -318,7 +326,7 @@ Each point separates what the test measured from how we interpret it, and names 
 - More runs, longer ones (at least 60 seconds), at different times of day. Report the median and percentiles (p99), not only the mean, and always state which latency you report (clat or lat).
 - Both the plain workload and the one with `fsync`: a database lives on `fsync`.
 - For Ceph: several VMs or several parallel jobs (`--numjobs`), because Ceph spreads the load across many OSDs. `rados bench` and `rbd bench` measure the cluster without a VM in between.
-- Write everything down, as in [Test environment and versions](#test-environment-and-versions): versions, disk options (`cache`, `iothread`, `aio`, `discard`), block size and queue depth, size of the test area, date.
+- Write everything down, as in [Test environment and versions](#test-environment-and-versions): versions, disk options (`cache`, `iothread`, `discard`, and the `aio` mode actually in use, read with `qm showcmd`, since its default depends on the storage), block size and queue depth, size of the test area, date.
 
 ### Cleanup
 
@@ -350,6 +358,7 @@ qm stop 191 && qm destroy 191 --purge && rm -f /root/bench /root/bench.pub
 - [fio – documentation](https://fio.readthedocs.io/en/latest/fio_doc.html)
 - [fio – interpreting the output: slat, clat and lat](https://fio.readthedocs.io/en/latest/fio_doc.html#interpreting-the-output)
 - [Proxmox VE – Virtual disk options (cache, iothread, aio)](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#qm_hard_disk)
+- [Proxmox VE – qemu-server source, `Drive.pm`: the default `aio` mode for each storage type (`storage_allows_io_uring_default`, `aio_cmdline_option`)](https://git.proxmox.com/?p=qemu-server.git;a=blob;f=src/PVE/QemuServer/Drive.pm;hb=HEAD)
 - [Proxmox VE – Cloud-init support](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#qm_cloud_init)
 - [Proxmox VE – `qm` and importing disk images (`import-from`)](https://pve.proxmox.com/pve-docs/qm.1.html)
 - [OpenZFS – the `primarycache` property](https://openzfs.github.io/openzfs-docs/man/master/7/zfsprops.7.html#primarycache)

@@ -314,7 +314,7 @@ Prima di riavviare un nodo, ad esempio per un aggiornamento del kernel, imposta 
    - L'MDS attivo stava su `desopve02`: CephFS passa all'MDS di riserva su `desopve01`.
    - Gli OSD sono *down* ma restano *in*: nessuna copia viene spostata.
 
-4. Il nodo torna in linea (in questo laboratorio dopo circa 70 secondi; un server con un POST lungo può richiedere qualche minuto). Ceph recupera solo le scritture fatte nel frattempo, poi togli il flag:
+4. Il nodo torna in linea. In questo laboratorio ci ha messo circa 70 secondi, un'osservazione approssimativa che gli output non registrano; un server con un POST lungo può richiedere qualche minuto. Ceph recupera solo le scritture fatte nel frattempo, poi togli il flag:
 
    ```bash title="root@desopve01"
    ceph -s | grep -E "health|noout|pgs:"
@@ -476,7 +476,7 @@ Prima di riavviare un nodo, ad esempio per un aggiornamento del kernel, imposta 
 
    Il nuovo nodo porta solo dischi.
 
-8. In questo lab il ribilanciamento verso il quarto host è durato circa un minuto e mezzo. Due istantanee dello stato, 3 e 64 secondi dopo l'ingresso dei nuovi OSD:
+8. Ceph ribilancia i dati verso il quarto host. Quando il ribilanciamento sia finito gli output non lo registrano: in questo lab è stato circa un minuto e mezzo dopo l'ingresso degli OSD, un'osservazione approssimativa. Per misurarlo, segui `ceph -w` o ripeti `ceph pg stat` finché tutti i PG sono `active+clean`. Due istantanee dello stato, 3 e 64 secondi dopo l'ingresso dei nuovi OSD, lo mostrano in corso, con 32 PG rimappati all'inizio e 7 dopo 64 secondi:
 
    ```bash title="root@desopve04"
    ceph -s
