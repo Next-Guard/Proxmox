@@ -19,17 +19,17 @@ duration: 1 ora e 30 minuti
   - CT 121 e 122 sulla VLAN 10 ([Lab 20](/it/20-bridges-stable-names-vlans/)), CT 101 ([Lab 07](/it/07-first-vm-and-container/)), CT 271 e 272 ([Lab 27](/it/27-sdn-simple/)), CT 281 ([Lab 28](/it/28-sdn-vlan-qinq/)), VM 390 ([Lab 39](/it/39-windows-vm-virtio/)): servono alla bulk migration;
   - il pool ZFS `tank` di `desopve04` ([Lab 10](/it/10-zfs/)) e lo snippet `web-vendor.yaml` su `cephfs` ([Lab 40](/it/40-templates-cloud-init-clones/));
   - una VM di prova su `local-zfs`, creata nel lab.
-- **Misure:** un `ping` ogni 0,2 s verso la VM, dalla rete di gestione o da un altro CT, durante ogni migrazione.
+- **Misure:** il log del task di ogni migrazione e un `ping` ogni 0,2 s verso il guest, dalla rete di gestione o da un altro CT. Che cosa misura ciascuno è spiegato in *Come funziona*.
 - **Credenziali:** `root@pam` → [Appendice B](/it/b-credentials-and-addresses/).
 
 ## Obiettivi
 
-- Misurare la migrazione **live** con storage condiviso e quella **offline**.
-- Migrare a caldo una VM con **dischi locali**.
-- Capire la migrazione dei **container** (restart mode).
-- Usare la **bulk migration** e conoscerne la trappola.
-- Confrontare le modalità **secure** e **insecure** sulla rete dedicata.
-- Migrare una VM **tra cluster diversi** con `qm remote-migrate`, andata e ritorno, e scoprirne i limiti.
+- La VM 104 migrata **a caldo** con lo storage condiviso e il CT 281 migrato **a freddo**, registrando separatamente durata del task, fermo riportato da QEMU e pausa massima del ping.
+- Una VM accesa con **disco locale** migrata su un altro nodo insieme al disco, leggendo nel log il tempo speso a copiarlo.
+- Un **container** spostato in restart mode, sapendo per quanto il suo servizio resta irraggiungibile.
+- Una **bulk migration** avviata con selezionati solo i guest voluti.
+- Le modalità **secure** e **insecure** confrontate sulla rete dedicata, sapendo che cosa il log del task può dire, e che cosa no, sulla loro velocità.
+- Una VM spostata **su un altro cluster** con `qm remote-migrate` e riportata indietro, con i due errori incontrati spiegati e risolti.
 
 ## Come funziona
 
@@ -47,6 +47,28 @@ duration: 1 ora e 30 minuti
 ![Impostazioni di migrazione del datacenter](../../../assets/images/48/01-opzioni-migrazione.png)
 
 **Tra cluster.** `qm remote-migrate` usa l'API del cluster di destinazione con un **API token** e l'impronta del certificato. Tutto il traffico, dischi e RAM, passa in un tunnel *websocket* sulla porta 8006. È ancora una funzione *sperimentale*, solo da CLI (dalla GUI la offre Proxmox Datacenter Manager, Lab 53).
+
+**Che cosa misurano il log del task e il ping.** Tre valori si confondono facilmente, e in questo lab restano separati:
+
+- **durata del task**: la `duration` dell'ultima riga del log, in secondi interi, dall'inizio alla fine del task, preparazione e pulizia comprese;
+- **fermo riportato da QEMU**: il `downtime N ms` alla fine della fase di memoria, cioè il tempo per cui la VM resta in pausa sull'origine durante il passaggio finale. Proxmox VE riprende poi la VM sulla destinazione solo dopo alcuni altri passi, come lo spostamento della configurazione e, con i dischi locali, la chiusura del mirror dei dischi: la pausa vista dai client del guest può quindi essere più lunga di questo valore;
+- **pausa massima del ping**: l'intervallo più lungo tra due risposte di un `ping` inviato ogni 0,2 secondi. È quello che vede un client in rete, con una risoluzione di 0,2 secondi.
+
+Nemmeno la `average migration speed`, sulla stessa riga del fermo, è una velocità misurata: Proxmox VE la calcola come la RAM totale del guest divisa per la durata della fase di memoria, contata in secondi interi (vedi il sorgente di `QemuMigrate.pm` tra i riferimenti).
+
+### Ambiente e versioni della prova
+
+Gli output e i tempi di questo lab vengono da una prova eseguita il 10 novembre 2026 (ultima verifica: novembre 2026), in questa configurazione:
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)), sui nodi del cluster e su `desopve04` |
+| Migrazioni nel cluster | VLAN 100 su `vmbr1`, sopra `bond0` in *active-backup* con due schede da 10 Gbit/s, MTU 1500 ([Lab 21](/it/21-bonding/), [Lab 22](/it/22-dedicated-networks/)); tipo `secure` salvo dove indicato |
+| Migrazioni tra cluster | `qm remote-migrate` verso l'API dell'altro nodo (porta 8006), sulla rete di gestione |
+| Storage | `rbd-vm`: Ceph 20.2.5, pool `size 3` / `min_size 2` ([Lab 17](/it/17-ceph-installation/)); `local-zfs`: ZFS mirror sui dischi di sistema ([Lab 03](/it/03-install-proxmox-ve/)); su `desopve04`, `local-lvm` (LVM-thin) e `tank` (ZFS RAIDZ1) ([Lab 09](/it/09-lvm-and-lvm-thin/), [Lab 10](/it/10-zfs/)) |
+| Guest | VM 104 e 480, cloni del template 9000: Debian 13, 2 GiB di RAM, disco da 8 GiB ([Lab 40](/it/40-templates-cloud-init-clones/)); VM 100 con 2 GiB di RAM; CT 121 con indirizzo statico sulla VLAN 10 ([Lab 21](/it/21-bonding/)) |
+
+**Cosa misura e cosa non misura.** Ogni migrazione è stata eseguita una volta sola, il confronto secure/insecure due volte, con guest piccoli (2 GiB di RAM, 653 MiB di dati sul disco locale) e scarichi, tranne la VM 100 nel passo 6. La prova non copre guest che riscrivono velocemente la memoria, dischi grandi o una rete carica, e una o due ripetizioni non mostrano quanto variano i tempi.
 
 ## Procedura
 
@@ -67,9 +89,15 @@ qm migrate 104 desopve02 --online
 2026-11-10 05:56:03 migration finished successfully (duration 00:00:10)
 ```
 
-- **10 s** in tutto: si copiano solo 281 MiB di RAM, dalla VLAN 100.
-- **Downtime 33 ms** per QEMU.
-- Il `ping` ogni 0,2 s, dalla rete di gestione, ha avuto al massimo **0,84 s** tra due risposte. Dopo lo spostamento la rete deve imparare la nuova posizione del MAC della VM (QEMU invia pacchetti di annuncio): quel tempo dipende dagli switch, non da Proxmox.
+- **10 s** di durata del task: si trasferiscono solo 281 MiB di RAM (`transferred 281.4 MiB VM-state`), sulla VLAN 100.
+- **33 ms** di fermo riportato da QEMU.
+- **0,84 s**: l'intervallo più lungo tra due risposte del `ping`, inviato ogni 0,2 s dalla rete di gestione.
+
+La pausa del ping è molto più lunga del fermo: i due valori misurano cose diverse e vanno tenuti separati. Le spiegazioni possibili sono due, e questa prova non permette di distinguerle: Proxmox VE riprende la VM sulla destinazione solo dopo la fase di memoria e alcuni altri passi (vedi *Come funziona*), e dopo lo spostamento la rete deve imparare dove si trova ora l'indirizzo MAC della VM, motivo per cui QEMU invia pacchetti di annuncio. Per verificarlo servirebbero:
+
+- un `ping` molto più fitto (per esempio ogni 10 ms, `ping -i 0.01`), per misurare la pausa con una risoluzione paragonabile al fermo;
+- gli orari del ping (`ping -D`) confrontati con quelli delle ultime righe del log del task;
+- una cattura sul bridge del nodo di destinazione durante la migrazione (`tcpdump -eni vmbr0 arp or rarp`), per vedere quando la VM annuncia la nuova posizione.
 
 **Conntrack (novità 9.x).** La prima riga avvisa che lo stato delle connessioni tracciate dal firewall **non** viene migrato. Con il firewall nftables (Lab 33) si può chiedere di portarlo con la VM:
 
@@ -84,7 +112,7 @@ qm migrate 104 desopve01 --online --with-conntrack-state 1     # da desopve02: r
 2026-11-10 06:11:40 migration finished successfully (duration 00:00:14)
 ```
 
-Le voci migrate sono 0 perché `web01` non ha il firewall attivo sulla scheda. L'opzione serve per i guest con il firewall attivo: senza le voci di conntrack, sul nodo di destinazione il firewall scarterebbe come *invalid* i pacchetti delle connessioni già aperte. Nella GUI l'opzione **Conntrack state** è spuntata per default.
+Le voci migrate sono 0. È coerente con la configurazione di `web01`, che non ha il firewall attivo sulla scheda: l'opzione serve per i guest con il firewall attivo, perché senza le loro voci di conntrack il firewall del nodo di destinazione scarterebbe come *invalid* i pacchetti delle connessioni già aperte. La documentazione la descrive come una funzione best-effort. Per vederla all'opera ripeti la prova con un guest che ha `firewall=1` sulla scheda e una connessione aperta, per esempio una sessione SSH, e controlla che la sessione sopravviva allo spostamento. Nella GUI l'opzione **Conntrack state** è spuntata per default.
 
 ### 2. Offline
 
@@ -132,11 +160,13 @@ mirror-scsi0: Completed successfully.
 
 | | Storage condiviso (VM 104) | Disco locale (VM 480) |
 |---|---|---|
-| Durata | 10 s | 45 s (25 s solo per il disco) |
-| Downtime di QEMU | 33 ms | 88 ms |
-| Pausa massima del ping | 0,84 s | 3,73 s |
+| Durata del task | 10 s | 45 s, di cui 25 s per il disco (05:58:03 → 05:58:28 nel log) |
+| Fermo riportato da QEMU | 33 ms | 88 ms |
+| Pausa massima del ping (uno ogni 0,2 s) | 0,84 s | 3,73 s |
 
-Il disco occupava solo 653 MiB (thin): un disco pieno da centinaia di GB richiede di conseguenza decine di minuti. Con la replica ZFS (Lab 11) si copia solo la differenza dall'ultima replica: nel lab **20 s contro 1 min 13 s**.
+Il disco conteneva solo 653 MiB di dati (thin provisioning), e copiarlo ha richiesto 25 secondi. Il tempo di copia cresce con i dati da copiare, ma questo lab non ha misurato un disco grande: prima di pianificare la migrazione di dischi da centinaia di GB, misura quel tempo sul tuo sistema. Con la replica ZFS ([Lab 11](/it/11-zfs-replication/)) si copia solo la differenza dall'ultima replica: in quel lab la migrazione ha richiesto **20 s invece di 1 min 13 s**.
+
+Con il disco locale anche la pausa del ping è più lunga (3,73 s contro 0,84 s), mentre il fermo riportato da QEMU resta sotto i 100 ms. Con una sola prova per caso non si può dire perché. Uno dei passi che precedono la ripresa sulla destinazione, la chiusura del mirror del disco, esiste solo in questo caso; le verifiche sono le stesse del passo 1.
 
 ### 4. Container: restart mode
 
@@ -154,7 +184,9 @@ pct migrate 121 desopve02 --restart                                    # sul nod
 2026-11-10 05:59:09 migration finished successfully (duration 00:00:10)
 ```
 
-Pausa massima del ping: **11,65 s**, cioè arresto, avvio e DHCP del CT. Per un CT "spostare" significa sempre **riavviare**: i servizi devono tollerarlo. Senza `--restart` la migrazione di un CT acceso viene rifiutata ("not implemented", [Lab 41](/it/41-lxc-containers/)).
+Il task dura 10 s; il `ping` dal CT 122, uno ogni 0,2 s, ha una pausa massima di **11,65 s**. Per un CT "spostare" significa sempre **riavviare**: i suoi servizi devono tollerare l'interruzione. La documentazione parla, per la migrazione con riavvio, di un fermo normalmente di qualche centinaio di millisecondi; qui la pausa è molto più lunga, e questa prova non la scompone. Comprende almeno l'arresto del CT sull'origine, il suo avvio sulla destinazione (il log mostra l'avvio alle 05:59:04 e la fine del task alle 05:59:09) e il tempo che il CT impiega a rispondere di nuovo in rete. Per verificarlo confronta gli orari che `ping -D` ha scritto in `/tmp/p121.log` con il log completo del task, e guarda nel CT quando è salita la sua rete (`journalctl -b`).
+
+Senza `--restart` la migrazione di un CT acceso viene rifiutata ("not implemented", [Lab 41](/it/41-lxc-containers/)).
 
 ### 5. Bulk migration (e la sua trappola)
 
@@ -189,7 +221,9 @@ TASK OK
 pvesh create /nodes/desopve01/migrateall --target desopve02 --vms 101,105,122,271,272,390 --maxworkers 2
 ```
 
-6 guest in **43 s**. Prima di confermare una bulk migration, controlla la colonna di selezione oppure usa i filtri (stato, pool, tag).
+6 guest in **43 s**. Le due prove spostano guest diversi, otto e sei, e solo la prima comprende la VM 480, il cui disco locale va copiato: non isolano l'effetto dei lavori in parallelo. Per misurarlo, sposta lo stesso gruppo di guest con 1 e con 2 lavori.
+
+Prima di confermare una bulk migration, controlla la colonna di selezione oppure usa i filtri (stato, pool, tag).
 
 ### 6. Secure contro insecure
 
@@ -208,14 +242,20 @@ qm migrate 100 desopve01 --online --migration_type insecure     # dal nodo 02
 2026-11-10 06:00:04 migration completed, transferred 1.1 GiB VM-state
 ```
 
-| Prova | Velocità media | Durata |
+| Prova | `average migration speed` (log) | Durata del task |
 |---|---|---|
 | secure | 413 MiB/s | 14 s |
 | insecure | 413 MiB/s | 14 s |
 | secure (ripetuta) | 413 MiB/s | 14 s |
 | insecure (ripetuta) | 688 MiB/s | 12 s |
 
-I valori vengono dalla riga `average migration speed` dei log dei task: tre prove su quattro hanno dato proprio 413 MiB/s. Con 1,1 GiB di RAM da copiare, nel lab la differenza è piccola: il limite è la banda della rete di migrazione, non la cifratura. Su reti da 25-100 Gbit/s e VM con centinaia di GB di RAM, SSH diventa il collo di bottiglia e *insecure* sulla rete dedicata fa risparmiare minuti. In *insecure* la destinazione apre la porta 60000: il firewall deve permetterla sulla rete di migrazione (gruppo `servizi-cluster`, Lab 33).
+I valori vengono dalla riga `average migration speed` dei log dei task, e tre prove su quattro hanno dato proprio 413 MiB/s. Come spiegato in *Come funziona*, quel valore è la RAM del guest divisa per la durata della fase di memoria in secondi interi: con circa 2 GiB di RAM, 413 MiB/s corrispondono a 5 secondi e 688 MiB/s a 3 secondi. Tre valori uguali sono quindi tre fasi di memoria della stessa durata, arrotondata al secondo, non tre velocità uguali.
+
+- **Che cosa mostra la prova:** con 1,1 GiB di memoria da trasferire, la fase di memoria dura 3-5 secondi e il task intero 12-14 secondi, in entrambe le modalità. Con questa risoluzione non si vede una differenza netta tra *secure* e *insecure*, e la prova non dice se a limitare il trasferimento sia la rete o la cifratura.
+- **Che cosa dice la documentazione:** la cifratura richiede molta potenza di calcolo, e l'effetto si vede soprattutto sulle reti veloci, da 10 Gbit/s in su; è minore sulle CPU che implementano AES in hardware. La migrazione dei dischi usa sempre il canale cifrato, qualunque sia l'impostazione.
+- **Come verificarlo sul tuo sistema:** migra una VM con molta più memoria in uso, così che la fase di memoria duri minuti; leggi la banda effettiva sull'interfaccia di migrazione, per esempio dai contatori di byte di `ip -s link show vmbr1.100` prima e dopo; durante una migrazione *secure* osserva l'uso di CPU del processo `ssh` sul nodo di origine (`top`); misura la sola rete con `iperf3` tra due nodi sulla VLAN 100.
+
+In *insecure* la destinazione apre la porta 60000: il firewall deve permetterla sulla rete di migrazione (gruppo `servizi-cluster`, Lab 33).
 
 ### 7. Migrazione tra cluster: `qm remote-migrate`
 
@@ -230,7 +270,7 @@ pvenode cert info | grep -B1 -A1 pve-ssl.pem
 
 Il token deve poter creare VM, allocare storage e usare il bridge sulla destinazione. Qui si usa `root@pam` senza separazione dei privilegi; in produzione conviene un utente dedicato.
 
-**Primo tentativo**, verso `local-lvm`:
+**Primo tentativo: verso `local-lvm`.**
 
 ```bash
 qm remote-migrate 480 480 \
@@ -243,16 +283,20 @@ ERROR: … failed to handle 'disk-import' command - no matching import/export fo
 migration aborted
 ```
 
-Il log mostra che a fallire è il disco di **cloud-init** (`ide2`, su `local-zfs`). Il disco principale, collegato alla VM accesa, viene copiato a caldo con il mirror NBD; il disco di cloud-init invece passa da un **export/import** dello storage. In questa combinazione (origine ZFS, destinazione LVM-thin, PVE 9.2) l'origine lo offriva solo nel formato `zfs`, che LVM-thin non importa. Non è una regola generale: dipende dai formati che i due storage hanno in comune, ed è il motivo per cui il tentativo successivo usa uno storage ZFS anche sulla destinazione. Il [lab 53](/it/53-datacenter-manager/) incontra lo stesso errore dalla GUI di PDM e mostra come verificarlo.
+**Errore osservato.** Il log mostra che a fallire è il disco di **cloud-init** (`ide2`, su `local-zfs`). Il disco principale, collegato alla VM accesa, viene copiato a caldo con il mirror NBD; il disco di cloud-init invece passa da un **export/import** dello storage. In questa combinazione (origine ZFS, destinazione LVM-thin, PVE 9.2) l'origine lo offriva solo nel formato `zfs`, che LVM-thin non importa. Non è una regola generale: dipende dai formati che i due storage hanno in comune. Il [lab 53](/it/53-datacenter-manager/) incontra lo stesso errore dalla GUI di PDM e mostra come verificarlo.
 
-**Secondo tentativo**, verso `tank` (ZFS):
+**Decisione.** Usare uno storage ZFS anche sulla destinazione, `tank`, così che il formato `zfs` sia comune ai due storage.
+
+**Secondo tentativo: verso `tank` (ZFS).**
 
 ```text
 ERROR: … failed to handle 'config' command - storage 'cephfs' does not exist
 migration aborted
 ```
 
-La configurazione della VM cita uno snippet su `cephfs` (`cicustom`), uno storage che sulla destinazione non esiste. Lo snippet serviva solo al primo avvio:
+**Errore osservato.** La configurazione della VM cita uno snippet su `cephfs` (`cicustom`), uno storage che sulla destinazione non esiste.
+
+**Decisione.** Lo snippet serviva solo al primo avvio: si toglie il riferimento e si riprova con le stesse opzioni.
 
 ```bash
 qm set 480 --delete cicustom
@@ -269,7 +313,7 @@ mirror-scsi0: Completed successfully.
 2026-11-10 06:08:41 migration finished successfully (duration 00:00:52)
 ```
 
-52 s, downtime di 31 ms, pausa massima del ping 3,11 s. La pagina web della VM ha continuato a rispondere dall'altro "datacenter".
+**Risultato.** Il task termina in 52 secondi, con un fermo di 31 ms riportato da QEMU. La pausa massima del ping è di 3,11 s, anche qui molto più lunga del fermo: il passo 1 elenca le spiegazioni possibili e le verifiche. Dopo la migrazione la pagina web della VM risponde dall'altro "datacenter".
 
 Sul cluster la VM **resta**, spenta e bloccata (`lock: migrate`): per default `remote-migrate` non cancella l'originale. Si elimina a mano dopo aver verificato la copia:
 
@@ -298,7 +342,7 @@ qm remote-migrate 480 480 \
 2026-11-10 06:10:50 migration finished successfully (duration 00:00:32)
 ```
 
-Su `desopve04` la VM non c'è più.
+Il ritorno dura 32 secondi, con un fermo di 62 ms riportato da QEMU, e su `desopve04` la VM non c'è più.
 
 :::caution
 Non lanciare `remote-migrate` in una pipe che può chiudersi prima della fine (per esempio `| head`): il comando viene interrotto a metà e lascia sulla destinazione una VM vuota bloccata in `lock: create`, da pulire con `qm unlock` e `qm destroy`. Meglio lanciarlo dentro `screen` o `tmux`.
@@ -325,16 +369,18 @@ pveum user token remove root@pam migra       # su desopve04
 
 ## Verifica e test
 
-| Prova | Risultato nel lab |
-|---|---|
-| Live, storage condiviso (VM 104) | 10 s, downtime 33 ms, ping max 0,84 s |
-| Offline, storage condiviso (CT 281) | 1 s |
-| Live, disco locale (VM 480, 8 GiB thin) | 45 s, downtime 88 ms, ping max 3,73 s |
-| CT in restart mode (CT 121) | 10 s, servizio fermo 11,65 s |
-| Bulk migration, 8 guest | 137 s con 1 lavoro alla volta; 6 guest in 43 s con 2 |
-| secure contro insecure | 413 contro 413-688 MiB/s, 12-14 s |
-| Remote-migrate verso `desopve04` | 52 s, downtime 31 ms (dopo 2 errori istruttivi) |
-| Remote-migrate di ritorno con `--delete 1` | 32 s, origine eliminata |
+Il lab è riuscito se ogni migrazione termina con `migration finished successfully` (la bulk migration con `TASK OK`), se ogni guest risponde sulla sua destinazione e se, dopo la migrazione tra cluster, l'origine è stata eliminata a ragion veduta.
+
+| Prova | Criterio di successo | Risultato nel lab |
+|---|---|---|
+| Live, storage condiviso (VM 104) | VM accesa e raggiungibile sulla destinazione | task 10 s; fermo riportato da QEMU 33 ms; pausa massima del ping 0,84 s |
+| Offline, storage condiviso (CT 281) | si sposta solo la configurazione | task 1 s |
+| Live, disco locale (VM 480, 8 GiB thin) | disco copiato, VM raggiungibile sulla destinazione | task 45 s, di cui 25 s per il disco; fermo 88 ms; pausa massima del ping 3,73 s |
+| CT in restart mode (CT 121) | CT acceso sulla destinazione | task 10 s; pausa massima del ping vista dal CT 122: 11,65 s |
+| Bulk migration | migrati solo i guest selezionati | 8 guest in 137 s con 1 lavoro alla volta; altri 6 guest in 43 s con 2 |
+| secure contro insecure | entrambe le modalità funzionano sulla VLAN 100 | task da 12-14 s; `average migration speed` 413-688 MiB/s, cioè fasi di memoria da 3-5 s |
+| Remote-migrate verso `desopve04` | VM accesa sulla destinazione, origine spenta e bloccata | dopo 2 errori: task 52 s; fermo 31 ms; pausa massima del ping 3,11 s |
+| Remote-migrate di ritorno con `--delete 1` | VM di nuovo sul cluster, origine eliminata | task 32 s; fermo 62 ms |
 
 ## Stato finale del lab
 
@@ -349,18 +395,18 @@ pveum user token remove root@pam migra       # su desopve04
 
 ## Cosa hai imparato
 
-- Con lo storage condiviso una live migration copia solo la RAM: secondi, con un downtime di decine di ms.
-- Con i dischi locali si copia prima il disco: il tempo cresce con i dati, e la replica ZFS lo riduce.
-- I container si migrano solo riavviandoli.
-- La bulk migration preseleziona **tutti** i guest: si controlla prima di confermare.
-- *insecure* conviene solo su reti dedicate molto veloci e con VM grandi; il firewall deve aprire le porte 60000-60050.
-- Il **conntrack state** si può migrare con il firewall nftables (novità 9.x).
-- `qm remote-migrate` sposta VM tra cluster con un token; storage, snippet e formati devono essere compatibili sulla destinazione, e l'origine resta se non si usa `--delete 1`.
+- **Come stimare la finestra di una migrazione.** Con lo storage condiviso si sposta solo la memoria: qui 10 secondi di task e 33 ms di fermo riportato da QEMU. Con i dischi locali si copia prima il disco, e il tempo cresce con i suoi dati; la replica ZFS ([Lab 11](/it/11-zfs-replication/)) lo riduce. Un container si riavvia sempre: va messa in conto un'interruzione del servizio, 11,65 secondi in questo lab.
+- **Come leggere il fermo di una migrazione.** Il fermo del task, la pausa vista da un client e la `average migration speed` sono cose diverse: il primo lo misura QEMU, la seconda richiede uno strumento con una risoluzione adeguata, la terza non è una velocità misurata. Una pausa di secondi, come i 3,73 s con il disco locale, va verificata prima di attribuirle una causa.
+- **Quando conviene *insecure*.** Solo su una rete dedicata e fidata, e solo se una misura sul tuo hardware mostra che il collo di bottiglia è la cifratura: la prova di questo lab non permetteva di dirlo. Il firewall deve aprire le porte 60000-60050.
+- **Come avviare una bulk migration senza sorprese.** La finestra preseleziona **tutti** i guest: controlla la selezione prima di confermare.
+- **Cosa controllare prima di una migrazione tra cluster.** Storage con un formato di export in comune per i dischi che non si copiano a caldo, le risorse citate dalla configurazione (snippet, ISO, storage), i permessi del token e la sorte dell'origine: resta, spenta e bloccata, se non si usa `--delete 1`.
+- **Se migrare lo stato del conntrack.** È una novità della 9.x, funziona in modalità best-effort e serve ai guest con il firewall attivo.
 
 ## Riferimenti
 
 - [Proxmox VE – Migration (qm)](https://pve.proxmox.com/pve-docs/chapter-qm.html#qm_migration)
-- [Proxmox VE – Container Migration](https://pve.proxmox.com/pve-docs/chapter-pct.html#pct_migration)
-- [Proxmox VE – Migration settings](https://pve.proxmox.com/pve-docs/chapter-pvecm.html#pvecm_migration)
-- [Proxmox VE – qm(1), remote-migrate](https://pve.proxmox.com/pve-docs/qm.1.html)
-- [Proxmox VE – Firewall, conntrack](https://pve.proxmox.com/pve-docs/chapter-pve-firewall.html)
+- [Proxmox VE – Migrazione dello stato del conntrack](https://pve.proxmox.com/pve-docs/chapter-qm.html#_conntrack_state_migration)
+- [Proxmox VE – Migrazione dei container e restart mode](https://pve.proxmox.com/pve-docs/chapter-pct.html#pct_migration)
+- [Proxmox VE – Migrazione dei guest: tipo (secure/insecure) e rete](https://pve.proxmox.com/pve-docs/chapter-pvecm.html#_guest_migration)
+- [Proxmox VE – qm(1), remote-migrate](https://pve.proxmox.com/pve-docs/qm.1.html#cli_qm_remote-migrate)
+- [Codice sorgente di Proxmox VE – `QemuMigrate.pm`: come il log calcola la `average migration speed` e quando la VM riprende sulla destinazione](https://git.proxmox.com/?p=qemu-server.git;a=blob;f=src/PVE/QemuMigrate.pm;hb=HEAD)

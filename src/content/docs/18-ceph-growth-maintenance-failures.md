@@ -16,11 +16,11 @@ duration: 3 hours
 
 ## Objectives
 
-- Grow Ceph: add a disk to a node and then a whole node, and watch the rebalancing.
-- Perform maintenance without unnecessary data movement: the `noout` flag, orderly reboots, updates.
-- Change how data is protected: 3-way and 2-way replication, *erasure coding*, *device classes* and CRUSH rules, the PG autoscaler.
-- See what really happens when a disk fails or a node suddenly powers off, measuring the I/O pauses inside the VM.
-- Decommission a node from Ceph and from the Proxmox cluster **without reinstalling it**.
+- Ceph grown by one disk and then by a whole node, with the new distribution of the data read in `ceph osd df tree` and the usable space in `ceph df`.
+- A node rebooted for maintenance with the `noout` flag, without Ceph rebuilding copies elsewhere, knowing in which order to update the daemons.
+- The protection of a pool changed and restored (replication 3 → 2 → 3), and a pool on a single *device class* and an *erasure-coded* pool created, compared and removed.
+- The I/O pauses seen by a VM during an OSD failure, a planned reboot and a sudden power-off measured, and compared with the moments Ceph marked the OSDs *down* or *out* in its log.
+- A node removed from Ceph and from the Proxmox cluster **without reinstalling it**, with its own storages working again.
 
 ## How it works
 
@@ -57,10 +57,25 @@ Each OSD has two independent states:
 
 *Erasure coding* is Ceph's "distributed RAID 6": it splits each object into `k` data chunks and computes `m` parity chunks, each stored on a different host.
 
+### Test environment and versions
+
+The outputs and pauses in this lab come from a run carried out on 9 November 2026 (last checked in November 2026), with this configuration:
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/04-first-access-repositories-updates/)) |
+| Ceph | 20.2.5 (tentacle), three monitors on `desopve01-03`, public and cluster networks on VLANs 50 and 51, MTU 1500 ([Lab 17](/17-ceph-installation/)) |
+| OSDs | the six from Lab 17 plus `osd.6` from step 1, on the 60 GB disks of `desopve01-03`; two more on the 40 GB disks of `desopve04` between steps 4 and 7; all of class `hdd` |
+| Pool `rbd-vm` | replicated, `size 3` / `min_size 2`, 32 PGs, one copy per host |
+| Ceph timers | default values: `osd_heartbeat_grace` 20 s, `mon_osd_down_out_interval` 600 s (read in step 2) |
+| VM under test | VM 100 `debian01`: Debian 13, 2 GiB of RAM, 16 GiB disk on `rbd-vm`, running on `desopve01` |
+
+**What the probe measures, and what it does not.** The script in the note below measures how long one write of the VM waits, `fsync` included. Each write touches only a small part of the disk, and therefore only a few of the 32 PGs of `rbd-vm`: a pause shows up only if those PGs are affected, so a run without pauses does not prove that the whole disk kept working. A pause that begins during the one-second sleep between two writes is measured shorter, by up to about a second. The script discards the messages of `dd`: I/O errors would appear in the kernel log of the VM (`journalctl -k`), not in `io.log`. Each event was observed once, on a lab scaled down compared with a production cluster ([Lab 17](/17-ceph-installation/)): the figures describe this configuration, not Ceph in general.
+
 ## Procedure
 
 :::note
-Throughout the lab, a script runs in VM 100 that writes 16 MiB every second with `O_DIRECT` and `fsync` and logs how long each write takes. A normal write takes 25-45 ms: any much higher value is an I/O pause as seen by the VM.
+Throughout the lab, a script runs in VM 100 that writes 16 MiB every second with `O_DIRECT` and `fsync` and logs how long each write takes, next to the time the write ended. A normal write takes 25-45 ms: any much higher value means that the write waited, and this lab calls it an I/O pause as seen by the VM.
 
 ```bash title="labuser@debian01"
 nohup bash -c 'while true; do s=$(date +%s%N)
@@ -112,7 +127,7 @@ The script keeps running in the background even after you close the SSH session;
        recovery: 8.2 MiB/s, 2 objects/s
    ```
 
-   In about a minute Ceph moved part of the PGs of `desopve03` to the new `osd.6`:
+   This status was taken 109 seconds after the new OSD joined (`7 in (since 109s)`), while Ceph was still copying data to it; the total duration of the rebalancing was not recorded (to time it, repeat `ceph -s` until no PG is being moved). At the end, part of the PGs of `desopve03` are on the new `osd.6`:
 
    ```bash title="root@desopve01"
    ceph osd df tree
@@ -167,7 +182,7 @@ The script keeps running in the background even after you close the SSH session;
    600
    ```
 
-   To avoid waiting, mark the OSD *out* yourself. In less than 40 seconds the missing copies are recreated on the other OSD of `desopve02`:
+   To avoid waiting, mark the OSD *out* yourself. Ceph recreates the missing copies: since the rule keeps one copy per host, those of `desopve02` can only go to `osd.3`, the other OSD of that node. 41 seconds after the `out` (`6 in (since 41s)`) the status is already `HEALTH_OK`, with all 97 PGs `active+clean`, so the recovery took at most that long:
 
    ```bash title="root@desopve01"
    ceph osd out 2
@@ -216,6 +231,8 @@ The script keeps running in the background even after you close the SSH session;
                 4  remapped+peering
    ```
 
+   Bringing the OSD back changes the map again: at this moment 12 of the 97 PGs (8 + 4, the 12.371% `not active`) are peering, and a PG accepts no writes until it is active again.
+
 4. What the VM saw:
 
    ```bash title="labuser@debian01"
@@ -229,7 +246,9 @@ The script keeps running in the background even after you close the SSH session;
    17:37:56 4261 ms
    ```
 
-   No errors, but pauses of up to 4 seconds during **peering**, when the PGs change OSDs. With SSD/NVMe disks and 25 Gbit/s networks, peering takes a fraction of a second.
+   - **Measured:** no errors observed; in the three minutes of the test (17:36:30-17:39:30) the longest write took 4,261 ms and three more took 1.7-2.1 s, against the usual 25-45 ms.
+   - **Interpretation:** every step of the test (stop, `out`, start, `in`) changes the OSD map and makes some PGs peer, and while a PG peers it accepts no writes: the pauses are compatible with **peering**. The test, however, did not record the time of each command, so it cannot say which step caused which pause, nor whether the recovery traffic also slowed the writes down. How long peering lasts depends on the hardware, the network and the load: this lab did not measure it on faster hardware.
+   - **How to check:** note the time of each command (`date; ceph osd out 2`), follow the cluster log with `ceph -w` (or read `/var/log/ceph/ceph.log` on a monitor node) and compare both with `io.log`, whose timestamps mark the end of each write.
 
 ### 3. Maintenance: the `noout` flag, orderly reboot and updates
 
@@ -330,7 +349,9 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
    pct start 101
    ```
 
-   In the VM the longest pause was **13.5 seconds**: the time needed to notice that the node was no longer responding and to re-peer its PGs.
+   - **Measured:** in the VM the longest pause was **13.5 seconds**.
+   - **Interpretation:** during a reboot several things happen in sequence, and each of them can hold writes back for a while: the OSDs of `desopve02` go down and later come back, their PGs peer both times, and the monitor of `desopve02` leaves the quorum and later rejoins it. The test does not say which of these produced the 13.5 seconds.
+   - **How to check:** compare `io.log` with the cluster log of the same minutes (`/var/log/ceph/ceph.log` on `desopve01`), which records when the OSDs went down and came back up (`boot`), the monitor elections and, every few seconds, the state of the PGs.
 
 ### 4. Growth: a new node in the cluster and in Ceph
 
@@ -429,7 +450,7 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
    Error initializing cluster client: ObjectNotFound('RADOS object not found (error calling conf_read_file)')
    ```
 
-   The `ceph` client looks for `/etc/ceph/ceph.conf`, but on the new node the link to the shared configuration does not exist yet: when you only install the packages from the command line, you have to create it by hand.
+   The `ceph` client looks for `/etc/ceph/ceph.conf`. In this lab, after the packages had been installed from the command line, the new node did not have the link to the shared configuration yet; creating it by hand solved the problem:
 
    ```bash title="root@desopve04"
    ln -s /etc/pve/ceph.conf /etc/ceph/ceph.conf
@@ -455,7 +476,7 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
    The new node contributes only disks.
 
-8. Rebalancing onto the fourth host takes about a minute and a half:
+8. In this lab the rebalancing onto the fourth host took about a minute and a half. Two snapshots of the status, 3 and 64 seconds after the new OSDs joined:
 
    ```bash title="root@desopve04"
    ceph -s
@@ -653,6 +674,8 @@ Every OSD has a *class* (`hdd`, `ssd`, `nvme`), detected automatically. A CRUSH 
    - **3-way replication:** 1 GiB takes up 3 (2.9 in the output): the efficiency is 33%.
    - **`rbd-fast`** has only 63 GiB available: it uses only the four OSDs of class `ssd`.
 
+   The two `rbd bench` runs are there to fill the pools: a single 1 GiB run per pool is not a performance comparison between replication and erasure coding. [Lab 19](/19-fio-benchmark/) describes the method for that.
+
 #### The PG autoscaler
 
 ```bash title="root@desopve01"
@@ -689,7 +712,7 @@ for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-d
    echo 1 > /proc/sys/kernel/sysrq; echo o > /proc/sysrq-trigger
    ```
 
-2. For the first few seconds Ceph does not know anything yet: the OSDs are declared *down* only after about 20 seconds without *heartbeats*.
+2. At first Ceph does not notice anything. According to the documentation, the other OSDs report an OSD as failed after 20 seconds without replies to their *heartbeats* (`osd_heartbeat_grace`), and the monitors mark it *down* once OSDs on two different hosts have reported it.
 
    ```bash title="root@desopve01"
    ceph -s          # 13 seconds later
@@ -725,7 +748,7 @@ for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-d
 
    ![A node suddenly powered off](../../assets/images/18/11-nodo-spento-status.png)
 
-   The VM saw **a 26.8-second pause**: writes to the PGs whose primary was on `desopve03` stayed pending until the OSDs were declared *down*. Then I/O resumed on the remaining copies.
+   In the VM, the longest write:
 
    ```bash title="labuser@debian01"
    sort -k2 -n io.log | tail -1
@@ -734,6 +757,10 @@ for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-d
    ```text output
    18:04:48 26833 ms
    ```
+
+   - **Measured:** 13 seconds after the power-off all nine OSDs were still `up`; 38 seconds after it, three had been `down` for 12 seconds, so the monitors had marked them down about 26 seconds after the power-off. In the VM, one write waited **26.8 seconds**, and ended at 18:04:48.
+   - **Interpretation:** a write to a PG whose primary OSD is on the lost node waits until that OSD is marked *down* and the PG peers with a new primary; then I/O resumes on the remaining copies. Two records line up with this explanation: the long write ended at 18:04:48, and the monitor log shown in the next step says that at 18:14:52 the OSDs had been down for 604 seconds, that is, since about 18:04:48. The match assumes that the clocks of the VM and of the nodes agree, which NTP should ensure. The seconds beyond the 20-second grace period are compatible with the heartbeat interval (under 6 seconds according to the documentation) and with the collection of the failure reports; the test does not break them down.
+   - **How to check:** the cluster log records when each OSD was reported failed, after how many seconds and with which grace (`grep -E "osd\.[4-6] failed" /var/log/ceph/ceph.log` on a monitor node); `ceph config get osd osd_heartbeat_grace` shows the value in force.
 
 3. After 600 seconds the monitors mark the OSDs *out* and Ceph rebuilds the copies on the other three hosts: with four hosts there is room for them.
 
@@ -768,6 +795,8 @@ for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-d
                 94 active+clean
    ```
 
+   52 seconds after the `out` the recovery was not over yet: 1.44% of the objects were still degraded and one PG out of 97 (1.031%) was not active. The lab did not record how long the whole recovery took, nor how the VM's writes behaved meanwhile. To see it, read `io.log` for the minutes after 18:14:52 and follow `ceph -s` until `HEALTH_OK`.
+
 4. Power the node back on. The OSDs come back *up* and the monitors mark them *in* again on their own, because they had been marked *out* automatically:
 
    ```bash title="root@desopve01"
@@ -790,7 +819,7 @@ for o in 1 3 5 7; do ceph osd crush rm-device-class osd.$o; ceph osd crush set-d
    ```
 
    - The `clock skew` warning lasts a few seconds: after power-on, the node's clock syncs with NTP. Ceph is very sensitive to time, which is why NTP is among the prerequisites (lab 04).
-   - The log also shows `OSD bench result ... is not within the threshold` warnings. At startup every OSD benchmarks its own disk. If the result falls outside the thresholds expected for the disk's class (for example a disk classified as `hdd` that performs like an SSD because it sits behind a controller cache), Ceph discards it and uses the default value. In production you measure the capacity with fio and set it with `osd_mclock_max_capacity_iops_hdd`/`_ssd`.
+   - The log also shows `OSD bench result ... is not within the threshold` warnings. At startup every OSD benchmarks its own disk. If the result falls outside the thresholds expected for the disk's class (for example a disk classified as `hdd` that performs like an SSD because it sits behind a controller cache), Ceph discards it and uses the default value. The warning itself reports the measured value and the threshold; this lab did not investigate which case applied to its disks. In production you measure the capacity with fio and set it with `osd_mclock_max_capacity_iops_hdd`/`_ssd`.
    - With slow disks under load, the `BLUESTORE_SLOW_OP_ALERT` warning can also appear; by default it stays visible for 24 hours after the last occurrence. If you want it to clear sooner, reduce the time to 10 minutes:
 
      ```bash title="root@desopve01"
@@ -961,6 +990,8 @@ Now `desopve04` leaves Ceph and the cluster and becomes a standalone node again,
 
 ## Verification and tests
 
+The lab has succeeded when Ceph is back to `HEALTH_OK` with 7 OSDs and all PGs `active+clean`, the cluster has three nodes again, and `desopve04` works on its own with its storages:
+
 ```bash title="root@desopve01"
 ceph -s | sed -n "/health:/p;/mon:/p;/mgr:/p;/mds:/p;/osd:/p;/pgs:/p"
 ```
@@ -985,11 +1016,13 @@ pvecm nodes
          3          1 desopve03
 ```
 
-| Event | Longest I/O pause in the VM | Data lost |
-|---|---|---|
-| OSD stopped, then *out* and *in* | 4.3 s (peering) | none |
-| Node reboot with `noout` | 13.5 s | none |
-| Node suddenly powered off | 26.8 s (waiting for heartbeats) | none |
+The pauses measured by the probe in the VM (normally 25-45 ms per write):
+
+| Event | Longest write in the VM | Reading | Data lost |
+|---|---|---|---|
+| OSD stopped, then *out* and *in* | 4.3 s | compatible with peering; which step caused it was not recorded | none: `HEALTH_OK` at the end |
+| Node reboot with `noout` | 13.5 s | cause not established: OSDs *down* and then *up* again, peering, monitor election | none |
+| Node suddenly powered off | 26.8 s | ended when the monitors marked the OSDs *down* (18:04:48) | none |
 
 ### Cleanup
 
@@ -1015,19 +1048,22 @@ pkill -f io.bin; rm -f $HOME/io.bin $HOME/io.log
 
 ## What you learned
 
-- A *down* OSD triggers no data movement for 10 minutes; an *out* OSD does. `noout` avoids unnecessary rebuilds during maintenance.
-- An extra disk on a single node does not increase the usable space if there are only as many hosts as copies: you need to grow evenly, or add a host.
-- A new node enters the cluster through the join and enters Ceph through its OSDs. Local storages must be restricted to the nodes that actually have them.
-- 3/2 replication is the safe compromise. 2/1 puts data at risk. Erasure coding saves space but requires more hosts.
-- *Device classes* and CRUSH rules separate fast and slow disks into different pools.
-- During failures Ceph loses no data, but the VM can stall for tens of seconds until the failure is detected. The detection time depends on `osd_heartbeat_grace` (20 s); faster hardware shortens only the peering.
-- You can decommission a node without reinstalling it: drain it, destroy its OSDs, separate it with `pmxcfs -l` and clean up the configuration on both sides.
+- **Choosing between waiting, `out` and `noout`.** A *down* OSD triggers no data movement for 10 minutes, an *out* one does. For a planned reboot set `noout`; for a failed disk, mark the OSD *out* (or let the monitors do it after 600 seconds) and replace it.
+- **Growing the cluster in a way that adds space.** With only as many hosts as copies, an extra disk on a single node does not increase the usable space: grow all the hosts evenly, or add a host. A new node enters the cluster through the join and Ceph through its OSDs, and the local storages must be restricted to the nodes that really have them.
+- **Choosing the protection of a pool.** 3/2 replication is the safe compromise; 2/2 stops writes at the first failure and 2/1 puts data at risk; erasure coding saves space but needs at least `k+m` hosts. *Device classes* and CRUSH rules separate fast and slow disks into different pools.
+- **Knowing what a failure costs the VMs.** In this lab Ceph lost no data, but after a sudden power-off the VM's writes waited 26.8 seconds, until the monitors marked the OSDs *down*, and up to 13.5 seconds during a planned reboot. Compare these figures, measured on your own hardware, with the timeouts of your guests and applications (for a Linux guest on a SCSI disk, `/sys/block/sda/device/timeout`) before deciding whether to change anything.
+- **Decommissioning a node without reinstalling it.** Drain it, destroy its OSDs, separate it with `pmxcfs -l` and clean up the configuration on both sides.
 
 ## References
 
-- [Proxmox VE – Ceph: maintenance, replacing OSDs, pools](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pve_ceph_maintenance)
-- [Proxmox VE – Erasure coded pools](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pve_ceph_ec_pools)
-- [Proxmox VE – Cluster: adding and removing nodes, *Separate a Node Without Reinstalling*](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_remove_a_cluster_node)
-- [Ceph – Monitoring OSDs and PGs](https://docs.ceph.com/en/latest/rados/operations/monitoring-osd-pg/)
-- [Ceph – Erasure code](https://docs.ceph.com/en/latest/rados/operations/erasure-code/)
-- [Ceph – CRUSH device classes](https://docs.ceph.com/en/latest/rados/operations/crush-map/#device-classes)
+- [Proxmox VE – Ceph maintenance: replacing OSDs](https://pve.proxmox.com/pve-docs/chapter-pveceph.html#_ceph_maintenance)
+- [Proxmox VE – Ceph pools and the PG autoscaler](https://pve.proxmox.com/pve-docs/chapter-pveceph.html#pve_ceph_pools)
+- [Proxmox VE – Erasure coded pools](https://pve.proxmox.com/pve-docs/chapter-pveceph.html#pve_ceph_ec_pools)
+- [Proxmox VE – Shutting down a Proxmox VE + Ceph cluster: the `noout` flag](https://pve.proxmox.com/pve-docs/chapter-pveceph.html#pveceph_shutdown)
+- [Proxmox VE – Adding a node to the cluster](https://pve.proxmox.com/pve-docs/chapter-pvecm.html#pvecm_join_node_to_cluster)
+- [Proxmox VE – *Separate a Node Without Reinstalling*](https://pve.proxmox.com/pve-docs/chapter-pvecm.html#pvecm_separate_node_without_reinstall)
+- [Ceph Tentacle – Monitoring OSDs and PGs: peering and PG states](https://docs.ceph.com/en/tentacle/rados/operations/monitoring-osd-pg/)
+- [Ceph Tentacle – Monitor/OSD interaction: heartbeats, grace period, *down* and *out*](https://docs.ceph.com/en/tentacle/rados/configuration/mon-osd-interaction/)
+- [Ceph Tentacle – Erasure code](https://docs.ceph.com/en/tentacle/rados/operations/erasure-code/)
+- [Ceph Tentacle – CRUSH device classes](https://docs.ceph.com/en/tentacle/rados/operations/crush-map/#device-classes)
+- [Ceph Tentacle – mClock: OSD capacity and the bench threshold](https://docs.ceph.com/en/tentacle/rados/configuration/mclock-config-ref/#mitigation-of-unrealistic-osd-capacity-from-automated-test)

@@ -11,18 +11,18 @@ duration: 1 ora e 30 minuti
   - [Lab 38](/it/38-linux-vm-guest-agent/) e [Lab 40](/it/40-templates-cloud-init-clones/): le VM con il guest agent (`debian01`, `web01`-`web03`);
   - [Lab 07](/it/07-first-vm-and-container/) e [Lab 41](/it/41-lxc-containers/): i container 101 e 141;
   - [Lab 44](/it/44-users-groups-roles-pools-tokens/): il pool `web`, usato per scegliere cosa salvare.
-- **Sistemi:** nodi `desopve01`-`03`, NAS `desonas`. Le misure di fermo usano un `ping` dalla rete di gestione.
+- **Sistemi:** nodi `desopve01`-`03`, NAS `desonas`. Per misurare le interruzioni, un `ping` ogni 0,2 s verso la VM dalla rete di gestione.
 - **Credenziali:** `root@pam` → [Appendice B](/it/b-credentials-and-addresses/).
 
 ## Obiettivi
 
-- Capire e misurare le tre **modalità** di backup: *snapshot*, *suspend*, *stop*.
-- Confrontare gli algoritmi di **compressione**.
-- Salvare su storage diversi (NFS, CephFS, SMB) e usare il **fleecing**.
-- Escludere dischi dal backup e capire cosa succede ai **bind mount** dei container.
-- Proteggere un backup e applicare una **retention** (prune), prima simulata e poi reale.
-- Creare un **job pianificato** con le note automatiche.
-- **Ripristinare** una VM e un container su un altro nodo e un altro storage.
+- Tre backup della stessa VM nelle tre **modalità**, *snapshot*, *suspend* e *stop*, con l'interruzione vista dalla rete misurata per ciascuna, per poter scegliere la modalità adatta a ogni tipo di guest.
+- Lo stesso backup con le quattro opzioni di **compressione**, confrontando dimensioni e durate.
+- Backup su NFS, CephFS e SMB, uno dei quali con il **fleecing**, con l'immagine temporanea creata e rimossa da vzdump.
+- Un disco escluso dal backup di una VM, e i mount point dei container che restano fuori dal backup (**bind mount**) riconosciuti nel log.
+- Un backup protetto che sopravvive a una **retention** (prune), prima simulata e poi applicata.
+- Un **job pianificato** notturno sul pool `web`, con retention e note automatiche, eseguito una volta a mano.
+- Una VM e un container **ripristinati** su un altro nodo e un altro storage, con nuovi indirizzi MAC.
 
 ## Come funziona
 
@@ -32,13 +32,28 @@ duration: 1 ora e 30 minuti
 
 | Modalità | VM | Container |
 |---|---|---|
-| **snapshot** | la VM resta accesa; QEMU tiene traccia dei blocchi mentre li copia, quindi il backup è coerente con l'istante di partenza. Con il guest agent, i filesystem vengono "congelati" per un attimo (`fs-freeze`/`fs-thaw`) | snapshot dello storage (ZFS, Ceph, LVM-thin), poi copia dallo snapshot |
-| **suspend** | la VM viene messa in pausa per avviare il backup, poi riparte | `rsync` a caldo, pausa, secondo `rsync` |
+| **snapshot** | la VM resta accesa; QEMU tiene traccia dei blocchi mentre li copia, quindi il backup è coerente con l'istante di partenza. Con il guest agent, i filesystem vengono "congelati" per un attimo (`fs-freeze`/`fs-thaw`) | il container viene sospeso per un attimo per fare lo snapshot dello storage (ZFS, Ceph, LVM-thin), poi la copia avviene dallo snapshot |
+| **suspend** | la VM viene messa in pausa per avviare il backup, poi riparte. Resta per compatibilità: la documentazione consiglia invece *snapshot* | `rsync` a caldo, pausa, secondo `rsync` |
 | **stop** | spegnimento pulito; la VM riparte appena il backup è avviato, e la copia continua in background | il container resta spento per **tutta** la durata del backup e riparte alla fine: fermo potenzialmente lungo |
 
 **Fleecing.** Durante un backup *snapshot*, quando il guest vuole scrivere su un blocco non ancora copiato, QEMU deve prima copiare quel blocco sul backup. Se la destinazione è lenta, il guest rallenta. Con il fleecing il blocco vecchio va invece in un'**immagine temporanea su uno storage veloce** (idealmente locale, thin e con discard) e il guest scrive subito.
 
 **Retention (prune).** Le opzioni `keep-last`, `keep-hourly`, `keep-daily`, `keep-weekly`, `keep-monthly`, `keep-yearly` dicono quanti backup tenere per ciascun intervallo. Dopo ogni backup del job, quelli non coperti vengono cancellati. Un backup **protetto** non viene mai cancellato dal prune.
+
+**Che cosa misurano il log e il ping.** La durata in `Finished Backup of VM … (hh:mm:ss)` è quella dell'intero backup, in secondi interi. In modalità *suspend* e *stop* il log riporta anche `resuming VM again after N seconds`: vzdump conta, in secondi interi, dal momento in cui sospende la VM o ne avvia lo spegnimento al momento in cui la lascia ripartire. Quel valore non comprende ciò che succede dopo nel guest, come l'avvio che segue uno *stop*. Il `ping` ogni 0,2 s dalla rete di gestione mostra quello che vede un client: risposte perse o in ritardo.
+
+### Ambiente e versioni della prova
+
+Gli output e i tempi di questo lab vengono da una prova eseguita il 10 novembre 2026 (ultima verifica: novembre 2026), in questa configurazione:
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)) |
+| VM della prova | VM 104 `web01`: Debian 13 dal template 9000, 2 GiB di RAM, disco da 8 GiB su `rbd-vm` con circa 1,2 GB di dati, guest agent attivo ([Lab 40](/it/40-templates-cloud-init-clones/)) |
+| Destinazioni dei backup | `nas-nfs`: NFS 4.2 verso il NAS TrueNAS SCALE 25.10 ([Lab 12](/it/12-truenas-nas/), [Lab 13](/it/13-nfs/)); `nas-smb`: SMB 3.11 verso lo stesso NAS ([Lab 14](/it/14-smb-cifs/)); `cephfs`: Ceph 20.2.5 ([Lab 17](/it/17-ceph-installation/)) |
+| vzdump | opzioni predefinite tranne quelle indicate in ogni comando: zstd con un thread se non si indica `--zstd` |
+
+**Cosa misura e cosa non misura.** Le modalità e la compressione sono state provate una o due volte ciascuna, su una sola VM piccola e quasi scarica. Il ping misura la raggiungibilità in rete, non il disco del guest: non mostra per quanto `fs-freeze` blocca le scritture del guest, né quanto il backup le rallenta. Le durate dipendono dal NAS, dalla rete e dalla CPU del nodo, che questa prova non separa.
 
 ## Procedura
 
@@ -95,13 +110,19 @@ INFO: resuming VM again after 13 seconds
 INFO: Finished Backup of VM 104 (00:00:38)
 ```
 
-| Modalità | Durata | Cosa ha visto il ping |
-|---|---|---|
-| snapshot | 17 s | 144 risposte su 144, nessuna interruzione |
-| suspend | 29-31 s | nessuna risposta persa, ma ritardate fino a **3,0 s** (la VM era in pausa e ha risposto alla ripresa) |
-| stop | 38 s | 106 risposte su 219: **circa 23 secondi** senza rete, tra spegnimento e riavvio del sistema operativo |
+| Modalità | Durata del backup | Pausa nel log di vzdump | Cosa ha visto il ping (uno ogni 0,2 s) |
+|---|---|---|---|
+| snapshot | 17 s | nessuna: vzdump non mette in pausa la VM (`resuming VM again` è senza secondi) | 144 risposte su 144 |
+| suspend | 29-31 s | `resuming VM again after 4 seconds` | nessuna risposta persa, ma alcune in ritardo fino a **3,0 s** |
+| stop | 38 s | `resuming VM again after 13 seconds` | 106 risposte su 219: **circa 23 secondi** senza risposte |
 
-*snapshot* è la modalità da usare quasi sempre: nessun fermo e, con il guest agent, filesystem coerenti. *stop* dà la coerenza massima per applicazioni che non sopportano la pausa, ma costa un riavvio.
+Per ogni modalità, che cosa è stato misurato, come leggerlo e come verificarlo:
+
+- **snapshot.** Nessuna risposta del ping persa. Il ping però mostra solo che la VM ha continuato a rispondere in rete: non misura il disco del guest durante `fs-freeze`, né il rallentamento delle sue scritture mentre il backup è in corso. Li mostrerebbe una sonda di scrittura nel guest, come quella del [Lab 18](/it/18-ceph-growth-maintenance-failures/), attiva durante il backup.
+- **suspend.** Secondo vzdump la VM è rimasta in pausa 4 secondi; il ping non ha perso risposte, ma alcune sono arrivate con un ritardo fino a 3,0 s. È compatibile con richieste rimaste in attesa durante la pausa e servite alla ripresa, e i due valori concordano entro la loro risoluzione (1 secondo per il log, 0,2 per il ping). Per verificarlo confronta gli orari di `ping -D` con le righe `suspending guest` e `resuming VM again` del log.
+- **stop.** vzdump riporta 13 secondi dall'inizio dello spegnimento alla ripartenza della VM; il ping, circa 23 secondi senza risposte (113 mancanti su 219). La differenza è compatibile con l'avvio del guest dopo la ripartenza, che vzdump non conta: la VM era stata spenta, quindi deve fare di nuovo il boot prima di rispondere. Per verificarlo guarda la sequenza di avvio del guest (`systemd-analyze`, `journalctl -b`) e confronta gli orari del ping con quelli del log.
+
+*snapshot* è la modalità da usare quasi sempre: in questa prova la VM non ha mai smesso di rispondere e, con il guest agent, `fs-freeze` migliora la coerenza dei filesystem. *suspend* resta per compatibilità. *stop* dà la coerenza massima, perché il guest viene spento in modo pulito prima che la copia inizi, ma costa un riavvio: qui circa 23 secondi senza rete.
 
 ### 3. Compressione
 
@@ -111,7 +132,7 @@ Lo stesso backup della VM 104 con i quattro algoritmi:
 for C in 0 lzo gzip zstd; do vzdump 104 --mode snapshot --storage nas-nfs --compress $C; done
 ```
 
-| Compressione | File | Dimensione | Durata |
+| Compressione | File | Dimensione | Durata del backup |
 |---|---|---|---|
 | nessuna (`0`) | `.vma` | 1,15 GB | 33 s |
 | `lzo` | `.vma.lzo` | 521 MB | 41 s |
@@ -119,7 +140,9 @@ for C in 0 lzo gzip zstd; do vzdump 104 --mode snapshot --storage nas-nfs --comp
 | `zstd` (1 thread, il default della GUI) | `.vma.zst` | 353 MB | 25 s (17 s in una seconda prova) |
 | `zstd` con `--zstd 0` (metà dei core) | `.vma.zst` | 354 MB | 14 s |
 
-Il disco da 8 GiB contiene circa 1,2 GB di dati: i blocchi vuoti non finiscono nel backup. **zstd** è il miglior compromesso ed è il default della GUI; da CLI il default di `--compress` è `0` (nessuna compressione), quindi va indicato `--compress zstd` o impostato in `/etc/vzdump.conf`. `--zstd 0` usa metà dei core del nodo per comprimere. Le durate su uno storage di rete condiviso variano da una prova all'altra: confronta l'ordine di grandezza, non il secondo.
+Il disco da 8 GiB contiene circa 1,2 GB di dati: i blocchi vuoti non finiscono nel backup. In questa prova **zstd** ha prodotto il file più piccolo e, con `--zstd 0`, il backup più breve; è anche il default della GUI. Da CLI il default di `--compress` è `0` (nessuna compressione), quindi va indicato `--compress zstd` o impostato in `/etc/vzdump.conf`. `--zstd 0` usa metà dei core del nodo per comprimere.
+
+Le durate vengono da una sola esecuzione ciascuna (due per zstd con un thread, 25 e 17 s), su uno storage di rete condiviso con il resto del laboratorio: confronta l'ordine di grandezza, non il secondo. La prova non separa il tempo speso a comprimere da quello speso a scrivere sul NAS. Per vederlo osserva l'uso di CPU del compressore sul nodo durante il backup (`top`) e ripeti lo stesso backup sullo storage `local` del nodo, che toglie di mezzo la rete.
 
 ### 4. Container e destinazione CephFS
 
@@ -193,7 +216,7 @@ INFO: removing (old) fleecing image 'rbd-vm:vm-104-fleece-0'
 INFO: Finished Backup of VM 104 (00:00:19)
 ```
 
-Per ogni disco vzdump crea un'immagine `vm-<vmid>-fleece-N` sullo storage indicato e la cancella alla fine. Lo storage del fleecing deve essere **veloce** e avere spazio per i blocchi riscritti durante il backup: idealmente locale, thin e con discard (ZFS, LVM-thin); qui si usa Ceph RBD, condiviso ma veloce.
+Per ogni disco vzdump crea un'immagine `vm-<vmid>-fleece-N` sullo storage indicato e la cancella alla fine. Lo storage del fleecing deve avere spazio per i blocchi riscritti durante il backup. La documentazione consiglia uno storage locale veloce, thin e con discard, e tra gli esempi cita LVM-thin, RBD e ZFS con `sparse`; qui si usa Ceph RBD (`rbd-vm`). Questa prova mostra che l'immagine viene creata e rimossa; non misura l'effetto del fleecing sulle scritture del guest, che è il suo scopo. Per misurarlo fai girare nel guest una sonda di scrittura (come nel [Lab 18](/it/18-ceph-growth-maintenance-failures/)) durante un backup verso `nas-smb`, con e senza fleecing.
 
 ### 7. Backup protetti e retention
 
@@ -389,19 +412,21 @@ Lo script si attiva con l'opzione `script` del job o in `/etc/vzdump.conf`.
 
 ## Verifica e test
 
-| Prova | Risultato atteso | Esito |
+Il lab è riuscito se ogni backup termina con `Finished Backup`, se il job pianificato compare nell'elenco e applica la sua retention, e se le copie ripristinate esistono sul nuovo nodo e sul nuovo storage, con nuovi indirizzi MAC.
+
+| Prova | Criterio di successo | Risultato nel lab |
 |---|---|---|
-| Backup *snapshot* con guest agent | `fs-freeze`/`fs-thaw`, nessuna interruzione | ok |
-| Backup *suspend* | pausa di 4 s, risposte ritardate fino a 3 s | ok |
-| Backup *stop* | circa 23 s senza rete, VM riaccesa da sola | ok |
-| Compressione | zstd il più piccolo e tra i più veloci | ok |
-| Disco con `backup=0` | `exclude disk 'scsi1'` | ok |
-| Bind mount di un CT | `excluding bind mount point … (not a volume)` | ok |
-| Fleecing | immagine `vm-104-fleece-0` creata e rimossa | ok |
-| Backup protetto | marcato `protected` e mai cancellato dal prune | ok |
-| Job pianificato | backup del pool `web` su tre nodi, note dal modello, retention applicata | ok |
-| Restore di VM e CT su altro nodo e storage | VM 4104 e CT 4101 creati, nuovi MAC | ok |
-| Live-restore da file vzdump | rifiutato: serve PBS | ok |
+| Backup *snapshot* con guest agent | `fs-freeze`/`fs-thaw` nel log, nessuna risposta del ping persa | 17 s; 144 risposte su 144 |
+| Backup *suspend* | VM messa in pausa e ripresa da vzdump | 4 s di pausa secondo il log; nessuna risposta persa, alcune in ritardo fino a 3,0 s |
+| Backup *stop* | VM spenta e riaccesa da sola | ripartita dopo 13 s secondo il log; circa 23 s senza risposte al ping |
+| Compressione | un file valido con ogni algoritmo | zstd il più piccolo (353-354 MB); 14 s con `--zstd 0` |
+| Disco con `backup=0` | `exclude disk 'scsi1'` nel log | come atteso |
+| Bind mount di un CT | `excluding bind mount point … (not a volume)` | come atteso |
+| Fleecing | immagine `vm-104-fleece-0` creata e rimossa | come atteso |
+| Backup protetto | marcato `protected` e mai cancellato dal prune | conservato sia da `keep-last` sia dalla retention del job |
+| Job pianificato | backup del pool `web` su tre nodi, note dal modello, retention applicata | come atteso |
+| Restore di VM e CT su altro nodo e storage | VM 4104 e CT 4101 creati, nuovi MAC | VM ripristinata in 18,8 s e CT in 24,2 s (`time`) |
+| Live-restore da file vzdump | rifiutato | `live-restore is only compatible with backup images from a Proxmox Backup Server` |
 
 ## Stato finale del lab
 
@@ -414,19 +439,20 @@ Lo script si attiva con l'opzione `script` del job o in `/etc/vzdump.conf`.
 
 ## Cosa hai imparato
 
-- vzdump salva un file completo per guest; per backup incrementali e deduplica serve PBS.
-- *snapshot* non ferma il guest e, con il guest agent, congela i filesystem; *suspend* lo mette in pausa; *stop* spegne la VM solo per avviare il backup, ma tiene spento il container per tutto il backup.
-- zstd (default della GUI, da indicare in CLI) è la scelta giusta; `--zstd 0` usa più core.
-- Si possono escludere dischi (`backup=0`); i mount point dei container entrano solo con `backup=1`, i bind mount mai.
-- Il fleecing protegge le prestazioni del guest quando la destinazione è lenta.
-- La retention conserva un backup per intervallo e non tocca i backup protetti; si simula prima con `--dry-run`.
-- Un job pianificato per pool salva da solo anche le VM aggiunte al pool in futuro.
-- Il restore può cambiare nodo e storage; `--unique` evita MAC duplicati; il live-restore richiede PBS.
+- **Quale modalità per quale guest.** *snapshot* quasi sempre: in questa prova il ping non ha mai perso una risposta, e il guest agent congela i filesystem per lo snapshot. *stop* solo quando vuoi il guest spento in modo pulito prima della copia e puoi accettare un riavvio, qui circa 23 secondi senza rete per una piccola VM Debian. Per un container *stop* significa restare spento per tutto il backup. *suspend* solo per compatibilità.
+- **Dove tenere i backup.** Fuori dal nodo: `local` si perde con il nodo. vzdump salva un file completo per guest; per backup incrementali e deduplica serve PBS ([Lab 47](/it/47-proxmox-backup-server/)).
+- **Quale compressione.** zstd, da indicare esplicitamente in CLI, dove il default è nessuna compressione; con `--zstd 0` usa metà dei core, se il nodo ha CPU libera durante il backup.
+- **Che cosa resta fuori dal backup.** I dischi con `backup=0`, i mount point dei container senza `backup=1` e sempre i bind mount: vanno salvati in altro modo.
+- **Quando usare il fleecing.** Quando la destinazione del backup è lenta, su uno storage veloce e con spazio per i blocchi riscritti; misura il suo effetto sul guest prima di contarci.
+- **Come impostare la retention.** `keep-daily` conserva un backup al giorno, il più recente; simula prima con `--dry-run` e proteggi i backup che devono sopravvivere. Un job per pool salva anche le VM aggiunte al pool in seguito.
+- **Come ripristinare.** Il restore può cambiare nodo e storage; `--unique` evita MAC duplicati; il live-restore richiede PBS.
 
 ## Riferimenti
 
 - [Proxmox VE – Backup and Restore](https://pve.proxmox.com/pve-docs/chapter-vzdump.html)
 - [Proxmox VE – Backup Modes](https://pve.proxmox.com/pve-docs/chapter-vzdump.html#_backup_modes)
-- [Proxmox VE – Backup Retention](https://pve.proxmox.com/pve-docs/chapter-vzdump.html#vzdump_retention)
 - [Proxmox VE – Backup Fleecing](https://pve.proxmox.com/pve-docs/chapter-vzdump.html#_vm_backup_fleecing)
+- [Proxmox VE – Backup Retention](https://pve.proxmox.com/pve-docs/chapter-vzdump.html#vzdump_retention)
+- [Proxmox VE – Backup Protection](https://pve.proxmox.com/pve-docs/chapter-vzdump.html#vzdump_protection)
+- [Proxmox VE – Live-Restore](https://pve.proxmox.com/pve-docs/chapter-vzdump.html#_live_restore)
 - [Proxmox VE – vzdump(1)](https://pve.proxmox.com/pve-docs/vzdump.1.html)

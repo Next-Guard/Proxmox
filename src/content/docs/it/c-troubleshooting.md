@@ -85,7 +85,7 @@ Davanti a un problema conviene procedere sempre allo stesso modo:
 | `HEALTH_WARN BLUESTORE_SLOW_OP_ALERT` che resta per ore | I dischi lenti generano operazioni lente; l'avviso di default resta visibile 24 ore | Indaga i dischi; nel laboratorio `bluestore_slow_ops_warn_lifetime 600` | [22](/it/22-dedicated-networks/) |
 | Avvisi `OSD bench result … not within the threshold` all'avvio degli OSD | All'avvio l'OSD misura il disco e ottiene IOPS fuori dalla soglia attesa | Ceph usa il valore predefinito; misura i dischi con `fio` e imposta `osd_mclock_max_capacity_iops_*` | [18](/it/18-ceph-growth-maintenance-failures/) |
 | Ribilanciamento inutile durante un riavvio programmato | Senza `noout` gli OSD vengono marcati `out` dopo 600 s | `ceph osd set noout` prima della manutenzione, `unset` dopo | [18](/it/18-ceph-growth-maintenance-failures/) |
-| I/O della VM fermo per circa 27 s alla caduta brutale di un nodo | Tempo di rilevamento del guasto da parte di Ceph | Atteso; la ricostruzione parte dopo 600 s se il nodo non torna | [18](/it/18-ceph-growth-maintenance-failures/) |
+| I/O della VM fermo per circa 27 s alla caduta brutale di un nodo | Nella prova la scrittura bloccata è ripartita quando i monitor hanno marcato *down* gli OSD del nodo, cosa che avviene dopo il periodo di grazia degli heartbeat (20 s) e le segnalazioni di guasto | Atteso; confrontalo con i timeout dei guest. La ricostruzione parte dopo 600 s se il nodo non torna | [18](/it/18-ceph-growth-maintenance-failures/) |
 
 ### Cluster e alta disponibilità
 
