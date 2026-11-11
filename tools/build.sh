@@ -32,5 +32,8 @@ ln -sfn "$REPO/node_modules" "$WORK/node_modules"
 rm -rf "$OUT"
 (cd "$WORK" && ./node_modules/.bin/astro build --outDir "$OUT")
 
+# Alias /sitemap.xml: alcuni strumenti (es. Search Console) cercano questo nome.
+cp "$OUT/sitemap-index.xml" "$OUT/sitemap.xml"
+
 node "$REPO/tools/check-site.mjs" "$OUT" "$REPO"
 echo "Sito generato in: $OUT"
