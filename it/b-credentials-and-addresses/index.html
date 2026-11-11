@@ -1,0 +1,890 @@
+<!DOCTYPE html><html lang="it" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-trynvq57"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Appendice B – Credenziali e indirizzi del laboratorio | Proxmox Community</title><link rel="canonical" href="https://proxmox.community/it/b-credentials-and-addresses/"/><link rel="alternate" hreflang="en" href="https://proxmox.community/b-credentials-and-addresses/"/><link rel="alternate" hreflang="it" href="https://proxmox.community/it/b-credentials-and-addresses/"/><link rel="alternate" hreflang="x-default" href="https://proxmox.community/b-credentials-and-addresses/"/><link rel="sitemap" href="/sitemap-index.xml"/><script>(function(){try{var k='pc-lang',p=location.pathname,it=p==='/it'||p.indexOf('/it/')===0,s=localStorage.getItem(k);if(s){return}var l=(navigator.languages&&navigator.languages[0])||navigator.language||'';if(/^it\b/i.test(l)&&!it){localStorage.setItem(k,'it');location.replace('/it'+(p==='/'?'/':p)+location.search+location.hash)}else{localStorage.setItem(k,it?'it':'en')}}catch(e){}})();</script><link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.10"/><meta name="generator" content="Starlight v0.42.10"/><meta property="og:title" content="Appendice B – Credenziali e indirizzi del laboratorio"/><meta property="og:type" content="article"/><meta property="og:url" content="https://proxmox.community/it/b-credentials-and-addresses/"/><meta property="og:locale" content="it"/><meta property="og:description" content="Practical, step-by-step Proxmox VE 9 labs on a real lab, from zero to hero."/><meta property="og:site_name" content="Proxmox Community"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Practical, step-by-step Proxmox VE 9 labs on a real lab, from zero to hero."/><meta name="author" content="NextGuard"/><meta property="og:image" content="https://proxmox.community/og-image.png"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta property="og:image:alt" content="Proxmox Community: from zero to hero, one lab at a time. 53 connected hands-on Proxmox VE 9 labs."/><meta name="twitter:image" content="https://proxmox.community/og-image.png"/><meta name="theme-color" content="#0b1222"/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/assets/print.C9eyqPGL.css" media="print"><link rel="stylesheet" href="/assets/common.B99KopgN.css"><style>@layer starlight.components{svg:where(.astro-vr7f5wbx){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}}
+</style><script type="module" src="/assets/page.B6W2cjQm.js"></script></head><body class="astro-trynvq57"><a class="sl-skip-link astro-gcl7crwr" href="#_top">Salta ai contenuti</a><div class="page sl-flex astro-4yledpm6"><header class="header astro-4yledpm6"><div class="header astro-nen7h5rs"><div class="title-wrapper sl-flex astro-nen7h5rs"><a href="/it/" class="site-title sl-flex astro-iewkfi74"><img class="light:sl-hidden print:hidden astro-iewkfi74" alt src="/assets/logo-dark.jleCxE-U.svg" width="64" height="64"><img class="dark:sl-hidden print:block astro-iewkfi74" alt src="/assets/logo-light.Dt163m9k.svg" width="64" height="64"><span class="astro-iewkfi74" translate="no">Proxmox Community</span></a></div><div class="sl-flex print:hidden search-wrapper astro-nen7h5rs"><site-search class="astro-nen7h5rs astro-7zmzciqg" data-translations="{&quot;placeholder&quot;:&quot;Cerca&quot;}"><button data-open-modal disabled aria-label="Cerca" aria-keyshortcuts="Control+K" class="astro-7zmzciqg"><svg aria-hidden="true" class="astro-7zmzciqg astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-7zmzciqg" aria-hidden="true">Cerca</span><kbd class="sl-hidden md:sl-flex astro-7zmzciqg" style="display: none"><kbd class="astro-7zmzciqg">Ctrl</kbd><kbd class="astro-7zmzciqg">K</kbd></kbd></button><dialog style="padding: 0" aria-label="Cerca" class="astro-7zmzciqg"><div class="dialog-frame sl-flex astro-7zmzciqg"><button data-close-modal class="sl-flex md:sl-hidden astro-7zmzciqg">Cancella</button><div class="search-container astro-7zmzciqg"><div id="starlight__search" class="astro-7zmzciqg"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/assets/Search.astro_astro_type_script_index_0_lang.y6iDvYgE.js"></script><a class="pc-lang-mobile astro-nen7h5rs" href="/b-credentials-and-addresses/" hreflang="en" lang="en" title="English" data-pc-lang="en">EN</a></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-nen7h5rs"><div class="sl-flex social-icons astro-nen7h5rs"><a href="https://github.com/Next-Guard/Proxmox" rel="me" class="sl-flex astro-ijbmhpv4"><span class="sr-only astro-ijbmhpv4">GitHub</span><svg aria-hidden="true" class="astro-ijbmhpv4 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Seleziona tema</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="dark" class="astro-ln6gpn3j">Scuro</option><option value="light" class="astro-ln6gpn3j">Chiaro</option><option value="auto" selected class="astro-ln6gpn3j">Auto</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Seleziona lingua</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="/b-credentials-and-addresses/" class="astro-ln6gpn3j">English</option><option value="/it/b-credentials-and-addresses/" selected class="astro-ln6gpn3j">Italiano</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div><script type="module">var e=e=>{try{localStorage.setItem(`pc-lang`,e)}catch{}};document.querySelectorAll(`[data-pc-lang]`).forEach(t=>t.addEventListener(`click`,()=>e(t.dataset.pcLang||`en`))),document.querySelectorAll(`starlight-lang-select select`).forEach(t=>t.addEventListener(`change`,()=>e(t.value.startsWith(`/it`)?`it`:`en`)));</script></header><nav class="sidebar print:hidden astro-4yledpm6" aria-label="Principale"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-73qhb7c7"><svg aria-hidden="true" class="open-menu astro-73qhb7c7 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-73qhb7c7 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-73qhb7c7">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-4yledpm6"><div class="sidebar-content sl-flex astro-4yledpm6"><sl-sidebar-state-persist data-hash="0jeal0o" class="astro-d6egtmw5"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-n6clcsez"><li class="astro-n6clcsez"><details open class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">Il laboratorio</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/it/the-lab/" class="astro-n6clcsez"><span class="astro-n6clcsez">Il laboratorio e il percorso</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">Parte 0 – Il laboratorio di base</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/it/01-lab-architecture/" class="astro-n6clcsez"><span class="astro-n6clcsez">01 Architettura del laboratorio</span></a></li><li class="astro-n6clcsez"><a href="/it/02-domain-controller/" class="astro-n6clcsez"><span class="astro-n6clcsez">02 Domain controller</span></a></li><li class="astro-n6clcsez"><a href="/it/03-install-proxmox-ve/" class="astro-n6clcsez"><span class="astro-n6clcsez">03 Installazione di Proxmox VE</span></a></li><li class="astro-n6clcsez"><a href="/it/04-first-access-repositories-updates/" class="astro-n6clcsez"><span class="astro-n6clcsez">04 Primo accesso, repository, aggiornamenti</span></a></li><li class="astro-n6clcsez"><a href="/it/05-ssh-shell-cli/" class="astro-n6clcsez"><span class="astro-n6clcsez">05 SSH, shell e CLI</span></a></li><li class="astro-n6clcsez"><a href="/it/06-cluster-corosync/" class="astro-n6clcsez"><span class="astro-n6clcsez">06 Cluster e Corosync</span></a></li><li class="astro-n6clcsez"><a href="/it/07-first-vm-and-container/" class="astro-n6clcsez"><span class="astro-n6clcsez">07 Prima VM e primo container</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">A – Storage</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/it/08-storage-model/" class="astro-n6clcsez"><span class="astro-n6clcsez">08 Il modello di storage</span></a></li><li class="astro-n6clcsez"><a href="/it/09-lvm-and-lvm-thin/" class="astro-n6clcsez"><span class="astro-n6clcsez">09 LVM e LVM-thin</span></a></li><li class="astro-n6clcsez"><a href="/it/10-zfs/" class="astro-n6clcsez"><span class="astro-n6clcsez">10 ZFS</span></a></li><li class="astro-n6clcsez"><a href="/it/11-zfs-replication/" class="astro-n6clcsez"><span class="astro-n6clcsez">11 Replica ZFS</span></a></li><li class="astro-n6clcsez"><a href="/it/12-truenas-nas/" class="astro-n6clcsez"><span class="astro-n6clcsez">12 NAS TrueNAS</span></a></li><li class="astro-n6clcsez"><a href="/it/13-nfs/" class="astro-n6clcsez"><span class="astro-n6clcsez">13 NFS</span></a></li><li class="astro-n6clcsez"><a href="/it/14-smb-cifs/" class="astro-n6clcsez"><span class="astro-n6clcsez">14 SMB/CIFS</span></a></li><li class="astro-n6clcsez"><a href="/it/15-iscsi-lvm-multipath/" class="astro-n6clcsez"><span class="astro-n6clcsez">15 iSCSI, LVM condiviso, multipath</span></a></li><li class="astro-n6clcsez"><a href="/it/16-snapshots/" class="astro-n6clcsez"><span class="astro-n6clcsez">16 Snapshot</span></a></li><li class="astro-n6clcsez"><a href="/it/17-ceph-installation/" class="astro-n6clcsez"><span class="astro-n6clcsez">17 Ceph 1: installazione</span></a></li><li class="astro-n6clcsez"><a href="/it/18-ceph-growth-maintenance-failures/" class="astro-n6clcsez"><span class="astro-n6clcsez">18 Ceph 2: crescita, manutenzione, guasti</span></a></li><li class="astro-n6clcsez"><a href="/it/19-fio-benchmark/" class="astro-n6clcsez"><span class="astro-n6clcsez">19 Benchmark dello storage con fio</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">B – Rete</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/it/20-bridges-stable-names-vlans/" class="astro-n6clcsez"><span class="astro-n6clcsez">20 Bridge, nomi stabili, VLAN</span></a></li><li class="astro-n6clcsez"><a href="/it/21-bonding/" class="astro-n6clcsez"><span class="astro-n6clcsez">21 Bond</span></a></li><li class="astro-n6clcsez"><a href="/it/22-dedicated-networks/" class="astro-n6clcsez"><span class="astro-n6clcsez">22 Reti dedicate</span></a></li><li class="astro-n6clcsez"><a href="/it/23-open-vswitch/" class="astro-n6clcsez"><span class="astro-n6clcsez">23 Open vSwitch</span></a></li><li class="astro-n6clcsez"><a href="/it/24-routing-nat/" class="astro-n6clcsez"><span class="astro-n6clcsez">24 Routing e NAT</span></a></li><li class="astro-n6clcsez"><a href="/it/25-ipv6/" class="astro-n6clcsez"><span class="astro-n6clcsez">25 IPv6</span></a></li><li class="astro-n6clcsez"><a href="/it/26-virtual-router/" class="astro-n6clcsez"><span class="astro-n6clcsez">26 Router virtuale</span></a></li><li class="astro-n6clcsez"><a href="/it/27-sdn-simple/" class="astro-n6clcsez"><span class="astro-n6clcsez">27 SDN 1: zona Simple</span></a></li><li class="astro-n6clcsez"><a href="/it/28-sdn-vlan-qinq/" class="astro-n6clcsez"><span class="astro-n6clcsez">28 SDN 2: VLAN e QinQ</span></a></li><li class="astro-n6clcsez"><a href="/it/29-sdn-vxlan/" class="astro-n6clcsez"><span class="astro-n6clcsez">29 SDN 3: VXLAN</span></a></li><li class="astro-n6clcsez"><a href="/it/30-sdn-evpn/" class="astro-n6clcsez"><span class="astro-n6clcsez">30 SDN 4: EVPN</span></a></li><li class="astro-n6clcsez"><a href="/it/31-sdn-fabrics/" class="astro-n6clcsez"><span class="astro-n6clcsez">31 SDN 5: Fabrics</span></a></li><li class="astro-n6clcsez"><a href="/it/32-firewall-1/" class="astro-n6clcsez"><span class="astro-n6clcsez">32 Firewall 1</span></a></li><li class="astro-n6clcsez"><a href="/it/33-firewall-2/" class="astro-n6clcsez"><span class="astro-n6clcsez">33 Firewall 2</span></a></li><li class="astro-n6clcsez"><a href="/it/34-network-performance-troubleshooting/" class="astro-n6clcsez"><span class="astro-n6clcsez">34 Prestazioni e troubleshooting di rete</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">C – Calcolo</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="4"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/it/35-kvm-qemu/" class="astro-n6clcsez"><span class="astro-n6clcsez">35 KVM e QEMU</span></a></li><li class="astro-n6clcsez"><a href="/it/36-memory/" class="astro-n6clcsez"><span class="astro-n6clcsez">36 Memoria</span></a></li><li class="astro-n6clcsez"><a href="/it/37-virtual-disks-controllers/" class="astro-n6clcsez"><span class="astro-n6clcsez">37 Dischi e controller virtuali</span></a></li><li class="astro-n6clcsez"><a href="/it/38-linux-vm-guest-agent/" class="astro-n6clcsez"><span class="astro-n6clcsez">38 VM Linux e guest agent</span></a></li><li class="astro-n6clcsez"><a href="/it/39-windows-vm-virtio/" class="astro-n6clcsez"><span class="astro-n6clcsez">39 VM Windows e VirtIO</span></a></li><li class="astro-n6clcsez"><a href="/it/40-templates-cloud-init-clones/" class="astro-n6clcsez"><span class="astro-n6clcsez">40 Template, cloud-init, cloni</span></a></li><li class="astro-n6clcsez"><a href="/it/41-lxc-containers/" class="astro-n6clcsez"><span class="astro-n6clcsez">41 Container LXC</span></a></li><li class="astro-n6clcsez"><a href="/it/42-hotplug-resize-limits/" class="astro-n6clcsez"><span class="astro-n6clcsez">42 Hotplug, resize, limiti</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">D – Servizi integrati</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="5"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/it/43-active-directory-realm-ldaps/" class="astro-n6clcsez"><span class="astro-n6clcsez">43 Realm Active Directory</span></a></li><li class="astro-n6clcsez"><a href="/it/44-users-groups-roles-pools-tokens/" class="astro-n6clcsez"><span class="astro-n6clcsez">44 Utenti, ruoli, pool, token</span></a></li><li class="astro-n6clcsez"><a href="/it/45-two-factor-authentication/" class="astro-n6clcsez"><span class="astro-n6clcsez">45 Autenticazione a due fattori</span></a></li><li class="astro-n6clcsez"><a href="/it/46-vzdump-backup/" class="astro-n6clcsez"><span class="astro-n6clcsez">46 Backup con vzdump</span></a></li><li class="astro-n6clcsez"><a href="/it/47-proxmox-backup-server/" class="astro-n6clcsez"><span class="astro-n6clcsez">47 Proxmox Backup Server</span></a></li><li class="astro-n6clcsez"><a href="/it/48-migrations/" class="astro-n6clcsez"><span class="astro-n6clcsez">48 Migrazioni</span></a></li><li class="astro-n6clcsez"><a href="/it/49-high-availability/" class="astro-n6clcsez"><span class="astro-n6clcsez">49 Alta disponibilità</span></a></li><li class="astro-n6clcsez"><a href="/it/50-import-from-esxi/" class="astro-n6clcsez"><span class="astro-n6clcsez">50 Import da VMware ESXi</span></a></li><li class="astro-n6clcsez"><a href="/it/51-notifications-metrics-logs/" class="astro-n6clcsez"><span class="astro-n6clcsez">51 Notifiche, metriche, log</span></a></li><li class="astro-n6clcsez"><a href="/it/52-api-automation/" class="astro-n6clcsez"><span class="astro-n6clcsez">52 API e automazione</span></a></li><li class="astro-n6clcsez"><a href="/it/53-datacenter-manager/" class="astro-n6clcsez"><span class="astro-n6clcsez">53 Datacenter Manager</span></a></li></ul></details></li><li class="astro-n6clcsez"><details open class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">Appendici</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="6"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/it/a-upgrade-8-to-9/" class="astro-n6clcsez"><span class="astro-n6clcsez">A Aggiornamento da 8 a 9</span></a></li><li class="astro-n6clcsez"><a href="/it/b-credentials-and-addresses/" aria-current="page" class="astro-n6clcsez"><span class="astro-n6clcsez">B Credenziali e indirizzi</span></a></li><li class="astro-n6clcsez"><a href="/it/c-troubleshooting/" class="astro-n6clcsez"><span class="astro-n6clcsez">C Risoluzione dei problemi</span></a></li><li class="astro-n6clcsez"><a href="/it/d-rebuild-as-virtual/" class="astro-n6clcsez"><span class="astro-n6clcsez">D Ricostruire il lab in virtuale</span></a></li></ul></details></li><li class="astro-n6clcsez"><a href="/it/contributing/" class="large astro-n6clcsez"><span class="astro-n6clcsez">Contribuisci</span></a></li><li class="astro-n6clcsez"><a href="/it/about/" class="large astro-n6clcsez"><span class="astro-n6clcsez">Chi siamo</span></a></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-z7znpu2r"><div class="social-icons astro-z7znpu2r"><a href="https://github.com/Next-Guard/Proxmox" rel="me" class="sl-flex astro-ijbmhpv4"><span class="sr-only astro-ijbmhpv4">GitHub</span><svg aria-hidden="true" class="astro-ijbmhpv4 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Seleziona tema</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="dark" class="astro-ln6gpn3j">Scuro</option><option value="light" class="astro-ln6gpn3j">Chiaro</option><option value="auto" selected class="astro-ln6gpn3j">Auto</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Seleziona lingua</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="/b-credentials-and-addresses/" class="astro-ln6gpn3j">English</option><option value="/it/b-credentials-and-addresses/" selected class="astro-ln6gpn3j">Italiano</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-4yledpm6"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lsqnlrcc"><aside class="right-sidebar-container print:hidden astro-lsqnlrcc"><div class="right-sidebar astro-lsqnlrcc"><div class="lg:sl-hidden astro-t5hjjspy"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-7shyke4g"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-7shyke4g"><details id="starlight__mobile-toc" class="astro-7shyke4g"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-7shyke4g"><span class="toggle sl-flex astro-7shyke4g">In questa pagina<svg aria-hidden="true" class="caret astro-7shyke4g astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-7shyke4g"></span></summary><div class="dropdown astro-7shyke4g"><ul class="isMobile astro-ojuxdcim" style="--depth: 0;"><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#_top" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Panoramica</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#la-password-del-laboratorio" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">La password del laboratorio</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#account" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Account</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#indirizzi" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Indirizzi</span></a><ul class="isMobile astro-ojuxdcim" style="--depth: 1;"><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#reti-dei-nodi-lab-06-15-17-20-22-29-31" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Reti dei nodi (lab 06, 15, 17, 20-22, 29, 31)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#reti-sdn-lab-27-31" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Reti SDN (lab 27-31)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#reti-di-desopve04-lab-23-24" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Reti di desopve04 (lab 23-24)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#ipv6-lab-25" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">IPv6 (lab 25)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#alta-disponibilità-lab-49" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Alta disponibilità (lab 49)</span></a></li></ul></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#porte-di-servizio" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Porte di servizio</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/assets/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-t5hjjspy"><div class="sl-container astro-t5hjjspy"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">In questa pagina</h2><ul class="astro-ojuxdcim" style="--depth: 0;"><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#_top" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Panoramica</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#la-password-del-laboratorio" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">La password del laboratorio</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#account" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Account</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#indirizzi" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Indirizzi</span></a><ul class="astro-ojuxdcim" style="--depth: 1;"><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#reti-dei-nodi-lab-06-15-17-20-22-29-31" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Reti dei nodi (lab 06, 15, 17, 20-22, 29, 31)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#reti-sdn-lab-27-31" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Reti SDN (lab 27-31)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#reti-di-desopve04-lab-23-24" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Reti di desopve04 (lab 23-24)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#ipv6-lab-25" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">IPv6 (lab 25)</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#alta-disponibilità-lab-49" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Alta disponibilità (lab 49)</span></a></li></ul></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#porte-di-servizio" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Porte di servizio</span></a></li></ul></nav></starlight-toc><script type="module" src="/assets/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lsqnlrcc"><main data-pagefind-body class="astro-trynvq57" lang="it" dir="ltr"><div class="content-panel astro-uwfimqze"><div class="sl-container astro-uwfimqze"><div class="pc-title astro-u72m6wot"><p class="pc-title__kicker astro-u72m6wot" aria-hidden="true"><span class="pc-title__number astro-u72m6wot">Appendice B</span><span class="pc-title__group astro-u72m6wot">Appendici</span></p><h1 id="_top" class="astro-u72m6wot"><span class="sr-only astro-u72m6wot">Appendice B – </span>Credenziali e indirizzi del laboratorio</h1></div></div></div><div class="content-panel astro-uwfimqze"><div class="sl-container astro-uwfimqze"><div class="sl-markdown-content"><p>Questa appendice raccoglie in un solo posto le credenziali e gli indirizzi usati in tutto il manuale.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="la-password-del-laboratorio">La password del laboratorio</h2><a class="sl-anchor-link" href="#la-password-del-laboratorio"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “La password del laboratorio”</span></a></div>
+<p>Nel manuale compare un’unica password segnaposto: <strong><code dir="auto">&lt;password-lab&gt;</code></strong>.</p>
+<ul>
+<li>Scegli tu la password prima di iniziare e usala ovunque il manuale indica <code dir="auto">&lt;password-lab&gt;</code>: Administrator del dominio, <code dir="auto">root</code> dei nodi Proxmox VE, NAS, Proxmox Backup Server, utenti di test.</li>
+<li>Rispetta i requisiti di complessità di Windows Server (almeno 8 caratteri, con maiuscole, minuscole, numeri e simboli), così la stessa password è valida ovunque.</li>
+<li>Una password unica va bene <strong>solo in un laboratorio isolato</strong>. In produzione ogni sistema e ogni account di servizio ha la sua password, custodita in un gestore di segreti.</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="account">Account</h2><a class="sl-anchor-link" href="#account"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “Account”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Sistema</th>
+<th>Utente</th>
+<th>Password</th>
+<th>Introdotto nel lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dominio <code dir="auto">proxmox.community</code></td>
+<td><code dir="auto">Administrator</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>02</td>
+</tr>
+<tr>
+<td>Nodi Proxmox VE</td>
+<td><code dir="auto">root</code> (realm <code dir="auto">pam</code>)</td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>03</td>
+</tr>
+<tr>
+<td>Dominio: account di servizio <code dir="auto">svc-pve-ldap</code> (bind LDAPS del realm, OU <code dir="auto">PVE/Servizi</code>)</td>
+<td><code dir="auto">svc-pve-ldap@proxmox.community</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>43</td>
+</tr>
+<tr>
+<td>Dominio: utenti di prova (OU <code dir="auto">PVE/Utenti</code>)</td>
+<td><code dir="auto">mario.rossi</code> (pve-admins), <code dir="auto">laura.bianchi</code> e <code dir="auto">anna.neri</code> (pve-operators), <code dir="auto">paolo.verdi</code> (pve-auditors)</td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>43</td>
+</tr>
+<tr>
+<td>Dominio: utente fuori dall’OU, escluso dalla sync</td>
+<td><code dir="auto">utente.esterno</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>43</td>
+</tr>
+<tr>
+<td>Proxmox VE, realm <code dir="auto">pve</code>: utente locale di prova (lettura del pool <code dir="auto">web</code>)</td>
+<td><code dir="auto">stagista@pve</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>44</td>
+</tr>
+<tr>
+<td>Proxmox VE, realm <code dir="auto">pve</code>: utente per le automazioni, solo API token</td>
+<td><code dir="auto">automazione@pve</code></td>
+<td>nessuna (solo token)</td>
+<td>44</td>
+</tr>
+<tr>
+<td>Proxmox Backup Server <code dir="auto">desopbs01</code></td>
+<td><code dir="auto">root</code> (realm <code dir="auto">pam</code>)</td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>47</td>
+</tr>
+<tr>
+<td>Proxmox Backup Server: utente del cluster, solo API token <code dir="auto">pve-backup@pbs!pve</code> (DatastoreBackup su <code dir="auto">/datastore/zpbs</code>)</td>
+<td><code dir="auto">pve-backup@pbs</code></td>
+<td>nessuna (solo token)</td>
+<td>47</td>
+</tr>
+<tr>
+<td>Cluster: chiave di cifratura dello storage <code dir="auto">pbs01-cifrato</code></td>
+<td>file <code dir="auto">/etc/pve/priv/storage/pbs01-cifrato.enc</code></td>
+<td>da copiare fuori dal cluster</td>
+<td>47</td>
+</tr>
+<tr>
+<td>NAS TrueNAS</td>
+<td><code dir="auto">truenas_admin</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>12</td>
+</tr>
+<tr>
+<td>NAS TrueNAS: utente di servizio per la condivisione SMB</td>
+<td><code dir="auto">svc-pve</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>12</td>
+</tr>
+<tr>
+<td>Server ESXi di origine (solo lab 50)</td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>50</td>
+</tr>
+<tr>
+<td>Proxmox Datacenter Manager</td>
+<td><code dir="auto">root</code> (realm <code dir="auto">pam</code>)</td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>53</td>
+</tr>
+<tr>
+<td>VM <code dir="auto">100</code> <code dir="auto">debian01</code></td>
+<td><code dir="auto">root</code>, <code dir="auto">labuser</code> (con sudo dal lab 38)</td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>07, 38</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">101</code> <code dir="auto">debian-ct01</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>07</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">121</code>-<code dir="auto">123</code> <code dir="auto">vlan-ct1</code>-<code dir="auto">vlan-ct3</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>20</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">401</code>-<code dir="auto">404</code> su <code dir="auto">desopve04</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>23-25</td>
+</tr>
+<tr>
+<td>VM <code dir="auto">390</code> <code dir="auto">win2025</code> (Windows Server 2025 Evaluation)</td>
+<td><code dir="auto">Administrator</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>39</td>
+</tr>
+<tr>
+<td>Template <code dir="auto">9000</code> e VM <code dir="auto">104</code>-<code dir="auto">106</code> <code dir="auto">web01</code>-<code dir="auto">web03</code></td>
+<td><code dir="auto">labuser</code> (solo chiave SSH del DC, sudo senza password)</td>
+<td>–</td>
+<td>40</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">141</code> <code dir="auto">lxc-unpriv</code> (non privilegiato; utente <code dir="auto">ana</code> UID 1000)</td>
+<td><code dir="auto">root</code>, <code dir="auto">ana</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code> (<code dir="auto">ana</code> senza password)</td>
+<td>41</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">143</code> <code dir="auto">oci-nginx</code> (application container OCI)</td>
+<td>–</td>
+<td>–</td>
+<td>41</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">271</code>-<code dir="auto">272</code> <code dir="auto">simple-ct1</code>-<code dir="auto">simple-ct2</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>27</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">281</code>-<code dir="auto">282</code> <code dir="auto">vlan30-ct1</code>-<code dir="auto">vlan30-ct2</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>28</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">291</code>-<code dir="auto">292</code> <code dir="auto">vxlan-ct1</code>-<code dir="auto">vxlan-ct2</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>29</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">301</code>-<code dir="auto">302</code> <code dir="auto">evpn-ct1</code>-<code dir="auto">evpn-ct2</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>30</td>
+</tr>
+<tr>
+<td>Router <code dir="auto">rtr-core</code> (MikroTik RouterOS 7)</td>
+<td><code dir="auto">admin</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>01</td>
+</tr>
+<tr>
+<td>VM <code dir="auto">261</code> <code dir="auto">router01</code> (RouterOS CHR)</td>
+<td><code dir="auto">admin</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>26</td>
+</tr>
+<tr>
+<td>Server di servizi di rete <code dir="auto">netsvc</code> (Ubuntu Server 24.04)</td>
+<td>amministratore locale con <code dir="auto">sudo</code></td>
+<td>a tua scelta</td>
+<td>01</td>
+</tr>
+<tr>
+<td>Postazione di amministrazione (DC)</td>
+<td>chiave SSH <code dir="auto">administrator@proxmox.community</code></td>
+<td>passphrase <code dir="auto">&lt;password-lab&gt;</code></td>
+<td>05</td>
+</tr>
+<tr>
+<td>Postazione di amministrazione (DC): script di prova del firewall <a href="/files/32/fwtest.ps1"><code dir="auto">fwtest.ps1</code></a> in <code dir="auto">C:\lab</code></td>
+<td><code dir="auto">Administrator</code></td>
+<td>–</td>
+<td>32</td>
+</tr>
+<tr>
+<td>Gotify (CT <code dir="auto">152</code>), interfaccia web e API</td>
+<td><code dir="auto">admin</code> (applicazione “Proxmox VE” con token per il target <code dir="auto">gotify</code>)</td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>51</td>
+</tr>
+<tr>
+<td>InfluxDB 2 (CT <code dir="auto">153</code>), organizzazione <code dir="auto">proxmox</code></td>
+<td><code dir="auto">admin</code>; token <code dir="auto">pve-scrittura</code> (Proxmox VE) e <code dir="auto">grafana-lettura</code> (Grafana)</td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>51</td>
+</tr>
+<tr>
+<td>Grafana (CT <code dir="auto">153</code>)</td>
+<td><code dir="auto">admin</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>51</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">153</code> <code dir="auto">monitor</code></td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>51</td>
+</tr>
+<tr>
+<td>Mailpit (CT <code dir="auto">151</code>)</td>
+<td>nessun accesso: riceve tutta la posta senza autenticazione</td>
+<td>–</td>
+<td>51</td>
+</tr>
+<tr>
+<td>CT <code dir="auto">154</code> <code dir="auto">automazione</code> (Ansible, OpenTofu)</td>
+<td><code dir="auto">root</code></td>
+<td><code dir="auto">&lt;password-lab&gt;</code></td>
+<td>52</td>
+</tr>
+<tr>
+<td>Proxmox VE (cluster e <code dir="auto">desopve04</code>): utente per PDM, solo API token <code dir="auto">pdm@pve!pdm</code> (<code dir="auto">Administrator</code> su <code dir="auto">/</code>, senza privilege separation)</td>
+<td><code dir="auto">pdm@pve</code></td>
+<td>nessuna (solo token, salvato in PDM)</td>
+<td>53</td>
+</tr>
+<tr>
+<td>Proxmox Backup Server: utente per PDM, solo API token <code dir="auto">pdm@pbs!pdm</code> (<code dir="auto">Audit</code> su <code dir="auto">/</code>)</td>
+<td><code dir="auto">pdm@pbs</code></td>
+<td>nessuna (solo token, salvato in PDM)</td>
+<td>53</td>
+</tr>
+<tr>
+<td>Proxmox VE: token <code dir="auto">automazione@pve!ansible</code> (privilege separation, ruolo <code dir="auto">Automazione</code> sul pool <code dir="auto">automazione</code>)</td>
+<td><code dir="auto">automazione@pve!ansible</code></td>
+<td>segreto in <code dir="auto">/root/.pve-token</code> nel CT 154</td>
+<td>52</td>
+</tr>
+</tbody>
+</table>
+<p>Le altre utenze (account di servizio, utenti di test, API token) vengono create nei rispettivi lab e aggiunte a questa tabella.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="indirizzi">Indirizzi</h2><a class="sl-anchor-link" href="#indirizzi"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “Indirizzi”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Nome host (FQDN)</th>
+<th>Ruolo</th>
+<th>Rete di gestione</th>
+<th>Rete storage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">desopve-dc01.proxmox.community</code></td>
+<td>Domain controller, DNS</td>
+<td>172.27.199.20</td>
+<td>172.32.199.20</td>
+</tr>
+<tr>
+<td><code dir="auto">desopve01.proxmox.community</code></td>
+<td>Nodo PVE (cluster)</td>
+<td>172.27.199.21</td>
+<td>172.32.199.21</td>
+</tr>
+<tr>
+<td><code dir="auto">desopve02.proxmox.community</code></td>
+<td>Nodo PVE (cluster)</td>
+<td>172.27.199.22</td>
+<td>172.32.199.22</td>
+</tr>
+<tr>
+<td><code dir="auto">desopve03.proxmox.community</code></td>
+<td>Nodo PVE (cluster)</td>
+<td>172.27.199.23</td>
+<td>172.32.199.23</td>
+</tr>
+<tr>
+<td><code dir="auto">desopve04.proxmox.community</code></td>
+<td>Nodo PVE autonomo</td>
+<td>172.27.199.24</td>
+<td>172.32.199.24</td>
+</tr>
+<tr>
+<td><code dir="auto">desonas.proxmox.community</code></td>
+<td>NAS TrueNAS Community Edition 25.10</td>
+<td>172.27.199.10</td>
+<td>172.32.199.10 (alias, dal lab 15)</td>
+</tr>
+<tr>
+<td><code dir="auto">netsvc.proxmox.community</code> (<code dir="auto">proxy</code>, <code dir="auto">ntp</code>)</td>
+<td>Proxy HTTP <code dir="auto">:3128</code>, NTP; scheda <code dir="auto">lab0</code> (seconda scheda <code dir="auto">uplink0</code> verso la rete aziendale)</td>
+<td>172.27.199.250</td>
+<td>172.32.199.250</td>
+</tr>
+<tr>
+<td><code dir="auto">rtr-core.proxmox.community</code></td>
+<td>Router del laboratorio (gateway), entrambi gli indirizzi su <code dir="auto">ether1</code></td>
+<td>172.27.199.1</td>
+<td>172.32.199.1</td>
+</tr>
+<tr>
+<td>–</td>
+<td>PC di amministrazione (facoltativo, per il Desktop remoto verso il DC)</td>
+<td>172.27.199.9</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">esxi8.proxmox.community</code></td>
+<td>Server ESXi di origine (solo lab 50)</td>
+<td>172.27.199.30</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">linux-src01.proxmox.community</code></td>
+<td>VM Linux sul server ESXi (lab 50)</td>
+<td>172.27.199.31</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">win-src01.proxmox.community</code></td>
+<td>VM Windows sul server ESXi (lab 50)</td>
+<td>172.27.199.32</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">desopbs01.proxmox.community</code></td>
+<td>Proxmox Backup Server 4.2</td>
+<td>172.27.199.40</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">desopdm01.proxmox.community</code></td>
+<td>Proxmox Datacenter Manager 1.1 (remote: <code dir="auto">deso-cluster</code>, <code dir="auto">desopve04</code>, <code dir="auto">desopbs01</code>)</td>
+<td>172.27.199.41</td>
+<td>–</td>
+</tr>
+<tr>
+<td>–</td>
+<td>Altre VM del server ESXi (lab 50)</td>
+<td>172.27.199.33–39</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">pve8-test</code> e il suo container</td>
+<td>Nodo di prova dell’aggiornamento e CT di prova, eliminati alla fine (<a href="/it/a-upgrade-8-to-9/">Appendice A</a>)</td>
+<td>172.27.199.80-81</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">pve-virt01</code></td>
+<td>Nodo Proxmox VE di prova in una VM, eliminato alla fine (<a href="/it/d-rebuild-as-virtual/">Appendice D</a>)</td>
+<td>172.27.199.82</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">debian01</code></td>
+<td>VM 100 (lab 07)</td>
+<td>172.27.199.100</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">debian-ct01</code></td>
+<td>Container 101 (lab 07)</td>
+<td>172.27.199.101</td>
+<td>–</td>
+</tr>
+<tr>
+<td>–</td>
+<td>VM e container dei lab (ID <code dir="auto">1xx</code> → indirizzo <code dir="auto">.1xx</code>)</td>
+<td>172.27.199.100–199</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">web01</code>-<code dir="auto">web03</code></td>
+<td>VM 104-106, linked clone del template 9000 (lab 40)</td>
+<td>172.27.199.104-106</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">WIN2025</code></td>
+<td>VM 390 Windows Server 2025, spenta (lab 39)</td>
+<td>172.27.199.190</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">linux-src01</code> (importata)</td>
+<td>VM 501, importata dall’host ESXi (lab 50); l’originale su ESXi è spenta</td>
+<td>172.27.199.31</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">win-src01</code> (importata)</td>
+<td>VM 502, importata dall’host ESXi, spenta (lab 50); l’originale su ESXi è spenta</td>
+<td>172.27.199.32</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">lxc-unpriv</code></td>
+<td>Container 141 non privilegiato (lab 41)</td>
+<td>172.27.199.141</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">oci-nginx</code></td>
+<td>Container 143 da immagine OCI (lab 41)</td>
+<td>172.27.199.143</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">vlan-ct1</code>-<code dir="auto">vlan-ct3</code></td>
+<td>Container 121-123 (lab 20-22, gateway <code dir="auto">router01</code> dal lab 26)</td>
+<td>–</td>
+<td>VLAN 10: 10.10.10.121-122, VLAN 20: 10.20.20.123</td>
+</tr>
+<tr>
+<td><code dir="auto">router01.proxmox.community</code></td>
+<td>VM 261, router tra le VLAN 10 e 20 (lab 26)</td>
+<td>172.27.199.26</td>
+<td>VLAN 10: 10.10.10.1, VLAN 20: 10.20.20.1, DHCP .150-.199</td>
+</tr>
+<tr>
+<td><code dir="auto">ovs-ct1</code></td>
+<td>Container 401 su <code dir="auto">desopve04</code> (lab 23)</td>
+<td>–</td>
+<td>VLAN 10 su OVS: 10.10.10.124</td>
+</tr>
+<tr>
+<td><code dir="auto">nat-ct1</code></td>
+<td>Container 402 su <code dir="auto">desopve04</code> (lab 24)</td>
+<td>dietro NAT, porta 8080 del nodo</td>
+<td>rete privata 192.168.100.10</td>
+</tr>
+<tr>
+<td><code dir="auto">routed-ct1</code></td>
+<td>Container 403 su <code dir="auto">desopve04</code> (lab 24)</td>
+<td>subnet instradata 10.99.99.2/28</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">v6-ct1</code></td>
+<td>Container 404 su <code dir="auto">desopve04</code> (lab 25)</td>
+<td>172.27.199.125 e SLAAC</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">simple-ct1</code>, <code dir="auto">simple-ct2</code></td>
+<td>Container 271-272 sulla VNet SDN <code dir="auto">vnsimp1</code> (lab 27)</td>
+<td>dietro SNAT del nodo</td>
+<td>10.60.60.100-101 (DHCP dell’SDN)</td>
+</tr>
+<tr>
+<td><code dir="auto">mailpit</code></td>
+<td>Container 151 da immagine OCI, sink SMTP (lab 51)</td>
+<td>172.27.199.151 (SMTP 1025, web 8025)</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">gotify</code></td>
+<td>Container 152 da immagine OCI, notifiche push (lab 51)</td>
+<td>172.27.199.152 (web 80)</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">monitor</code></td>
+<td>Container 153: InfluxDB 2, Grafana, rsyslog centrale (lab 51)</td>
+<td>172.27.199.153 (8086, 3000, TCP 514)</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">automazione</code></td>
+<td>Container 154: postazione di automazione (lab 52)</td>
+<td>172.27.199.154</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">ans01</code>, <code dir="auto">tofu01</code></td>
+<td>VM 155 e 156 di prova, create ed eliminate nel lab 52</td>
+<td>172.27.199.155-156</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">perf-341</code>, <code dir="auto">perf-342</code></td>
+<td>VM 341 e 342 di prova delle misure di rete, create ed eliminate nel lab 34 (indirizzi temporanei, liberi a quel punto del corso; dal lab 41 appartengono ai CT 141 e 142)</td>
+<td>172.27.199.141-142</td>
+<td>–</td>
+</tr>
+<tr>
+<td><code dir="auto">migra-locale</code></td>
+<td>VM 480 di prova con disco locale, creata ed eliminata nel lab 48 (eccezione alla regola ID → indirizzo: l’ID 480 ha l’indirizzo <code dir="auto">.148</code>)</td>
+<td>172.27.199.148</td>
+<td>–</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="reti-dei-nodi-lab-06-15-17-20-22-29-31">Reti dei nodi (lab 06, 15, 17, 20-22, 29, 31)</h3><a class="sl-anchor-link" href="#reti-dei-nodi-lab-06-15-17-20-22-29-31"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “Reti dei nodi (lab 06, 15, 17, 20-22, 29, 31)”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Rete</th>
+<th>VLAN</th>
+<th>Subnet</th>
+<th>Interfaccia sui nodi</th>
+<th>Indirizzi dei nodi</th>
+<th>Gateway</th>
+<th>Introdotta nel lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Gestione, Corosync link 0</td>
+<td>senza tag</td>
+<td>172.27.199.0/24</td>
+<td><code dir="auto">vmbr0</code> (<code dir="auto">nic0</code>), VLAN-aware</td>
+<td>.21-.24</td>
+<td><code dir="auto">rtr-core</code> .1</td>
+<td>03, 20</td>
+</tr>
+<tr>
+<td>Cluster e storage (link 1 di Corosync fino al lab 22, secondo percorso iSCSI)</td>
+<td>senza tag</td>
+<td>172.32.199.0/24</td>
+<td><code dir="auto">nic1</code></td>
+<td>.21-.24</td>
+<td><code dir="auto">rtr-core</code> .1</td>
+<td>06, 15</td>
+</tr>
+<tr>
+<td>Corosync link 1</td>
+<td>40</td>
+<td>10.40.10.0/24</td>
+<td><code dir="auto">nic1.40</code></td>
+<td>10.40.10.21-23</td>
+<td>nessuno</td>
+<td>22</td>
+</tr>
+<tr>
+<td>Ceph public</td>
+<td>50</td>
+<td>10.50.10.0/24</td>
+<td><code dir="auto">nic2.50</code></td>
+<td>10.50.10.21-23</td>
+<td>nessuno</td>
+<td>17</td>
+</tr>
+<tr>
+<td>Ceph cluster</td>
+<td>51</td>
+<td>10.51.10.0/24</td>
+<td><code dir="auto">nic2.51</code></td>
+<td>10.51.10.21-23</td>
+<td>nessuno</td>
+<td>17</td>
+</tr>
+<tr>
+<td>Migrazione</td>
+<td>100</td>
+<td>10.100.10.0/24</td>
+<td><code dir="auto">vmbr1.100</code></td>
+<td>10.100.10.21-23</td>
+<td>nessuno</td>
+<td>22</td>
+</tr>
+<tr>
+<td>Underlay VXLAN/EVPN</td>
+<td>61</td>
+<td>10.61.10.0/24</td>
+<td><code dir="auto">vmbr1.61</code></td>
+<td>10.61.10.21-23</td>
+<td>nessuno</td>
+<td>29</td>
+</tr>
+<tr>
+<td>Fabric OpenFabric <code dir="auto">fab1</code>, collegamenti punto-punto</td>
+<td>81 (01-02), 82 (01-03), 83 (02-03)</td>
+<td>10.80.80.0/24, un <code dir="auto">/32</code> per nodo</td>
+<td><code dir="auto">vmbr1.81</code>-<code dir="auto">.83</code> senza indirizzo proprio, loopback <code dir="auto">dummy_fab1</code></td>
+<td>10.80.80.1-3</td>
+<td>nessuno (rotte della fabric)</td>
+<td>31</td>
+</tr>
+<tr>
+<td>Traffico delle VM</td>
+<td>10, 20, …</td>
+<td>per VLAN</td>
+<td><code dir="auto">vmbr1</code> su <code dir="auto">bond0</code> (<code dir="auto">nic3</code> + <code dir="auto">nic4</code>), VLAN-aware, senza IP</td>
+<td>–</td>
+<td><code dir="auto">router01</code>: 10.10.10.1 (VLAN 10), 10.20.20.1 (VLAN 20)</td>
+<td>20-21, 26</td>
+</tr>
+</tbody>
+</table>
+<p>Le reti senza gateway non sono instradate: il loro traffico resta sulla VLAN dedicata.</p>
+<p>Lo switch del laboratorio porta queste VLAN sulle porte dei nodi, insieme alla VLAN 30 della zona SDN (lab 28) e alle service VLAN 300 e 301 delle prove QinQ: l’elenco completo, con le regole di configurazione dello switch, è nel <a href="/it/01-lab-architecture/#lo-switch">Lab 01</a>.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="reti-sdn-lab-27-31">Reti SDN (lab 27-31)</h3><a class="sl-anchor-link" href="#reti-sdn-lab-27-31"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “Reti SDN (lab 27-31)”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Zona</th>
+<th>Tipo</th>
+<th>VNet</th>
+<th>Subnet</th>
+<th>Gateway</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">simple1</code></td>
+<td>Simple</td>
+<td><code dir="auto">vnsimp1</code></td>
+<td>10.60.60.0/24</td>
+<td>10.60.60.1 su ogni nodo</td>
+<td>SNAT, DHCP <code dir="auto">.100</code>-<code dir="auto">.200</code>, IPAM <code dir="auto">pve</code></td>
+</tr>
+<tr>
+<td><code dir="auto">vlanz</code></td>
+<td>VLAN su <code dir="auto">vmbr1</code></td>
+<td><code dir="auto">vnv30</code> (tag 30)</td>
+<td>10.30.30.0/24 (senza subnet SDN)</td>
+<td>nessuno</td>
+<td>CT 281-282 <code dir="auto">.11</code>-<code dir="auto">.12</code></td>
+</tr>
+<tr>
+<td><code dir="auto">vxz</code></td>
+<td>VXLAN, MTU 1450; underlay fabric <code dir="auto">fab1</code> dal lab 31 (nel lab 29: peer 10.61.10.21-23)</td>
+<td><code dir="auto">vnvx1</code> (VNI 10062)</td>
+<td>10.62.62.0/24 (senza subnet SDN)</td>
+<td>nessuno</td>
+<td>CT 291-292 <code dir="auto">.11</code>-<code dir="auto">.12</code>, MTU 1450</td>
+</tr>
+<tr>
+<td><code dir="auto">evpnz</code></td>
+<td>EVPN, controller <code dir="auto">evpnctl</code> (ASN 65000), VRF-VXLAN 10070, MTU 1450</td>
+<td><code dir="auto">vnev1</code> (VNI 10071)</td>
+<td>10.71.71.0/24</td>
+<td>10.71.71.1 anycast</td>
+<td>SNAT, exit node <code dir="auto">desopve01</code> (principale) e <code dir="auto">desopve02</code>, CT 301 <code dir="auto">.11</code></td>
+</tr>
+<tr>
+<td><code dir="auto">evpnz</code></td>
+<td></td>
+<td><code dir="auto">vnev2</code> (VNI 10072)</td>
+<td>10.72.72.0/24</td>
+<td>10.72.72.1 anycast</td>
+<td>SNAT, CT 302 <code dir="auto">.12</code></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="reti-di-desopve04-lab-23-24">Reti di <code dir="auto">desopve04</code> (lab 23-24)</h3><a class="sl-anchor-link" href="#reti-di-desopve04-lab-23-24"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “Reti di desopve04 (lab 23-24)”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Rete</th>
+<th>Interfaccia</th>
+<th>Indirizzo del nodo</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VLAN 10 su Open vSwitch</td>
+<td><code dir="auto">vmbr2</code> (OVS) su <code dir="auto">bond1</code> (<code dir="auto">nic2</code> + <code dir="auto">nic3</code>), porta interna <code dir="auto">vlan10</code></td>
+<td>10.10.10.24/24</td>
+<td>lab 23</td>
+</tr>
+<tr>
+<td>Rete privata con NAT</td>
+<td><code dir="auto">vmbr9</code>, senza porte</td>
+<td>192.168.100.1/24</td>
+<td>masquerading verso <code dir="auto">vmbr0</code>, port forwarding <code dir="auto">:8080</code> → 192.168.100.10:80</td>
+</tr>
+<tr>
+<td>Subnet instradata</td>
+<td><code dir="auto">vmbr8</code>, senza porte</td>
+<td>10.99.99.1/28</td>
+<td>route su <code dir="auto">rtr-core</code>: 10.99.99.0/28 via 172.27.199.24</td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="ipv6-lab-25">IPv6 (lab 25)</h3><a class="sl-anchor-link" href="#ipv6-lab-25"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “IPv6 (lab 25)”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Sistema</th>
+<th>Indirizzo IPv6</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prefisso della rete di gestione</td>
+<td><code dir="auto">fd27:199::/64</code> (ULA), annunciato da <code dir="auto">rtr-core</code> con RA</td>
+</tr>
+<tr>
+<td><code dir="auto">rtr-core</code> (gateway)</td>
+<td><code dir="auto">fd27:199::1</code>, link-local <code dir="auto">fe80::1</code></td>
+</tr>
+<tr>
+<td><code dir="auto">desopve-dc01</code></td>
+<td><code dir="auto">fd27:199::20</code> (statico, RA disattivati)</td>
+</tr>
+<tr>
+<td><code dir="auto">desopve01</code>-<code dir="auto">desopve04</code></td>
+<td><code dir="auto">fd27:199::21</code>-<code dir="auto">::24</code> (statici su <code dir="auto">vmbr0</code>, RA ignorati)</td>
+</tr>
+<tr>
+<td>Guest su <code dir="auto">vmbr0</code></td>
+<td>SLAAC nel prefisso <code dir="auto">fd27:199::/64</code></td>
+</tr>
+</tbody>
+</table>
+<p>I record AAAA del DC e dei nodi sono nella zona <code dir="auto">proxmox.community</code>.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="alta-disponibilità-lab-49">Alta disponibilità (lab 49)</h3><a class="sl-anchor-link" href="#alta-disponibilità-lab-49"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “Alta disponibilità (lab 49)”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Risorsa HA</th>
+<th>Posizione</th>
+<th>Regole</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">vm:104</code> <code dir="auto">web01</code></td>
+<td><code dir="auto">desopve01</code></td>
+<td>node affinity verso <code dir="auto">desopve01</code>; separata da <code dir="auto">vm:105</code> (<code dir="auto">web-separati</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">vm:105</code> <code dir="auto">web02</code></td>
+<td><code dir="auto">desopve02</code></td>
+<td>separata da <code dir="auto">vm:104</code>; insieme a <code dir="auto">ct:122</code> (<code dir="auto">web02-con-ct122</code>)</td>
+</tr>
+<tr>
+<td><code dir="auto">vm:106</code> <code dir="auto">web03</code></td>
+<td><code dir="auto">desopve03</code></td>
+<td>nessuna</td>
+</tr>
+<tr>
+<td><code dir="auto">ct:122</code> <code dir="auto">vlan-ct2</code></td>
+<td><code dir="auto">desopve02</code></td>
+<td>insieme a <code dir="auto">vm:105</code></td>
+</tr>
+</tbody>
+</table>
+<p>CRS del datacenter: <code dir="auto">ha=dynamic</code>, ribilanciamento automatico e <em>rebalance on start</em> attivi.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="porte-di-servizio">Porte di servizio</h2><a class="sl-anchor-link" href="#porte-di-servizio"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Sezione intitolata “Porte di servizio”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Servizio</th>
+<th>Indirizzo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GUI di Proxmox VE</td>
+<td><code dir="auto">https://&lt;nodo&gt;:8006</code></td>
+</tr>
+<tr>
+<td>Proxy HTTP</td>
+<td><code dir="auto">http://proxy.proxmox.community:3128</code></td>
+</tr>
+<tr>
+<td>NTP</td>
+<td><code dir="auto">ntp.proxmox.community</code> (UDP 123)</td>
+</tr>
+<tr>
+<td>DNS</td>
+<td><code dir="auto">172.27.199.20</code> (UDP/TCP 53)</td>
+</tr>
+<tr>
+<td>Posta di laboratorio (Mailpit)</td>
+<td>SMTP <code dir="auto">172.27.199.151:1025</code>, web <code dir="auto">http://172.27.199.151:8025</code></td>
+</tr>
+<tr>
+<td>Notifiche push (Gotify)</td>
+<td><code dir="auto">http://172.27.199.152</code></td>
+</tr>
+<tr>
+<td>InfluxDB 2</td>
+<td><code dir="auto">http://172.27.199.153:8086</code></td>
+</tr>
+<tr>
+<td>Grafana</td>
+<td><code dir="auto">http://172.27.199.153:3000</code></td>
+</tr>
+<tr>
+<td>Proxmox Datacenter Manager</td>
+<td><code dir="auto">https://desopdm01.proxmox.community:8443</code></td>
+</tr>
+<tr>
+<td>Log centralizzati (rsyslog)</td>
+<td>TCP <code dir="auto">172.27.199.153:514</code>, file in <code dir="auto">/var/log/remote/&lt;nodo&gt;/</code></td>
+</tr>
+</tbody>
+</table>
+</div><footer class="sl-flex astro-vrpkxuak"><div class="meta sl-flex astro-vrpkxuak"><a href="https://github.com/Next-Guard/Proxmox/edit/main/src/content/docs/it/b-credentials-and-addresses.md" class="sl-flex print:hidden astro-tmuti2mm"><svg aria-hidden="true" class="astro-tmuti2mm astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Modifica pagina</a></div><div class="pagination-links print:hidden astro-hkwk2k7q" dir="ltr"><a href="/it/a-upgrade-8-to-9/" rel="prev" class="astro-hkwk2k7q"><svg aria-hidden="true" class="astro-hkwk2k7q astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-hkwk2k7q">Indietro<br class="astro-hkwk2k7q"><span class="link-title astro-hkwk2k7q">A Aggiornamento da 8 a 9</span></span></a><a href="/it/c-troubleshooting/" rel="next" class="astro-hkwk2k7q"><svg aria-hidden="true" class="astro-hkwk2k7q astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-hkwk2k7q">Avanti<br class="astro-hkwk2k7q"><span class="link-title astro-hkwk2k7q">C Risoluzione dei problemi</span></span></a></div></footer><script type="module">var e={en:{open:`Enlarge diagram`,close:`Close`},it:{open:`Ingrandisci lo schema`,close:`Chiudi`}},t=e[document.documentElement.lang.split(`-`)[0]]??e.en,n=`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>`,r;function i(){return r||(r=document.createElement(`dialog`),r.className=`pc-zoom`,r.innerHTML=`<div class="pc-zoom__bar"><button type="button" class="pc-zoom__close">${t.close}</button></div><div class="pc-zoom__canvas"></div>`,r.querySelector(`.pc-zoom__close`).addEventListener(`click`,()=>r.close()),r.addEventListener(`click`,e=>{e.target===r&&r.close()}),document.body.append(r),r)}function a(e){let t=e.querySelector(`svg`);if(!t)return;let n=i(),r=t.cloneNode(!0),a=`${t.id}-zoom`,o=r.querySelector(`style`);o&&t.id&&(o.textContent=o.textContent.split(`#${t.id}`).join(`#${a}`)),r.id=a,r.removeAttribute(`width`),r.style.maxWidth=`none`,r.style.width=t.style.maxWidth,n.querySelector(`.pc-zoom__canvas`).replaceChildren(r),n.showModal()}function o(e){let r=e.querySelector(`svg`);if(!r)return;let i=e.parentElement;i?.classList.contains(`pc-mermaid`)||(i=document.createElement(`div`),i.className=`pc-mermaid`,e.before(i),i.append(e));let o=parseFloat(r.style.maxWidth)||0,s=r.getBoundingClientRect().width,c=i.querySelector(`:scope > .pc-zoom-btn`);o>s*1.1?c||(c=document.createElement(`button`),c.type=`button`,c.className=`pc-zoom-btn`,c.innerHTML=`${n}<span>${t.open}</span>`,c.addEventListener(`click`,()=>a(e)),i.append(c)):c?.remove()}var s=()=>document.querySelectorAll(`pre.mermaid[data-processed]`).forEach(o);new MutationObserver(s).observe(document.body,{subtree:!0,attributes:!0,attributeFilter:[`data-processed`]}),addEventListener(`resize`,s),s();</script><div id="pc-consent" class="pc-consent not-content astro-bm4qem4n" role="dialog" aria-live="polite" aria-label="Cookie statistici." hidden><p class="pc-consent__text astro-bm4qem4n"><strong class="astro-bm4qem4n">Cookie statistici.</strong> Con il tuo consenso usiamo Google Analytics per capire quali pagine vengono lette e migliorare il manuale. Nulla viene caricato finché non accetti, e puoi cambiare idea in qualsiasi momento. <a href="/it/privacy/" class="astro-bm4qem4n">Privacy e cookie</a></p><div class="pc-consent__actions astro-bm4qem4n"><button type="button" class="pc-consent__btn astro-bm4qem4n" data-pc-consent="denied">Rifiuta</button><button type="button" class="pc-consent__btn pc-consent__btn--primary astro-bm4qem4n" data-pc-consent="granted">Accetta</button></div></div><script type="module">var e=`pc-consent`,t=()=>{try{return localStorage.getItem(e)}catch{return null}},n=t=>{try{localStorage.setItem(e,t)}catch{}},r=window;function i(){if(r.__pcGtm)return;r.__pcGtm=!0,r.dataLayer=r.dataLayer||[],r.gtag=function(){r.dataLayer.push(arguments)},r.gtag(`consent`,`default`,{ad_storage:`denied`,ad_user_data:`denied`,ad_personalization:`denied`,analytics_storage:`granted`}),r.dataLayer.push({"gtm.start":Date.now(),event:`gtm.js`});let e=document.createElement(`script`);e.async=!0,e.src=`https://www.googletagmanager.com/gtm.js?id=GTM-WV3M2T5N`,document.head.appendChild(e)}function a(){let e=location.hostname.replace(/^www\./,``);for(let t of document.cookie.split(`;`)){let n=t.split(`=`)[0].trim();if(/^_ga|^_gid|^_gat/.test(n))for(let t of[``,`; domain=`+e,`; domain=.`+e])document.cookie=n+`=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`+t}}var o=document.getElementById(`pc-consent`),s=t();s===`granted`?i():s!==`denied`&&o&&(o.hidden=!1),o?.querySelectorAll(`[data-pc-consent]`).forEach(e=>e.addEventListener(`click`,()=>{let r=e.dataset.pcConsent,s=t();n(r),o.hidden=!0,r===`granted`?i():s===`granted`&&(a(),location.reload())})),document.querySelectorAll(`[data-pc-consent-open]`).forEach(e=>e.addEventListener(`click`,e=>{e.preventDefault(),o&&(o.hidden=!1)}));</script><div class="pc-footer not-content astro-jo6i4kqk"><div class="pc-footer__row astro-jo6i4kqk"><p class="pc-footer__brand astro-jo6i4kqk"><span class="astro-jo6i4kqk">Proxmox Community</span><a href="https://github.com/Next-Guard/Proxmox" class="pc-footer__repo astro-jo6i4kqk"><svg class="pc-icon astro-jo6i4kqk" width="1rem" height="1rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg>Sorgenti su GitHub</a></p><p class="pc-footer__credit astro-jo6i4kqk">Materiale creato da <a href="https://www.nextguard.it" class="astro-jo6i4kqk">NextGuard</a></p></div><p class="astro-jo6i4kqk">© 2026 NextGuard e contributori · Contenuti con licenza <a href="https://creativecommons.org/licenses/by-sa/4.0/" class="astro-jo6i4kqk">CC BY-SA 4.0</a>, codice con licenza <a href="https://opensource.org/license/mit" class="astro-jo6i4kqk">MIT</a>.</p><p class="pc-footer__tm astro-jo6i4kqk">Proxmox® è un marchio registrato di Proxmox Server Solutions GmbH. Questo progetto è indipendente e non è affiliato, sponsorizzato o approvato da Proxmox Server Solutions GmbH.</p><p class="pc-footer__legal astro-jo6i4kqk"><a href="/it/privacy/" class="astro-jo6i4kqk">Privacy e cookie</a> · <a href="/it/privacy/" data-pc-consent-open class="astro-jo6i4kqk">Preferenze cookie</a></p></div></div></div></main></div></div></div></div></body></html>

@@ -1,0 +1,6 @@
+version: 2
+ethernets:
+  nic:
+    match: {name: "e*"}
+    addresses: [172.27.199.31/24]
+    nameservers: {addresses: [172.27.199.20], search: [proxmox.community]}

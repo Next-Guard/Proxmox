@@ -1,0 +1,24 @@
+---
+# Lab 52: pulizia della VM creata da crea-vm.yml
+- name: Rimozione della VM di prova
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/community.proxmox.proxmox:
+      api_host: desopve01.proxmox.community
+      api_user: automazione@pve
+      api_token_id: ansible
+      api_token_secret: "{{ lookup('file', '/root/.pve-token') }}"
+      validate_certs: true
+  tasks:
+    - name: Spegnimento
+      community.proxmox.proxmox_kvm:
+        node: desopve01
+        vmid: 155
+        state: stopped
+        force: true
+    - name: Eliminazione
+      community.proxmox.proxmox_kvm:
+        node: desopve01
+        vmid: 155
+        state: absent

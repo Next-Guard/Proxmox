@@ -1,0 +1,885 @@
+<!DOCTYPE html><html lang="en" dir="ltr" data-theme="dark" data-has-toc data-has-sidebar class="astro-trynvq57"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Appendix C – Troubleshooting | Proxmox Community</title><link rel="canonical" href="https://proxmox.community/c-troubleshooting/"/><link rel="alternate" hreflang="en" href="https://proxmox.community/c-troubleshooting/"/><link rel="alternate" hreflang="it" href="https://proxmox.community/it/c-troubleshooting/"/><link rel="alternate" hreflang="x-default" href="https://proxmox.community/c-troubleshooting/"/><link rel="sitemap" href="/sitemap-index.xml"/><script>(function(){try{var k='pc-lang',p=location.pathname,it=p==='/it'||p.indexOf('/it/')===0,s=localStorage.getItem(k);if(s){return}var l=(navigator.languages&&navigator.languages[0])||navigator.language||'';if(/^it\b/i.test(l)&&!it){localStorage.setItem(k,'it');location.replace('/it'+(p==='/'?'/':p)+location.search+location.hash)}else{localStorage.setItem(k,it?'it':'en')}}catch(e){}})();</script><link rel="shortcut icon" href="/favicon.svg" type="image/svg+xml"/><meta name="generator" content="Astro v7.4.10"/><meta name="generator" content="Starlight v0.42.10"/><meta property="og:title" content="Appendix C – Troubleshooting"/><meta property="og:type" content="article"/><meta property="og:url" content="https://proxmox.community/c-troubleshooting/"/><meta property="og:locale" content="en"/><meta property="og:description" content="Practical, step-by-step Proxmox VE 9 labs on a real lab, from zero to hero."/><meta property="og:site_name" content="Proxmox Community"/><meta name="twitter:card" content="summary_large_image"/><meta name="description" content="Practical, step-by-step Proxmox VE 9 labs on a real lab, from zero to hero."/><meta name="author" content="NextGuard"/><meta property="og:image" content="https://proxmox.community/og-image.png"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta property="og:image:alt" content="Proxmox Community: from zero to hero, one lab at a time. 53 connected hands-on Proxmox VE 9 labs."/><meta name="twitter:image" content="https://proxmox.community/og-image.png"/><meta name="theme-color" content="#0b1222"/><script>
+	window.StarlightThemeProvider = (() => {
+		const storedTheme =
+			typeof localStorage !== 'undefined' && localStorage.getItem('starlight-theme');
+		const theme =
+			storedTheme ||
+			(window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+		document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+		return {
+			updatePickers(theme = storedTheme || 'auto') {
+				document.querySelectorAll('starlight-theme-select').forEach((picker) => {
+					const select = picker.querySelector('select');
+					if (select) select.value = theme;
+					/** @type {HTMLTemplateElement | null} */
+					const tmpl = document.querySelector(`#theme-icons`);
+					const newIcon = tmpl && tmpl.content.querySelector('.' + theme);
+					if (newIcon) {
+						const oldIcon = picker.querySelector('svg.label-icon');
+						if (oldIcon) {
+							oldIcon.replaceChildren(...newIcon.cloneNode(true).childNodes);
+						}
+					}
+				});
+			},
+		};
+	})();
+</script><template id="theme-icons"><svg aria-hidden="true" class="light astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M5 12a1 1 0 0 0-1-1H3a1 1 0 0 0 0 2h1a1 1 0 0 0 1-1Zm.64 5-.71.71a1 1 0 0 0 0 1.41 1 1 0 0 0 1.41 0l.71-.71A1 1 0 0 0 5.64 17ZM12 5a1 1 0 0 0 1-1V3a1 1 0 0 0-2 0v1a1 1 0 0 0 1 1Zm5.66 2.34a1 1 0 0 0 .7-.29l.71-.71a1 1 0 1 0-1.41-1.41l-.66.71a1 1 0 0 0 0 1.41 1 1 0 0 0 .66.29Zm-12-.29a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.71-.71a1.004 1.004 0 1 0-1.43 1.41l.73.71ZM21 11h-1a1 1 0 0 0 0 2h1a1 1 0 0 0 0-2Zm-2.64 6A1 1 0 0 0 17 18.36l.71.71a1 1 0 0 0 1.41 0 1 1 0 0 0 0-1.41l-.76-.66ZM12 6.5a5.5 5.5 0 1 0 5.5 5.5A5.51 5.51 0 0 0 12 6.5Zm0 9a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Zm0 3.5a1 1 0 0 0-1 1v1a1 1 0 0 0 2 0v-1a1 1 0 0 0-1-1Z"/></svg><svg aria-hidden="true" class="dark astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.64 13a1 1 0 0 0-1.05-.14 8.049 8.049 0 0 1-3.37.73 8.15 8.15 0 0 1-8.14-8.1 8.59 8.59 0 0 1 .25-2A1 1 0 0 0 8 2.36a10.14 10.14 0 1 0 14 11.69 1 1 0 0 0-.36-1.05Zm-9.5 6.69A8.14 8.14 0 0 1 7.08 5.22v.27a10.15 10.15 0 0 0 10.14 10.14 9.784 9.784 0 0 0 2.1-.22 8.11 8.11 0 0 1-7.18 4.32v-.04Z"/></svg><svg aria-hidden="true" class="auto astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg></template><link rel="stylesheet" href="/assets/print.C9eyqPGL.css" media="print"><link rel="stylesheet" href="/assets/common.B99KopgN.css"><style>@layer starlight.components{svg:where(.astro-vr7f5wbx){color:var(--sl-icon-color);font-size:var(--sl-icon-size,1em);width:1em;height:1em;overflow:visible}}
+</style><script type="module" src="/assets/page.B6W2cjQm.js"></script></head><body class="astro-trynvq57"><a class="sl-skip-link astro-gcl7crwr" href="#_top">Skip to content</a><div class="page sl-flex astro-4yledpm6"><header class="header astro-4yledpm6"><div class="header astro-nen7h5rs"><div class="title-wrapper sl-flex astro-nen7h5rs"><a href="/" class="site-title sl-flex astro-iewkfi74"><img class="light:sl-hidden print:hidden astro-iewkfi74" alt src="/assets/logo-dark.jleCxE-U.svg" width="64" height="64"><img class="dark:sl-hidden print:block astro-iewkfi74" alt src="/assets/logo-light.Dt163m9k.svg" width="64" height="64"><span class="astro-iewkfi74" translate="no">Proxmox Community</span></a></div><div class="sl-flex print:hidden search-wrapper astro-nen7h5rs"><site-search class="astro-nen7h5rs astro-7zmzciqg" data-translations="{&quot;placeholder&quot;:&quot;Search&quot;}"><button data-open-modal disabled aria-label="Search" aria-keyshortcuts="Control+K" class="astro-7zmzciqg"><svg aria-hidden="true" class="astro-7zmzciqg astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21.71 20.29 18 16.61A9 9 0 1 0 16.61 18l3.68 3.68a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.39ZM11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"/></svg><span class="sl-hidden md:sl-block astro-7zmzciqg" aria-hidden="true">Search</span><kbd class="sl-hidden md:sl-flex astro-7zmzciqg" style="display: none"><kbd class="astro-7zmzciqg">Ctrl</kbd><kbd class="astro-7zmzciqg">K</kbd></kbd></button><dialog style="padding: 0" aria-label="Search" class="astro-7zmzciqg"><div class="dialog-frame sl-flex astro-7zmzciqg"><button data-close-modal class="sl-flex md:sl-hidden astro-7zmzciqg">Cancel</button><div class="search-container astro-7zmzciqg"><div id="starlight__search" class="astro-7zmzciqg"></div></div></div></dialog></site-search><script>
+	(() => {
+		const openBtn = document.querySelector('button[data-open-modal]');
+		const shortcut = openBtn?.querySelector('kbd');
+		if (!openBtn || !(shortcut instanceof HTMLElement)) return;
+		const platformKey = shortcut.querySelector('kbd');
+		if (platformKey && /(Mac|iPhone|iPod|iPad)/i.test(navigator.platform)) {
+			platformKey.textContent = '⌘';
+			openBtn.setAttribute('aria-keyshortcuts', 'Meta+K');
+		}
+		shortcut.style.display = '';
+	})();
+</script><script type="module" src="/assets/Search.astro_astro_type_script_index_0_lang.y6iDvYgE.js"></script><a class="pc-lang-mobile astro-nen7h5rs" href="/it/c-troubleshooting/" hreflang="it" lang="it" title="Italiano" data-pc-lang="it">IT</a></div><div class="sl-hidden md:sl-flex print:hidden right-group astro-nen7h5rs"><div class="sl-flex social-icons astro-nen7h5rs"><a href="https://github.com/Next-Guard/Proxmox" rel="me" class="sl-flex astro-ijbmhpv4"><span class="sr-only astro-ijbmhpv4">GitHub</span><svg aria-hidden="true" class="astro-ijbmhpv4 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="dark" class="astro-ln6gpn3j">Dark</option><option value="light" class="astro-ln6gpn3j">Light</option><option value="auto" selected class="astro-ln6gpn3j">Auto</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><script type="module">var e=`starlight-theme`,t=e=>e===`auto`||e===`dark`||e===`light`?e:`auto`,n=()=>t(typeof localStorage<`u`&&localStorage.getItem(e));function r(t){typeof localStorage<`u`&&localStorage.setItem(e,t===`light`||t===`dark`?t:``)}var i=()=>matchMedia(`(prefers-color-scheme: light)`).matches?`light`:`dark`;function a(e){StarlightThemeProvider.updatePickers(e),document.documentElement.dataset.theme=e===`auto`?i():e,r(e)}matchMedia(`(prefers-color-scheme: light)`).addEventListener(`change`,()=>{n()===`auto`&&a(`auto`)});var o=class extends HTMLElement{constructor(){super(),a(n()),this.querySelector(`select`)?.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&a(t(e.currentTarget.value))})}};customElements.define(`starlight-theme-select`,o);</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Select language</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="/c-troubleshooting/" class="astro-ln6gpn3j">English</option><option value="/it/c-troubleshooting/" class="astro-ln6gpn3j">Italiano</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select><script type="module">var e=class extends HTMLElement{constructor(){super();let e=this.querySelector(`select`);e&&(e.addEventListener(`change`,e=>{e.currentTarget instanceof HTMLSelectElement&&(window.location.pathname=e.currentTarget.value)}),window.addEventListener(`pageshow`,t=>{if(!t.persisted)return;let n=e.querySelector(`option[selected]`)?.index;n!==e.selectedIndex&&(e.selectedIndex=n??0)}))}};customElements.define(`starlight-lang-select`,e);</script></div></div><script type="module">var e=e=>{try{localStorage.setItem(`pc-lang`,e)}catch{}};document.querySelectorAll(`[data-pc-lang]`).forEach(t=>t.addEventListener(`click`,()=>e(t.dataset.pcLang||`en`))),document.querySelectorAll(`starlight-lang-select select`).forEach(t=>t.addEventListener(`change`,()=>e(t.value.startsWith(`/it`)?`it`:`en`)));</script></header><nav class="sidebar print:hidden astro-4yledpm6" aria-label="Main"><button popovertarget="starlight__sidebar" class="sl-menu-button sl-flex md:sl-hidden print:hidden astro-73qhb7c7"><svg aria-hidden="true" class="open-menu astro-73qhb7c7 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M3 8h18a1 1 0 1 0 0-2H3a1 1 0 0 0 0 2Zm18 8H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Zm0-5H3a1 1 0 0 0 0 2h18a1 1 0 0 0 0-2Z"/></svg><svg aria-hidden="true" class="close-menu astro-73qhb7c7 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="m13.41 12 6.3-6.29a1.004 1.004 0 1 0-1.42-1.42L12 10.59l-6.29-6.3a1.004 1.004 0 0 0-1.42 1.42l6.3 6.29-6.3 6.29a1 1 0 0 0 0 1.42.998.998 0 0 0 1.42 0l6.29-6.3 6.29 6.3a.999.999 0 0 0 1.42 0 1 1 0 0 0 0-1.42L13.41 12Z"/></svg><span class="sr-only astro-73qhb7c7">Menu</span></button><script type="module">var e=class extends HTMLElement{constructor(){super();let e=matchMedia(`(min-width: 50em)`),t=()=>{this.popover=e.matches?null:`auto`};t(),e.addEventListener(`change`,()=>t()),this.addEventListener(`toggle`,({newState:e})=>this.trapFocus(e===`open`))}trapFocus(e){document.querySelectorAll(`.main-frame, .sl-skip-link`).forEach(t=>{t.toggleAttribute(`inert`,e)})}};customElements.define(`sl-sidebar-pane`,e);</script><sl-sidebar-pane popover id="starlight__sidebar" class="sidebar-pane astro-4yledpm6"><div class="sidebar-content sl-flex astro-4yledpm6"><sl-sidebar-state-persist data-hash="0meo6i6" class="astro-d6egtmw5"><script aria-hidden="true">
+		(() => {
+			try {
+				if (!matchMedia('(min-width: 50em)').matches) return;
+				/** @type {HTMLElement | null} */
+				const target = document.querySelector('sl-sidebar-state-persist');
+				const state = JSON.parse(sessionStorage.getItem('sl-sidebar-state') || '0');
+				if (!target || !state || target.dataset.hash !== state.hash) return;
+				window._starlightScrollRestore = state.scroll;
+				customElements.define(
+					'sl-sidebar-restore',
+					class SidebarRestore extends HTMLElement {
+						connectedCallback() {
+							try {
+								const idx = parseInt(this.dataset.index || '');
+								const details = this.closest('details');
+								if (details && typeof state.open[idx] === 'boolean') details.open = state.open[idx];
+							} catch {}
+						}
+					}
+				);
+			} catch {}
+		})();
+	</script><ul class="top-level astro-n6clcsez"><li class="astro-n6clcsez"><details open class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">The lab</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="0"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/the-lab/" class="astro-n6clcsez"><span class="astro-n6clcsez">The lab and the path</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">Part 0 – The base lab</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="1"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/01-lab-architecture/" class="astro-n6clcsez"><span class="astro-n6clcsez">01 Lab architecture</span></a></li><li class="astro-n6clcsez"><a href="/02-domain-controller/" class="astro-n6clcsez"><span class="astro-n6clcsez">02 Domain controller</span></a></li><li class="astro-n6clcsez"><a href="/03-install-proxmox-ve/" class="astro-n6clcsez"><span class="astro-n6clcsez">03 Installing Proxmox VE</span></a></li><li class="astro-n6clcsez"><a href="/04-first-access-repositories-updates/" class="astro-n6clcsez"><span class="astro-n6clcsez">04 First access, repositories, updates</span></a></li><li class="astro-n6clcsez"><a href="/05-ssh-shell-cli/" class="astro-n6clcsez"><span class="astro-n6clcsez">05 SSH, shell and CLI</span></a></li><li class="astro-n6clcsez"><a href="/06-cluster-corosync/" class="astro-n6clcsez"><span class="astro-n6clcsez">06 Cluster and Corosync</span></a></li><li class="astro-n6clcsez"><a href="/07-first-vm-and-container/" class="astro-n6clcsez"><span class="astro-n6clcsez">07 First VM and container</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">A – Storage</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="2"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/08-storage-model/" class="astro-n6clcsez"><span class="astro-n6clcsez">08 The storage model</span></a></li><li class="astro-n6clcsez"><a href="/09-lvm-and-lvm-thin/" class="astro-n6clcsez"><span class="astro-n6clcsez">09 LVM and LVM-thin</span></a></li><li class="astro-n6clcsez"><a href="/10-zfs/" class="astro-n6clcsez"><span class="astro-n6clcsez">10 ZFS</span></a></li><li class="astro-n6clcsez"><a href="/11-zfs-replication/" class="astro-n6clcsez"><span class="astro-n6clcsez">11 ZFS replication</span></a></li><li class="astro-n6clcsez"><a href="/12-truenas-nas/" class="astro-n6clcsez"><span class="astro-n6clcsez">12 TrueNAS NAS</span></a></li><li class="astro-n6clcsez"><a href="/13-nfs/" class="astro-n6clcsez"><span class="astro-n6clcsez">13 NFS</span></a></li><li class="astro-n6clcsez"><a href="/14-smb-cifs/" class="astro-n6clcsez"><span class="astro-n6clcsez">14 SMB/CIFS</span></a></li><li class="astro-n6clcsez"><a href="/15-iscsi-lvm-multipath/" class="astro-n6clcsez"><span class="astro-n6clcsez">15 iSCSI, shared LVM, multipath</span></a></li><li class="astro-n6clcsez"><a href="/16-snapshots/" class="astro-n6clcsez"><span class="astro-n6clcsez">16 Snapshots</span></a></li><li class="astro-n6clcsez"><a href="/17-ceph-installation/" class="astro-n6clcsez"><span class="astro-n6clcsez">17 Ceph 1: installation</span></a></li><li class="astro-n6clcsez"><a href="/18-ceph-growth-maintenance-failures/" class="astro-n6clcsez"><span class="astro-n6clcsez">18 Ceph 2: growth, maintenance, failures</span></a></li><li class="astro-n6clcsez"><a href="/19-fio-benchmark/" class="astro-n6clcsez"><span class="astro-n6clcsez">19 Storage benchmark with fio</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">B – Network</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="3"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/20-bridges-stable-names-vlans/" class="astro-n6clcsez"><span class="astro-n6clcsez">20 Bridges, stable names, VLANs</span></a></li><li class="astro-n6clcsez"><a href="/21-bonding/" class="astro-n6clcsez"><span class="astro-n6clcsez">21 Bonding</span></a></li><li class="astro-n6clcsez"><a href="/22-dedicated-networks/" class="astro-n6clcsez"><span class="astro-n6clcsez">22 Dedicated networks</span></a></li><li class="astro-n6clcsez"><a href="/23-open-vswitch/" class="astro-n6clcsez"><span class="astro-n6clcsez">23 Open vSwitch</span></a></li><li class="astro-n6clcsez"><a href="/24-routing-nat/" class="astro-n6clcsez"><span class="astro-n6clcsez">24 Routing and NAT</span></a></li><li class="astro-n6clcsez"><a href="/25-ipv6/" class="astro-n6clcsez"><span class="astro-n6clcsez">25 IPv6</span></a></li><li class="astro-n6clcsez"><a href="/26-virtual-router/" class="astro-n6clcsez"><span class="astro-n6clcsez">26 Virtual router</span></a></li><li class="astro-n6clcsez"><a href="/27-sdn-simple/" class="astro-n6clcsez"><span class="astro-n6clcsez">27 SDN 1: Simple zone</span></a></li><li class="astro-n6clcsez"><a href="/28-sdn-vlan-qinq/" class="astro-n6clcsez"><span class="astro-n6clcsez">28 SDN 2: VLAN and QinQ</span></a></li><li class="astro-n6clcsez"><a href="/29-sdn-vxlan/" class="astro-n6clcsez"><span class="astro-n6clcsez">29 SDN 3: VXLAN</span></a></li><li class="astro-n6clcsez"><a href="/30-sdn-evpn/" class="astro-n6clcsez"><span class="astro-n6clcsez">30 SDN 4: EVPN</span></a></li><li class="astro-n6clcsez"><a href="/31-sdn-fabrics/" class="astro-n6clcsez"><span class="astro-n6clcsez">31 SDN 5: Fabrics</span></a></li><li class="astro-n6clcsez"><a href="/32-firewall-1/" class="astro-n6clcsez"><span class="astro-n6clcsez">32 Firewall 1</span></a></li><li class="astro-n6clcsez"><a href="/33-firewall-2/" class="astro-n6clcsez"><span class="astro-n6clcsez">33 Firewall 2</span></a></li><li class="astro-n6clcsez"><a href="/34-network-performance-troubleshooting/" class="astro-n6clcsez"><span class="astro-n6clcsez">34 Network performance and troubleshooting</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">C – Compute</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="4"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/35-kvm-qemu/" class="astro-n6clcsez"><span class="astro-n6clcsez">35 KVM and QEMU</span></a></li><li class="astro-n6clcsez"><a href="/36-memory/" class="astro-n6clcsez"><span class="astro-n6clcsez">36 Memory</span></a></li><li class="astro-n6clcsez"><a href="/37-virtual-disks-controllers/" class="astro-n6clcsez"><span class="astro-n6clcsez">37 Virtual disks and controllers</span></a></li><li class="astro-n6clcsez"><a href="/38-linux-vm-guest-agent/" class="astro-n6clcsez"><span class="astro-n6clcsez">38 Linux VM and guest agent</span></a></li><li class="astro-n6clcsez"><a href="/39-windows-vm-virtio/" class="astro-n6clcsez"><span class="astro-n6clcsez">39 Windows VM and VirtIO</span></a></li><li class="astro-n6clcsez"><a href="/40-templates-cloud-init-clones/" class="astro-n6clcsez"><span class="astro-n6clcsez">40 Templates, cloud-init, clones</span></a></li><li class="astro-n6clcsez"><a href="/41-lxc-containers/" class="astro-n6clcsez"><span class="astro-n6clcsez">41 LXC containers</span></a></li><li class="astro-n6clcsez"><a href="/42-hotplug-resize-limits/" class="astro-n6clcsez"><span class="astro-n6clcsez">42 Hotplug, resize, limits</span></a></li></ul></details></li><li class="astro-n6clcsez"><details class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">D – Integrated services</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="5"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/43-active-directory-realm-ldaps/" class="astro-n6clcsez"><span class="astro-n6clcsez">43 Active Directory realm</span></a></li><li class="astro-n6clcsez"><a href="/44-users-groups-roles-pools-tokens/" class="astro-n6clcsez"><span class="astro-n6clcsez">44 Users, roles, pools, tokens</span></a></li><li class="astro-n6clcsez"><a href="/45-two-factor-authentication/" class="astro-n6clcsez"><span class="astro-n6clcsez">45 Two-factor authentication</span></a></li><li class="astro-n6clcsez"><a href="/46-vzdump-backup/" class="astro-n6clcsez"><span class="astro-n6clcsez">46 Backup with vzdump</span></a></li><li class="astro-n6clcsez"><a href="/47-proxmox-backup-server/" class="astro-n6clcsez"><span class="astro-n6clcsez">47 Proxmox Backup Server</span></a></li><li class="astro-n6clcsez"><a href="/48-migrations/" class="astro-n6clcsez"><span class="astro-n6clcsez">48 Migrations</span></a></li><li class="astro-n6clcsez"><a href="/49-high-availability/" class="astro-n6clcsez"><span class="astro-n6clcsez">49 High availability</span></a></li><li class="astro-n6clcsez"><a href="/50-import-from-esxi/" class="astro-n6clcsez"><span class="astro-n6clcsez">50 Import from VMware ESXi</span></a></li><li class="astro-n6clcsez"><a href="/51-notifications-metrics-logs/" class="astro-n6clcsez"><span class="astro-n6clcsez">51 Notifications, metrics, logs</span></a></li><li class="astro-n6clcsez"><a href="/52-api-automation/" class="astro-n6clcsez"><span class="astro-n6clcsez">52 API and automation</span></a></li><li class="astro-n6clcsez"><a href="/53-datacenter-manager/" class="astro-n6clcsez"><span class="astro-n6clcsez">53 Datacenter Manager</span></a></li></ul></details></li><li class="astro-n6clcsez"><details open class="astro-n6clcsez"><summary class="astro-n6clcsez"><span class="group-label astro-n6clcsez"><span class="large astro-n6clcsez">Appendices</span></span><svg aria-hidden="true" class="caret astro-n6clcsez astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.25rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></summary><sl-sidebar-restore data-index="6"></sl-sidebar-restore><ul class="astro-n6clcsez"><li class="astro-n6clcsez"><a href="/a-upgrade-8-to-9/" class="astro-n6clcsez"><span class="astro-n6clcsez">A Upgrading from 8 to 9</span></a></li><li class="astro-n6clcsez"><a href="/b-credentials-and-addresses/" class="astro-n6clcsez"><span class="astro-n6clcsez">B Credentials and addresses</span></a></li><li class="astro-n6clcsez"><a href="/c-troubleshooting/" aria-current="page" class="astro-n6clcsez"><span class="astro-n6clcsez">C Troubleshooting</span></a></li><li class="astro-n6clcsez"><a href="/d-rebuild-as-virtual/" class="astro-n6clcsez"><span class="astro-n6clcsez">D Rebuilding the lab as virtual</span></a></li></ul></details></li><li class="astro-n6clcsez"><a href="/contributing/" class="large astro-n6clcsez"><span class="astro-n6clcsez">Contribute</span></a></li><li class="astro-n6clcsez"><a href="/about/" class="large astro-n6clcsez"><span class="astro-n6clcsez">About</span></a></li></ul><script aria-hidden="true">
+		(() => {
+			const scroller = document.getElementById('starlight__sidebar');
+			if (!window._starlightScrollRestore || !scroller) return;
+			scroller.scrollTop = window._starlightScrollRestore;
+			delete window._starlightScrollRestore;
+		})();
+	</script></sl-sidebar-state-persist><div class="md:sl-hidden"><div class="mobile-preferences sl-flex astro-z7znpu2r"><div class="social-icons astro-z7znpu2r"><a href="https://github.com/Next-Guard/Proxmox" rel="me" class="sl-flex astro-ijbmhpv4"><span class="sr-only astro-ijbmhpv4">GitHub</span><svg aria-hidden="true" class="astro-ijbmhpv4 astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.83 1.24 1.83 1.24 1.08 1.83 2.81 1.3 3.5 1 .1-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3Z"/></svg></a></div><starlight-theme-select><label style="--sl-select-width: 6.25em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Select theme</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M21 14h-1V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v7H3a1 1 0 0 0-1 1v2a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3v-2a1 1 0 0 0-1-1ZM6 7a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7H6V7Zm14 10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1h16v1Z"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="dark" class="astro-ln6gpn3j">Dark</option><option value="light" class="astro-ln6gpn3j">Light</option><option value="auto" selected class="astro-ln6gpn3j">Auto</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-theme-select><script>
+	StarlightThemeProvider.updatePickers();
+</script><starlight-lang-select><label style="--sl-select-width: 7em" class="astro-ln6gpn3j"><span class="sr-only astro-ln6gpn3j">Select language</span><svg aria-hidden="true" class="icon label-icon astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path fill-rule="evenodd" d="M8.516 3a.94.94 0 0 0-.941.94v1.15H2.94a.94.94 0 1 0 0 1.882h7.362a7.422 7.422 0 0 1-1.787 3.958 7.42 7.42 0 0 1-1.422-2.425.94.94 0 1 0-1.774.627 9.303 9.303 0 0 0 1.785 3.043 7.422 7.422 0 0 1-4.164 1.278.94.94 0 1 0 0 1.881 9.303 9.303 0 0 0 5.575-1.855 9.303 9.303 0 0 0 4.11 1.74l-.763 1.525a.968.968 0 0 0-.016.034l-1.385 2.77a.94.94 0 1 0 1.683.841l1.133-2.267h5.806l1.134 2.267a.94.94 0 0 0 1.683-.841l-1.385-2.769a.95.95 0 0 0-.018-.036l-3.476-6.951a.94.94 0 0 0-1.682 0l-1.82 3.639a7.423 7.423 0 0 1-3.593-1.256 9.303 9.303 0 0 0 2.27-5.203h1.894a.94.94 0 0 0 0-1.881H9.456V3.94A.94.94 0 0 0 8.516 3Zm6.426 11.794a1.068 1.068 0 0 1-.02.039l-.703 1.407h3.924l-1.962-3.924-1.24 2.478Z" clip-rule="evenodd"/></svg><select autocomplete="off" class="astro-ln6gpn3j"><option value="/c-troubleshooting/" class="astro-ln6gpn3j">English</option><option value="/it/c-troubleshooting/" class="astro-ln6gpn3j">Italiano</option></select><svg aria-hidden="true" class="icon caret astro-ln6gpn3j astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1em;"><path d="M17 9.17a1 1 0 0 0-1.41 0L12 12.71 8.46 9.17a1 1 0 1 0-1.41 1.42l4.24 4.24a1.002 1.002 0 0 0 1.42 0L17 10.59a1.002 1.002 0 0 0 0-1.42Z"/></svg></label></starlight-lang-select></div></div></div></sl-sidebar-pane></nav><div class="main-frame astro-4yledpm6"><script type="module">var e=document.getElementById(`starlight__sidebar`),t=e?.querySelector(`sl-sidebar-state-persist`),n=`sl-sidebar-state`,r=()=>{let r=[],i=t?.dataset.hash||``;try{let e=sessionStorage.getItem(n),t=JSON.parse(e||`{}`);Array.isArray(t.open)&&t.hash===i&&(r=t.open)}catch{}return{hash:i,open:r,scroll:e?.scrollTop||0}},i=e=>{try{sessionStorage.setItem(n,JSON.stringify(e))}catch{}},a=()=>i(r()),o=(e,t)=>{let n=r();n.open[t]=e,i(n)};t?.addEventListener(`click`,e=>{if(!(e.target instanceof Element))return;let t=e.target.closest(`summary`)?.closest(`details`);if(!t)return;let n=t.querySelector(`sl-sidebar-restore`),r=parseInt(n?.dataset.index||``);isNaN(r)||o(!t.open,r)}),addEventListener(`visibilitychange`,()=>{document.visibilityState===`hidden`&&a()});</script><div class="lg:sl-flex astro-lsqnlrcc"><aside class="right-sidebar-container print:hidden astro-lsqnlrcc"><div class="right-sidebar astro-lsqnlrcc"><div class="lg:sl-hidden astro-t5hjjspy"><mobile-starlight-toc data-min-h="2" data-max-h="3" class="astro-7shyke4g"><nav aria-labelledby="starlight__on-this-page--mobile" class="astro-7shyke4g"><details id="starlight__mobile-toc" class="astro-7shyke4g"><summary id="starlight__on-this-page--mobile" class="sl-flex astro-7shyke4g"><span class="toggle sl-flex astro-7shyke4g">On this page<svg aria-hidden="true" class="caret astro-7shyke4g astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1rem;"><path d="m14.83 11.29-4.24-4.24a1 1 0 1 0-1.42 1.41L12.71 12l-3.54 3.54a1 1 0 0 0 0 1.41 1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.24-4.24a1.002 1.002 0 0 0 0-1.42Z"/></svg></span><span class="display-current astro-7shyke4g"></span></summary><div class="dropdown astro-7shyke4g"><ul class="isMobile astro-ojuxdcim" style="--depth: 0;"><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#_top" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Overview</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#the-method" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">The method</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#real-problems-by-area" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Real problems, by area</span></a><ul class="isMobile astro-ojuxdcim" style="--depth: 1;"><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#installation-and-updates" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Installation and updates</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#network" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Network</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#firewall" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Firewall</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#storage" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Storage</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#ceph" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Ceph</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#cluster-and-high-availability" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Cluster and high availability</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#vms-and-containers" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">VMs and containers</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#backup" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Backup</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#importing-from-vmware-esxi" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Importing from VMware ESXi</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#authentication-and-permissions" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Authentication and permissions</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#api-and-automation" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">API and automation</span></a></li></ul></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#where-to-look" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Where to look</span></a><ul class="isMobile astro-ojuxdcim" style="--depth: 1;"><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#web-interface" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Web interface</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#proxmox-ve-services" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Proxmox VE services</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#status-commands" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Status commands</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#capture-tools" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Capture tools</span></a></li></ul></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#references" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">References</span></a></li></ul></div></details></nav></mobile-starlight-toc><script type="module" src="/assets/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js"></script></div><div class="right-sidebar-panel sl-hidden lg:sl-block astro-t5hjjspy"><div class="sl-container astro-t5hjjspy"><starlight-toc data-min-h="2" data-max-h="3"><nav aria-labelledby="starlight__on-this-page"><h2 id="starlight__on-this-page">On this page</h2><ul class="astro-ojuxdcim" style="--depth: 0;"><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#_top" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Overview</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#the-method" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">The method</span></a></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#real-problems-by-area" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Real problems, by area</span></a><ul class="astro-ojuxdcim" style="--depth: 1;"><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#installation-and-updates" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Installation and updates</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#network" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Network</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#firewall" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Firewall</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#storage" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Storage</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#ceph" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Ceph</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#cluster-and-high-availability" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Cluster and high availability</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#vms-and-containers" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">VMs and containers</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#backup" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Backup</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#importing-from-vmware-esxi" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Importing from VMware ESXi</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#authentication-and-permissions" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Authentication and permissions</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#api-and-automation" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">API and automation</span></a></li></ul></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#where-to-look" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">Where to look</span></a><ul class="astro-ojuxdcim" style="--depth: 1;"><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#web-interface" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Web interface</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#proxmox-ve-services" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Proxmox VE services</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#status-commands" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Status commands</span></a></li><li style="--depth: 1;" class="astro-ojuxdcim"><a href="#capture-tools" style="--depth: 1;" class="astro-ojuxdcim"><span style="--depth: 1;" class="astro-ojuxdcim">Capture tools</span></a></li></ul></li><li style="--depth: 0;" class="astro-ojuxdcim"><a href="#references" style="--depth: 0;" class="astro-ojuxdcim"><span style="--depth: 0;" class="astro-ojuxdcim">References</span></a></li></ul></nav></starlight-toc><script type="module" src="/assets/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js"></script></div></div></div></aside><div class="main-pane astro-lsqnlrcc"><main data-pagefind-body class="astro-trynvq57" lang="en" dir="ltr"><div class="content-panel astro-uwfimqze"><div class="sl-container astro-uwfimqze"><div class="pc-title astro-u72m6wot"><p class="pc-title__kicker astro-u72m6wot" aria-hidden="true"><span class="pc-title__number astro-u72m6wot">Appendix C</span><span class="pc-title__group astro-u72m6wot">Appendices</span></p><h1 id="_top" class="astro-u72m6wot"><span class="sr-only astro-u72m6wot">Appendix C – </span>Troubleshooting</h1></div></div></div><div class="content-panel astro-uwfimqze"><div class="sl-container astro-uwfimqze"><div class="sl-markdown-content"><p>This appendix collects the problems encountered while building the lab, one by one, with the symptom, the cause and the solution. When the lab could not prove a cause, the row gives it as a hypothesis, as the lab does; a few rows describe a risk that a lab prevented rather than a failure it observed, and say so. Each entry points to the lab in which the problem appeared, where you will find the complete commands and output.</p>
+<p>The second part shows <strong>where to look</strong> when something does not work: logs, status commands and Proxmox VE diagnostic tools.</p>
+<div class="sl-heading-wrapper level-h2"><h2 id="the-method">The method</h2><a class="sl-anchor-link" href="#the-method"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “The method”</span></a></div>
+<p>When you face a problem, it pays to always proceed the same way:</p>
+<ol>
+<li><strong>Describe the symptom precisely</strong>: what does not work, since when, on which nodes or guests, with which error message.</li>
+<li><strong>Narrow down the scope</strong>: a single guest or all of them? A single node or the whole cluster? Only from one network or from everywhere?</li>
+<li><strong>Read the logs before changing anything</strong>: the task log in the GUI, then the journal of the service involved (see <a href="#where-to-look">Where to look</a>).</li>
+<li><strong>Form a hypothesis and verify it with a single test</strong>, without changing several things at once.</li>
+<li><strong>Prepare the way back</strong> before every change: a backup of the configuration, a snapshot, an SSH session already open.</li>
+<li><strong>Write down the cause and the solution</strong>: next time the problem is solved in a few minutes.</li>
+</ol>
+<div class="sl-heading-wrapper level-h2"><h2 id="real-problems-by-area">Real problems, by area</h2><a class="sl-anchor-link" href="#real-problems-by-area"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Real problems, by area”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="installation-and-updates">Installation and updates</h3><a class="sl-anchor-link" href="#installation-and-updates"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Installation and updates”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">hostname -f</code> returns a domain different from the one entered in the installer</td>
+<td>In the installer you went back after the network screen, and the name confirmed earlier stayed in <code dir="auto">/etc/hosts</code></td>
+<td>Fix <code dir="auto">/etc/hosts</code> (and <code dir="auto">resolv.conf</code>, Postfix) <strong>before</strong> creating the cluster, then run <code dir="auto">pvecm updatecerts --force</code></td>
+<td><a href="/03-install-proxmox-ve/">03</a></td>
+</tr>
+<tr>
+<td><code dir="auto">error reading cached package status in '/var/lib/pve-manager/pkgupdates'</code></td>
+<td>Update cache not yet created on a freshly installed node</td>
+<td>Harmless: it disappears after the first <code dir="auto">pveupdate</code> or an update check from the GUI</td>
+<td><a href="/04-first-access-repositories-updates/">04</a></td>
+</tr>
+<tr>
+<td><code dir="auto">pveam update</code> fails, while <code dir="auto">apt</code> works</td>
+<td><code dir="auto">apt</code> uses the proxy from <code dir="auto">/etc/apt/apt.conf.d/</code>, <code dir="auto">pveam</code> the datacenter one</td>
+<td>Set <strong>Datacenter → Options → HTTP proxy</strong> (or <code dir="auto">pvesh set /cluster/options --http_proxy …</code>)</td>
+<td><a href="/04-first-access-repositories-updates/">04</a>, <a href="/a-upgrade-8-to-9/">A</a></td>
+</tr>
+<tr>
+<td>Windows Update cannot be used on the lab DC, which is therefore not updated</td>
+<td>The lab proxy lets through only a short list of sites, while Windows Update uses many Microsoft services</td>
+<td>In production: update the server before putting it into service, allowing the Windows Update addresses in the proxy or using WSUS</td>
+<td><a href="/02-domain-controller/">02</a></td>
+</tr>
+<tr>
+<td>On the first boot of a UEFI VM, the “Press any key to boot from CD or DVD” prompt expires unanswered and OVMF finds nothing to boot (<code dir="auto">No bootable option or device was found</code>)</td>
+<td>On the first boot OVMF initializes the new EFI disk and is slower than usual: the prompt comes and goes if nobody is watching the console</td>
+<td>Press a key to open the OVMF <strong>Boot Manager</strong>, choose the drive with the Windows ISO and press a key right away; from the second boot on, OVMF is much faster</td>
+<td><a href="/39-windows-vm-virtio/">39</a></td>
+</tr>
+<tr>
+<td><code dir="auto">pve8to9</code> reports <code dir="auto">FAIL: systemd-boot meta-package installed</code></td>
+<td>As the check says, the meta-package will cause problems on upgrades of other boot-related packages</td>
+<td>Check the bootloader (<code dir="auto">proxmox-boot-tool status</code>), then <code dir="auto">apt remove systemd-boot</code>: with GRUB, as in the test, the node keeps booting with GRUB; with ZFS on UEFI (systemd-boot), keep <code dir="auto">systemd-boot-efi</code> and <code dir="auto">systemd-boot-tools</code> if the script says so</td>
+<td><a href="/a-upgrade-8-to-9/">A</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="network">Network</h3><a class="sl-anchor-link" href="#network"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Network”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>iSCSI session on the second path dropping every 10 s, VM stalled for up to 85 s</td>
+<td>Consistent with <strong>ARP flux</strong>: two network cards of the same node on the same Ethernet segment (same switch and VLAN, here with different subnets), with Linux answering ARP from the wrong one; <code dir="auto">ip neigh</code> on the NAS shows which MAC address it uses</td>
+<td><code dir="auto">arp_ignore=1</code> and <code dir="auto">arp_announce=2</code> in <code dir="auto">/etc/sysctl.d/</code>; better still, separate networks on VLANs</td>
+<td><a href="/15-iscsi-lvm-multipath/">15</a></td>
+</tr>
+<tr>
+<td>NAT or SNAT rules duplicated after network reloads</td>
+<td><code dir="auto">ifreload -a</code> reruns every <code dir="auto">post-up</code> command, even with the file unchanged: seen with hand-written rules in lab 24. For the SDN SNAT rules of lab 34 the same mechanism is a hypothesis: count the copies before and after an <code dir="auto">ifreload -a</code></td>
+<td>Make hand-written rules idempotent: <code dir="auto">iptables -C … || iptables -A …</code>. The SDN duplicates were left in place: a node reboot clears them</td>
+<td><a href="/24-routing-nat/">24</a>, <a href="/34-network-performance-troubleshooting/">34</a></td>
+</tr>
+<tr>
+<td>Corosync configuration changed, but the link stays the old one</td>
+<td>Reloading the configuration is not enough to move a link</td>
+<td>Restart Corosync <strong>one node at a time</strong>, checking the quorum between one node and the next</td>
+<td><a href="/22-dedicated-networks/">22</a></td>
+</tr>
+<tr>
+<td>802.3ad bond without LACP on the switch: the Linux bond works on one link at a time (one aggregator per card, <code dir="auto">Number of ports: 1</code>); the OVS bond disables both members and the guests lose the network</td>
+<td>No LACP partner: the lab switch does not negotiate the aggregation</td>
+<td>Configure LACP on the switch; if you do not control it, use active-backup. With OVS, <code dir="auto">lacp-fallback-ab</code> keeps the bond up but hides the problem: check that <code dir="auto">lacp_status</code> reads <code dir="auto">negotiated</code></td>
+<td><a href="/21-bonding/">21</a>, <a href="/23-open-vswitch/">23</a></td>
+</tr>
+<tr>
+<td>In a VXLAN VNet, large pings from a guest at MTU 1500 are lost (in a CT: <code dir="auto">No buffer space available</code>), while TCP works</td>
+<td>VXLAN encapsulation adds 50 bytes, so the guest needs MTU 1450. TCP works only because the host answers with an ICMP <em>fragmentation needed</em>: with ICMP blocked, or with UDP, connections can hang</td>
+<td>MTU 1450 in the VNet and in the guest; in Debian 13 CTs also write it in the CT network file, because ifupdown2 resets it to 1500</td>
+<td><a href="/29-sdn-vxlan/">29</a>, <a href="/34-network-performance-troubleshooting/">34</a></td>
+</tr>
+<tr>
+<td>Risk, not observed in the lab: with QinQ a 1500-byte IP packet becomes a 1522-byte frame (without FCS), which a switch that drops frames over 1518 bytes would discard without any error</td>
+<td>Each tag adds 4 bytes, 8 with the double tag</td>
+<td>Before using QinQ, check the MTU of the whole path with <code dir="auto">ping -M do</code>, or set the zone MTU to 1496</td>
+<td><a href="/28-sdn-vlan-qinq/">28</a></td>
+</tr>
+<tr>
+<td>Two guests in the same Simple VNet cannot see each other</td>
+<td>The <strong>Simple</strong> zone is local to each node</td>
+<td>Guests on the same node, or VLAN/VXLAN/EVPN zones</td>
+<td><a href="/27-sdn-simple/">27</a></td>
+</tr>
+<tr>
+<td>After the primary EVPN exit node fails, a ping that was already running gets no replies until the link is restored (2 tests out of 4), while a new ping works</td>
+<td>Observed on the backup exit node: the flow’s conntrack entry had no address translation (<code dir="auto">[UNREPLIED]</code>, reply half addressed to the guest). Why is a hypothesis: the first packets may have reached that node while its own default route still pointed to the primary, missing the SNAT rule (<code dir="auto">-o vmbr0</code>)</td>
+<td>Check with <code dir="auto">conntrack -E</code> and <code dir="auto">ip -ts monitor route</code> on the backup node; deleting the entry (<code dir="auto">conntrack -D</code>) shows whether it is the cause. If open flows must survive, plan an exit without SNAT, with the subnets advertised via BGP to the upstream routers (not tested here)</td>
+<td><a href="/30-sdn-evpn/">30</a></td>
+</tr>
+<tr>
+<td>Fabric reconvergence takes 26 s when a link goes down on one side only</td>
+<td>With the default timers, the neighbor only notices when the hellos expire</td>
+<td>Hello at 1 s: reconvergence in about 6 s</td>
+<td><a href="/31-sdn-fabrics/">31</a></td>
+</tr>
+<tr>
+<td>IPv6 guests do not receive router advertisements (RA): not observed in the lab, where the RAs arrived</td>
+<td>Possible cause, to check first: the switch drops RAs from unauthorized ports (<em>RA Guard</em>)</td>
+<td>Authorize the router port on the switch</td>
+<td><a href="/25-ipv6/">25</a></td>
+</tr>
+<tr>
+<td>The Windows DC registers automatic IPv6 addresses in DNS</td>
+<td>Windows accepts RAs and configures itself via SLAAC</td>
+<td>Static IPv6 on the DC network cards and RAs disabled</td>
+<td><a href="/25-ipv6/">25</a></td>
+</tr>
+<tr>
+<td><code dir="auto">accept_ra=0</code> is set, but the network cards present at boot still accept RAs</td>
+<td>The <code dir="auto">all</code> and <code dir="auto">default</code> keys do not apply to interfaces that already exist at boot</td>
+<td>Use the wildcard: <code dir="auto">net.ipv6.conf.*.accept_ra = 0</code> in <code dir="auto">/etc/sysctl.d/</code></td>
+<td><a href="/25-ipv6/">25</a></td>
+</tr>
+<tr>
+<td>Routing through the CHR router: 1.07 Mbit/s (iperf3, one TCP flow, receiver side), against 5,367 Mbit/s within the VLAN</td>
+<td>Consistent with the 1 Mbit/s per interface of the free license (level <code dir="auto">free</code>), but not separated from the router’s other limits (1 vCPU, 512 MiB of RAM)</td>
+<td>Check with a trial license (P1 or higher) and <code dir="auto">/system resource print</code>; in production, an appropriate license</td>
+<td><a href="/26-virtual-router/">26</a></td>
+</tr>
+<tr>
+<td>An <code dir="auto">.img</code> image does not show up in the import storage</td>
+<td>The import storage only lists the extensions it recognizes</td>
+<td>Rename the file to <code dir="auto">.raw</code></td>
+<td><a href="/26-virtual-router/">26</a></td>
+</tr>
+<tr>
+<td>Jumbo frames: 9000-byte packets between the nodes all lost, with no error, while 8938-byte packets get through</td>
+<td>Something on the path drops the larger frames: consistent with the switch’s maximum frame size, not located by the test</td>
+<td>MTU 1500, as in the lab, or a common MTU that the whole path carries (here at most 8938), checked with <code dir="auto">ping -M do</code></td>
+<td><a href="/21-bonding/">21</a></td>
+</tr>
+<tr>
+<td>Multiqueue with 4 queues: aggregate bandwidth with 4 streams about 20% lower (from 11.8-12.7 to 9.7-9.8 Gbit/s), no difference established with one stream</td>
+<td>Consistent with CPU contention (two VMs with 8 vCPUs on a 4-core node), not proven: CPU usage was not measured</td>
+<td>Keep it off unless a before-and-after test shows a gain</td>
+<td><a href="/34-network-performance-troubleshooting/">34</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="firewall">Firewall</h3><a class="sl-anchor-link" href="#firewall"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Firewall”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Risk, prevented in the lab: turning on the Datacenter firewall also turns on the nodes’ firewall, and the services on other networks (Ceph, the second Corosync link, BGP and VXLAN, migration, SDN DHCP and DNS) would be blocked</td>
+<td>Input policy <code dir="auto">DROP</code>; the automatic rules cover only the management network and Corosync</td>
+<td>First create a security group with all the cluster services, then enable one node at a time with an automatic rollback ready</td>
+<td><a href="/32-firewall-1/">32</a>, <a href="/33-firewall-2/">33</a></td>
+</tr>
+<tr>
+<td>With the VNet firewall enabled (<code dir="auto">DROP</code> policy), the guests no longer get an IP address from DHCP or resolve names</td>
+<td>The VNet’s policy also applies to traffic between the guests and the node, in both directions: the log shows the DNS query and the DHCP reply dropped</td>
+<td>Allow DNS to <code dir="auto">+sdn/&lt;vnet&gt;-gateway</code> and DHCP in both directions (<code dir="auto">dport 67</code>; <code dir="auto">sport 67</code> → <code dir="auto">dport 68</code>)</td>
+<td><a href="/33-firewall-2/">33</a></td>
+</tr>
+<tr>
+<td>The VNet firewall does not block outbound traffic</td>
+<td>It filters the traffic between guests and to the node, not the traffic routed out of the VNet</td>
+<td>Filter it with the guests’ outbound rules or with the host’s rules</td>
+<td><a href="/33-firewall-2/">33</a></td>
+</tr>
+<tr>
+<td>With nftables, SNAT traffic from a Simple zone to a CT with its firewall enabled on the <strong>same</strong> node is dropped, with no trace in the firewall log; repeated later with the same configuration, it worked</td>
+<td>Conntrack drops the packet (<code dir="auto">insert_failed</code>, <code dir="auto">drop</code>). Likely cause, not proven: without the <code dir="auto">fwbr</code> bridges, the SDN rule that tracks this traffic in a separate zone never applies</td>
+<td>Intermittent, delicate case: look at <code dir="auto">conntrack -S</code> first; from another node, or without SNAT, the service was reachable</td>
+<td><a href="/33-firewall-2/">33</a></td>
+</tr>
+<tr>
+<td>Gotify notifications to an internal address rejected with <code dir="auto">CONNECT proxy failed: 403</code></td>
+<td>The Gotify target uses the Datacenter proxy even for internal IPs (documented; in the source code the Webhook target uses the same setting, not tested)</td>
+<td>Allow the internal destinations on the proxy; the proxy log shows the refused request</td>
+<td><a href="/51-notifications-metrics-logs/">51</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="storage">Storage</h3><a class="sl-anchor-link" href="#storage"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Storage”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Writes blocked for 60 s, then I/O errors and data lost in a container</td>
+<td><strong>Full LVM thin pool</strong>: overprovisioning exceeded the real space</td>
+<td>Monitor <code dir="auto">Data%</code> and <code dir="auto">Meta%</code>; recover with <code dir="auto">lvextend</code> + <code dir="auto">pct fstrim</code>; enable automatic extension with an LVM profile</td>
+<td><a href="/09-lvm-and-lvm-thin/">09</a></td>
+</tr>
+<tr>
+<td>Risk, prevented in the lab: a Directory storage whose mount point (here a ZFS dataset) is not mounted would write into the empty folder underneath, on the system file system</td>
+<td>Without <code dir="auto">is_mountpoint</code>, PVE uses the folder as it is</td>
+<td>Set <code dir="auto">is_mountpoint</code>: with the path not mounted the storage turns <code dir="auto">inactive</code> (<code dir="auto">directory is expected to be a mount point but is not mounted</code>)</td>
+<td><a href="/08-storage-model/">08</a></td>
+</tr>
+<tr>
+<td>NFS service stopped on the NAS: processes in <code dir="auto">D</code> state on the node, VM disk I/O frozen, <code dir="auto">nfs: server … not responding</code></td>
+<td>The NFS mount is <code dir="auto">hard</code>: requests are retried until the server answers</td>
+<td>Expected: after the restart the VM was still running and no <code dir="auto">D</code> processes remained; check the guest for I/O errors (<code dir="auto">journalctl -k</code>). Plan the availability of the NAS and of the network to it</td>
+<td><a href="/13-nfs/">13</a></td>
+</tr>
+<tr>
+<td>SMB service stopped on the NAS: writes fail with <code dir="auto">Host is down</code> after about 10 s, storage <code dir="auto">inactive</code></td>
+<td>Proxmox VE always mounts CIFS storages <code dir="auto">soft</code>: operations fail instead of waiting, unlike NFS mounted <code dir="auto">hard</code> (lab 13). Which CIFS client timeouts produce the 10 s was not investigated</td>
+<td>Expected: repeat the failed operation; the client reconnects on its own when the service returns. Keep SMB for ISOs, templates and backups, not for VM disks, where the error would be an I/O error in the guest</td>
+<td><a href="/14-smb-cifs/">14</a></td>
+</tr>
+<tr>
+<td><code dir="auto">dd</code> of zeros in a VM: 2.7 GB/s on NFS, faster than the 762 MB/s on local storage</td>
+<td>Consistent with the zeros never reaching the NAS as data (QEMU’s <code dir="auto">detect_zeroes</code>, ZFS compression); the test does not tell which mechanism</td>
+<td>Do not measure with zeros: use random data or <code dir="auto">fio</code>. To check, compare the bytes sent by <code dir="auto">vmbr0</code> before and after the <code dir="auto">dd</code></td>
+<td><a href="/13-nfs/">13</a></td>
+</tr>
+<tr>
+<td>NFS/SMB free space dropped from about 95 to 56 GiB after creating a 40 GiB iSCSI zvol</td>
+<td>The zvol is thick: it reserves its whole size at once (<code dir="auto">zfs get volsize,refreservation</code> shows it)</td>
+<td>Take the reservation out of the pool’s free space when you size the other shares</td>
+<td><a href="/15-iscsi-lvm-multipath/">15</a></td>
+</tr>
+<tr>
+<td>I/O pause of about 15 s when an iSCSI path fails</td>
+<td>In the test: about 10 s to detect the failure (unanswered NOP-Out, error 1022) plus a 5 s session recovery timeout, consistent with multipathd’s <code dir="auto">fast_io_fail_tmo</code> rather than the 15 s of <code dir="auto">replacement_timeout</code></td>
+<td>Expected with these timers; read the values in effect (<code dir="auto">/sys/class/iscsi_session/*/recovery_tmo</code>) before tuning them</td>
+<td><a href="/15-iscsi-lvm-multipath/">15</a></td>
+</tr>
+<tr>
+<td>Rollback refused (<code dir="auto">not most recent</code>)</td>
+<td>ZFS and the volume chain only allow a rollback to the latest snapshot</td>
+<td>Delete the more recent snapshots, or use qcow2/LVM-thin for snapshot trees</td>
+<td><a href="/16-snapshots/">16</a></td>
+</tr>
+<tr>
+<td><code dir="auto">snapshot feature is not available</code> on thick LVM, even after enabling the volume chain</td>
+<td>Thick LVM has no usable snapshots; the volume chain (technology preview in PVE 9) applies only to disks created from then on, in qcow2 format</td>
+<td>Enable <strong>Allow Snapshots as Volume-Chain</strong>, then create the disk or move it with <code dir="auto">qm disk move … --format qcow2</code>; each snapshot takes an LV as large as the disk</td>
+<td><a href="/16-snapshots/">16</a></td>
+</tr>
+<tr>
+<td>After a VM restart the <code dir="auto">sdX</code> names of the SCSI and SATA disks swapped: a test on <code dir="auto">/dev/sdX</code> can hit the wrong disk without any error</td>
+<td>The disks can be detected in a different order from one boot to the next</td>
+<td>In tests and in <code dir="auto">/etc/fstab</code> use <code dir="auto">/dev/disk/by-id/…</code> (<code dir="auto">drive-scsiN</code> for SCSI disks)</td>
+<td><a href="/37-virtual-disks-controllers/">37</a></td>
+</tr>
+<tr>
+<td>The VM does not start with <code dir="auto">aio=native</code> and <code dir="auto">writeback</code> cache</td>
+<td>Combination not supported by QEMU</td>
+<td>Use <code dir="auto">io_uring</code> or the default cache</td>
+<td><a href="/37-virtual-disks-controllers/">37</a></td>
+</tr>
+<tr>
+<td>The same benchmark varies from one run to the next (up to ±50% between two runs in lab 19; 8,247-14,864 IOPS on the same disk in lab 37)</td>
+<td>Possible causes, not separated by the tests: activity elsewhere in the lab (Ceph, NAS, network), ZFS’s periodic flushes, write caches in the disk or controller</td>
+<td>Count a difference between configurations only if it is larger than the spread between runs of the same configuration; more and longer runs</td>
+<td><a href="/19-fio-benchmark/">19</a>, <a href="/37-virtual-disks-controllers/">37</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="ceph">Ceph</h3><a class="sl-anchor-link" href="#ceph"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Ceph”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">HEALTH_WARN BLUESTORE_SLOW_OP_ALERT</code> that persists for hours</td>
+<td>With slow disks under load, operations are slow; by default the warning stays visible for 24 hours after the last occurrence</td>
+<td>Investigate the disks; to clear it sooner, <code dir="auto">ceph config set osd bluestore_slow_ops_warn_lifetime 600</code> (10 minutes)</td>
+<td><a href="/18-ceph-growth-maintenance-failures/">18</a></td>
+</tr>
+<tr>
+<td><code dir="auto">OSD bench result … not within the threshold</code> warnings when the OSDs start</td>
+<td>At startup the OSD benchmarks the disk and gets IOPS outside the expected threshold</td>
+<td>Ceph uses the default value; measure the disks with <code dir="auto">fio</code> and set <code dir="auto">osd_mclock_max_capacity_iops_*</code></td>
+<td><a href="/18-ceph-growth-maintenance-failures/">18</a></td>
+</tr>
+<tr>
+<td>Risk, prevented in the lab with <code dir="auto">noout</code>: needless rebuilding of copies when a planned reboot lasts more than 600 s</td>
+<td>After <code dir="auto">mon_osd_down_out_interval</code> (600 s) the monitors mark the <em>down</em> OSDs <code dir="auto">out</code>, and Ceph rebuilds their copies elsewhere</td>
+<td><code dir="auto">ceph osd set noout</code> before the maintenance, <code dir="auto">unset</code> after it</td>
+<td><a href="/18-ceph-growth-maintenance-failures/">18</a></td>
+</tr>
+<tr>
+<td>VM I/O stalled for about 27 s when a node fails abruptly</td>
+<td>In the test, the stalled write resumed when the monitors marked the node’s OSDs <em>down</em>, which happens after the heartbeat grace period (20 s) and the failure reports</td>
+<td>Expected; compare it with the timeouts of the guests. Recovery starts after 600 s if the node does not come back</td>
+<td><a href="/18-ceph-growth-maintenance-failures/">18</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="cluster-and-high-availability">Cluster and high availability</h3><a class="sl-anchor-link" href="#cluster-and-high-availability"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Cluster and high availability”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">/etc/pve</code> read-only on a node (<code dir="auto">Permission denied</code>)</td>
+<td>The node has lost quorum (in the test, Corosync stopped on that node)</td>
+<td>Restore Corosync communication: once the node rejoins, <code dir="auto">/etc/pve</code> is writable again</td>
+<td><a href="/06-cluster-corosync/">06</a></td>
+</tr>
+<tr>
+<td>After a failure the replicated VM must be recovered manually</td>
+<td>ZFS replication is not HA</td>
+<td>Only if the failed node is certainly off: move the VM configuration to the node holding the replica; the data written after the snapshot of the last successful run is lost. If you need the writes left on the failed node, disable the job before powering it back on</td>
+<td><a href="/11-zfs-replication/">11</a></td>
+</tr>
+<tr>
+<td>Creating an HA group is rejected</td>
+<td>In PVE 9, groups have been replaced by HA rules</td>
+<td>Use <strong>node affinity rules</strong></td>
+<td><a href="/49-high-availability/">49</a></td>
+</tr>
+<tr>
+<td>A resource affinity rule is rejected</td>
+<td>The resource is already in a node affinity rule with multiple priorities</td>
+<td>Simplify the node affinity or do without the resource affinity</td>
+<td><a href="/49-high-availability/">49</a></td>
+</tr>
+<tr>
+<td>Maintenance mode cannot evacuate a node</td>
+<td>A <em>Keep Separate</em> rule on 3 VMs with 3 nodes leaves no room</td>
+<td>Reduce the rule or add nodes</td>
+<td><a href="/49-high-availability/">49</a></td>
+</tr>
+<tr>
+<td>After a node failure, containers not under HA stay off</td>
+<td>Only HA resources are restarted elsewhere</td>
+<td>Put under HA whatever must restart on its own</td>
+<td><a href="/49-high-availability/">49</a></td>
+</tr>
+<tr>
+<td>After the abrupt power-off of a node, the HA VM answered again only after 190 s (about three minutes of interruption for a client)</td>
+<td>Recovery waits until the lost node is <em>fenced</em>: confirmed after 128 s in the CRM log, consistent with the ~2 minutes in the documentation. The other 62 s are compatible with the VM’s start and boot, not broken down</td>
+<td>Expected: it is the guarantee against running the same guest twice. A service that cannot tolerate minutes of interruption also needs redundancy in the application</td>
+<td><a href="/49-high-availability/">49</a></td>
+</tr>
+<tr>
+<td>Bulk migration moves more guests than expected</td>
+<td>The <em>Bulk Migrate</em> window preselects <strong>all</strong> guests</td>
+<td>Check the selection before confirming</td>
+<td><a href="/48-migrations/">48</a></td>
+</tr>
+<tr>
+<td><code dir="auto">qm remote-migrate</code> (or a PDM migration) to an external node fails with <code dir="auto">no matching import/export format</code></td>
+<td>In the test: the cloud-init disk, which is not copied live, was offered only in the <code dir="auto">zfs</code> format, and the LVM-thin target cannot import it</td>
+<td>Check <code dir="auto">export_formats</code> in the log and pick a target storage with a format in common</td>
+<td><a href="/48-migrations/">48</a>, <a href="/53-datacenter-manager/">53</a></td>
+</tr>
+<tr>
+<td><code dir="auto">qm remote-migrate</code> fails with <code dir="auto">storage 'cephfs' does not exist</code></td>
+<td>The configuration references a <code dir="auto">cicustom</code> snippet on a storage that does not exist on the target</td>
+<td>If the snippet was needed only at the first boot, remove the reference (<code dir="auto">qm set &lt;vmid&gt; --delete cicustom</code>); otherwise make storage and snippet available on the target</td>
+<td><a href="/48-migrations/">48</a></td>
+</tr>
+<tr>
+<td>After a migration from PDM, the source keeps the <code dir="auto">migrate</code> lock</td>
+<td>Migration without <em>Delete Source</em></td>
+<td>Remove the source or the lock after verification</td>
+<td><a href="/53-datacenter-manager/">53</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="vms-and-containers">VMs and containers</h3><a class="sl-anchor-link" href="#vms-and-containers"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “VMs and containers”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hot-plugged CPUs stay offline in the guest</td>
+<td>The guest does not bring them online by itself</td>
+<td>A udev rule that brings them online</td>
+<td><a href="/42-hotplug-resize-limits/">42</a></td>
+</tr>
+<tr>
+<td>The hot-plugged network card is <code dir="auto">DOWN</code></td>
+<td>No configuration in the guest for the new network card</td>
+<td>Configure the interface in the guest</td>
+<td><a href="/42-hotplug-resize-limits/">42</a></td>
+</tr>
+<tr>
+<td>Manual ballooning “does not stick”</td>
+<td><code dir="auto">pvestatd</code> sets the balloon back to the maximum when the node is not under load</td>
+<td>Set the minimum and let the automatic mechanism do its work</td>
+<td><a href="/36-memory/">36</a></td>
+</tr>
+<tr>
+<td>A new VM with the ID of a deleted VM silently inherits its backup job</td>
+<td>The old VM was removed without <em>purge</em>, and the job still lists its VMID</td>
+<td>Delete with <em>purge</em> (<strong>Purge from job configurations</strong>, <code dir="auto">qm destroy &lt;vmid&gt; --purge 1</code>)</td>
+<td><a href="/38-linux-vm-guest-agent/">38</a></td>
+</tr>
+<tr>
+<td>Windows setup does not find the VirtIO drivers from the root of the CD</td>
+<td>The search does not descend into subfolders</td>
+<td>Point it to the exact folder (e.g. <code dir="auto">vioscsi\2k25\amd64</code>)</td>
+<td><a href="/39-windows-vm-virtio/">39</a></td>
+</tr>
+<tr>
+<td>cloud-init ends with <code dir="auto">degraded done</code></td>
+<td>Deprecation warning in the generated user-data</td>
+<td>Harmless</td>
+<td><a href="/40-templates-cloud-init-clones/">40</a></td>
+</tr>
+<tr>
+<td>Full clone to another node refused: <code dir="auto">can't clone to non-shared storage 'local-zfs'</code></td>
+<td>Cloning to another node requires a shared target storage</td>
+<td>Use a shared target storage, or clone on the same node</td>
+<td><a href="/40-templates-cloud-init-clones/">40</a></td>
+</tr>
+<tr>
+<td>Inside an unprivileged CT, the files of a bind mount belong to <code dir="auto">nobody</code> and the CT’s <code dir="auto">root</code> cannot write</td>
+<td>UID mapping between host and container: the node’s <code dir="auto">root</code> (UID 0) is not mapped</td>
+<td>Give the folder to the CT’s <code dir="auto">root</code> on the node (<code dir="auto">chown -R 100000:100000</code>), or map the required UIDs (<code dir="auto">lxc.idmap</code>, <code dir="auto">/etc/subuid</code>)</td>
+<td><a href="/41-lxc-containers/">41</a></td>
+</tr>
+<tr>
+<td>Mounting NFS from an unprivileged CT: <code dir="auto">Operation not permitted</code></td>
+<td>Mounting network file systems requires privileges</td>
+<td>Mount on the host and use a bind mount, or use a privileged CT</td>
+<td><a href="/41-lxc-containers/">41</a></td>
+</tr>
+<tr>
+<td>Downloads of TurnKey templates or OCI images ignore the proxy</td>
+<td><code dir="auto">pveam</code> passes only HTTP requests to the datacenter proxy (TurnKey uses HTTPS); <code dir="auto">skopeo</code> does not use it</td>
+<td>“Download from URL”, or <code dir="auto">skopeo</code> with <code dir="auto">HTTPS_PROXY</code></td>
+<td><a href="/41-lxc-containers/">41</a></td>
+</tr>
+<tr>
+<td>Live migration of a container refused: <code dir="auto">lxc live migration is currently not implemented</code></td>
+<td>Not implemented for CTs</td>
+<td>Restart migration (<code dir="auto">--restart</code>): in the lab, with the disk on shared storage, a 10 s task and about 3.4 s without ping replies</td>
+<td><a href="/41-lxc-containers/">41</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="backup">Backup</h3><a class="sl-anchor-link" href="#backup"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Backup”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A restored VM starts without network: a file written shortly before the backup is empty</td>
+<td>Backup without the guest agent: no <em>fsfreeze</em>, the file system was not consistent</td>
+<td>Install and enable the QEMU Guest Agent</td>
+<td><a href="/47-proxmox-backup-server/">47</a></td>
+</tr>
+<tr>
+<td>The job deleted more backups than expected: the three taken earlier the same day</td>
+<td><code dir="auto">keep-daily</code> keeps only one backup per day, the most recent</td>
+<td>Simulate the retention first with <code dir="auto">--dry-run</code> (<code dir="auto">keep-last</code> counts backups regardless of the day); protect the backups that must survive</td>
+<td><a href="/46-vzdump-backup/">46</a></td>
+</tr>
+<tr>
+<td>Live-restore not available</td>
+<td>It requires Proxmox Backup Server</td>
+<td>Use a PBS storage</td>
+<td><a href="/46-vzdump-backup/">46</a></td>
+</tr>
+<tr>
+<td>Encrypted restore: <code dir="auto">missing key</code></td>
+<td>The encryption key is not available</td>
+<td>Without the key the backup cannot be recovered: keep the key outside the cluster</td>
+<td><a href="/47-proxmox-backup-server/">47</a></td>
+</tr>
+<tr>
+<td>PBS GC does not free space immediately</td>
+<td>Chunks are removed only after 24 hours</td>
+<td>Expected</td>
+<td><a href="/47-proxmox-backup-server/">47</a></td>
+</tr>
+<tr>
+<td>Backup and fencing notifications do not arrive</td>
+<td>In the lab: messages deferred in the Postfix queue, the connection to port 25 of the domain’s own address timed out; consistent with a domain without an MX record</td>
+<td>Check <code dir="auto">postqueue -p</code> and the reason for the deferral; set a <code dir="auto">relayhost</code> or an SMTP target</td>
+<td><a href="/51-notifications-metrics-logs/">51</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="importing-from-vmware-esxi">Importing from VMware ESXi</h3><a class="sl-anchor-link" href="#importing-from-vmware-esxi"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Importing from VMware ESXi”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Imported Windows VM loses its static IP, twice</td>
+<td>Each time Windows sees a new adapter: after the import (same e1000e model and MAC, new PCI location: <code dir="auto">Connection #2</code>), then with VirtIO</td>
+<td>Write down the IP address and set it again after each change, from the console or with <code dir="auto">qm guest exec</code> once the agent responds</td>
+<td><a href="/50-import-from-esxi/">50</a></td>
+</tr>
+<tr>
+<td>VMware Tools cannot be uninstalled after the import (error 1603)</td>
+<td>The uninstaller requires the VMware environment</td>
+<td>Uninstall them <strong>on the source</strong>, before the import; after the import, stop and disable their services (<code dir="auto">VMTools</code>, <code dir="auto">VGAuthService</code>) and plan a cleanup</td>
+<td><a href="/50-import-from-esxi/">50</a></td>
+</tr>
+<tr>
+<td>Risk, avoided in the lab: the imported Linux VM would start without network</td>
+<td>The network card changes name (here <code dir="auto">ens18</code>, from the virtual PCI slot): a configuration with the exact name, or matching a MAC address that changes (Unique MAC addresses), no longer applies</td>
+<td>Before the import, match the cards by name with a wildcard (<code dir="auto">e*</code>, as in the lab), or keep the source MAC; otherwise fix <code dir="auto">/etc/netplan/</code> from the console and run <code dir="auto">netplan apply</code></td>
+<td><a href="/50-import-from-esxi/">50</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="authentication-and-permissions">Authentication and permissions</h3><a class="sl-anchor-link" href="#authentication-and-permissions"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Authentication and permissions”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LDAPS realm: <code dir="auto">certificate verify failed</code></td>
+<td>The domain CA is not installed on the node</td>
+<td>Install the CA on all nodes</td>
+<td><a href="/43-active-directory-realm-ldaps/">43</a></td>
+</tr>
+<tr>
+<td>The bind service account shows up among the synced users</td>
+<td>The user filter is too broad</td>
+<td>Filter by group (<code dir="auto">memberOf</code>)</td>
+<td><a href="/43-active-directory-realm-ldaps/">43</a></td>
+</tr>
+<tr>
+<td>Orphaned permissions that cannot be removed</td>
+<td>An API token was deleted while ACLs were still assigned to it</td>
+<td>Remove the ACLs first, then the token; if it has already happened, recreate the token and clean up</td>
+<td><a href="/44-users-groups-roles-pools-tokens/">44</a></td>
+</tr>
+<tr>
+<td>Cannot connect a VM network card to a VLAN of the bridge: <code dir="auto">Permission check failed (/sdn/zones/localnetwork/vmbr1/10, SDN.Use)</code></td>
+<td>The <code dir="auto">SDN.Use</code> permission on the bridge and its VLAN is missing</td>
+<td>Assign <code dir="auto">PVESDNUser</code> on the bridge (<code dir="auto">/sdn/zones/localnetwork/&lt;bridge&gt;</code>) with propagation, so that it covers all its VLANs</td>
+<td><a href="/44-users-groups-roles-pools-tokens/">44</a></td>
+</tr>
+<tr>
+<td>WebAuthn works on one node and returns 401 on the others</td>
+<td>The WebAuthn origin is tied to the name of a single node</td>
+<td>A domain origin and <code dir="auto">allow-subdomains=1</code></td>
+<td><a href="/45-two-factor-authentication/">45</a></td>
+</tr>
+<tr>
+<td>After 8 wrong TOTP codes, even the right one is rejected (<code dir="auto">totp-locked: 1</code>)</td>
+<td>The user’s TOTP is locked, a protection against brute-force attempts</td>
+<td>Unlock by an administrator (<strong>Unlock TFA</strong> in the GUI or <code dir="auto">pveum user tfa unlock &lt;user&gt;</code>), or log in with a recovery key, which also unlocks TOTP</td>
+<td><a href="/45-two-factor-authentication/">45</a></td>
+</tr>
+<tr>
+<td>Realm-enforced TFA: a 32-character base32 key accepted by <code dir="auto">pveum</code> is discarded at login (<code dir="auto">bad otp response</code> in the log)</td>
+<td>In the test only a 16-character base32 key, or a 40-character hexadecimal one, worked</td>
+<td>Use one of those formats; after clearing the field, remove the leftover <code dir="auto">&lt;old userconfig key 0&gt;</code> entry from the factors</td>
+<td><a href="/45-two-factor-authentication/">45</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="api-and-automation">API and automation</h3><a class="sl-anchor-link" href="#api-and-automation"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “API and automation”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Cause</th>
+<th>Solution</th>
+<th>Lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">401</code> on a POST request with the ticket</td>
+<td>The <code dir="auto">CSRFPreventionToken</code> header is missing</td>
+<td>Send the CSRF token obtained with the ticket, or use an API token</td>
+<td><a href="/52-api-automation/">52</a></td>
+</tr>
+<tr>
+<td><code dir="auto">403</code> from an API token</td>
+<td>With <em>privilege separation</em> the token only has its own permissions, intersected with the user’s</td>
+<td>Assign the permissions both to the token and to the user, as indicated by <em>Required permissions</em></td>
+<td><a href="/44-users-groups-roles-pools-tokens/">44</a>, <a href="/52-api-automation/">52</a></td>
+</tr>
+<tr>
+<td>Ansible reports <code dir="auto">changed</code> even on the second run</td>
+<td>The VM update task always reports itself as changed</td>
+<td>Expected with that module: evaluate idempotency task by task</td>
+<td><a href="/52-api-automation/">52</a></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h2"><h2 id="where-to-look">Where to look</h2><a class="sl-anchor-link" href="#where-to-look"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Where to look”</span></a></div>
+<div class="sl-heading-wrapper level-h3"><h3 id="web-interface">Web interface</h3><a class="sl-anchor-link" href="#web-interface"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Web interface”</span></a></div>
+<ul>
+<li><strong>Tasks</strong> (at the bottom): every operation has its complete log. Double-click the row to open it.</li>
+<li><strong>Node → System → System Log</strong>: the node journal.</li>
+<li><strong>Datacenter → Ceph</strong>, <strong>Datacenter → HA</strong>, <strong>Node → Firewall → Log</strong>: the status of the individual subsystems.</li>
+<li><strong>Summary</strong> of nodes and VMs: load, memory and <strong>pressure</strong> graphs (PSI), useful to understand whether a guest is waiting for CPU, memory or I/O.</li>
+</ul>
+<div class="sl-heading-wrapper level-h3"><h3 id="proxmox-ve-services">Proxmox VE services</h3><a class="sl-anchor-link" href="#proxmox-ve-services"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Proxmox VE services”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>What it does</th>
+<th>Log</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code dir="auto">pveproxy</code></td>
+<td>Web interface and API (port 8006)</td>
+<td><code dir="auto">journalctl -u pveproxy</code></td>
+</tr>
+<tr>
+<td><code dir="auto">pvedaemon</code></td>
+<td>Runs the operations requested through the API</td>
+<td><code dir="auto">journalctl -u pvedaemon</code></td>
+</tr>
+<tr>
+<td><code dir="auto">pvestatd</code></td>
+<td>Collects the status of nodes, guests and storage</td>
+<td><code dir="auto">journalctl -u pvestatd</code></td>
+</tr>
+<tr>
+<td><code dir="auto">pve-cluster</code></td>
+<td>Cluster file system <code dir="auto">/etc/pve</code> (pmxcfs)</td>
+<td><code dir="auto">journalctl -u pve-cluster</code></td>
+</tr>
+<tr>
+<td><code dir="auto">corosync</code></td>
+<td>Cluster communication and quorum</td>
+<td><code dir="auto">journalctl -u corosync</code></td>
+</tr>
+<tr>
+<td><code dir="auto">pve-ha-crm</code>, <code dir="auto">pve-ha-lrm</code></td>
+<td>High availability management</td>
+<td><code dir="auto">journalctl -u pve-ha-crm -u pve-ha-lrm</code></td>
+</tr>
+<tr>
+<td><code dir="auto">pve-firewall</code>, <code dir="auto">proxmox-firewall</code></td>
+<td>Firewall (iptables / nftables)</td>
+<td><code dir="auto">journalctl -u pve-firewall -u proxmox-firewall</code></td>
+</tr>
+<tr>
+<td><code dir="auto">pvescheduler</code></td>
+<td>Scheduled jobs (backup, replication)</td>
+<td><code dir="auto">journalctl -u pvescheduler</code></td>
+</tr>
+<tr>
+<td><code dir="auto">ceph-mon@…</code>, <code dir="auto">ceph-osd@…</code></td>
+<td>Ceph services</td>
+<td><code dir="auto">journalctl -u ceph-osd@&lt;id&gt;</code></td>
+</tr>
+<tr>
+<td><code dir="auto">frr</code></td>
+<td>Routing for SDN EVPN and Fabrics</td>
+<td><code dir="auto">journalctl -u frr</code></td>
+</tr>
+</tbody>
+</table>
+<p>To see only the errors since the last boot: <code dir="auto">journalctl -b -p err</code>.</p>
+<div class="sl-heading-wrapper level-h3"><h3 id="status-commands">Status commands</h3><a class="sl-anchor-link" href="#status-commands"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Status commands”</span></a></div>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Command</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Installed versions</td>
+<td><code dir="auto">pveversion -v</code></td>
+</tr>
+<tr>
+<td>Complete node report (to attach to a support request)</td>
+<td><code dir="auto">pvereport</code></td>
+</tr>
+<tr>
+<td>Recent node tasks</td>
+<td><code dir="auto">pvenode task list</code> (details: <code dir="auto">pvenode task log &lt;UPID&gt;</code>)</td>
+</tr>
+<tr>
+<td>Cluster and quorum</td>
+<td><code dir="auto">pvecm status</code>, <code dir="auto">corosync-cfgtool -s</code></td>
+</tr>
+<tr>
+<td>High availability</td>
+<td><code dir="auto">ha-manager status</code></td>
+</tr>
+<tr>
+<td>Ceph</td>
+<td><code dir="auto">ceph -s</code>, <code dir="auto">ceph health detail</code>, <code dir="auto">ceph osd tree</code>, <code dir="auto">ceph -w</code></td>
+</tr>
+<tr>
+<td>Storage</td>
+<td><code dir="auto">pvesm status</code>, <code dir="auto">lvs</code>, <code dir="auto">zpool status</code>, <code dir="auto">multipath -ll</code></td>
+</tr>
+<tr>
+<td>Network</td>
+<td><code dir="auto">ip -br a</code>, <code dir="auto">ip -d link</code>, <code dir="auto">bridge vlan show</code>, <code dir="auto">bridge fdb</code>, <code dir="auto">ss -tulpn</code></td>
+</tr>
+<tr>
+<td>SDN and routing</td>
+<td><code dir="auto">pvesh get /cluster/sdn</code>, <code dir="auto">vtysh -c 'show bgp summary'</code></td>
+</tr>
+<tr>
+<td>Firewall</td>
+<td><code dir="auto">pve-firewall status</code>, <code dir="auto">nft list ruleset</code>, <code dir="auto">conntrack -L</code></td>
+</tr>
+<tr>
+<td>VM</td>
+<td><code dir="auto">qm config &lt;id&gt;</code>, <code dir="auto">qm showcmd &lt;id&gt; --pretty</code>, <code dir="auto">qm monitor &lt;id&gt;</code></td>
+</tr>
+<tr>
+<td>Container</td>
+<td><code dir="auto">pct config &lt;id&gt;</code>, <code dir="auto">pct enter &lt;id&gt;</code></td>
+</tr>
+<tr>
+<td>Backup</td>
+<td><code dir="auto">cat /var/log/vzdump/qemu-&lt;id&gt;.log</code></td>
+</tr>
+<tr>
+<td>Major version upgrade</td>
+<td><code dir="auto">pve8to9 --full</code></td>
+</tr>
+</tbody>
+</table>
+<div class="sl-heading-wrapper level-h3"><h3 id="capture-tools">Capture tools</h3><a class="sl-anchor-link" href="#capture-tools"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Capture tools”</span></a></div>
+<ul>
+<li><strong><code dir="auto">tcpdump -eni &lt;interfaccia&gt;</code></strong> on the <code dir="auto">tap&lt;vmid&gt;i&lt;n&gt;</code>, <code dir="auto">veth&lt;vmid&gt;i&lt;n&gt;</code> and <code dir="auto">fwbr…</code> interfaces, on the bond and on the bridges, to follow a packet along its path (<a href="/34-network-performance-troubleshooting/">Lab 34</a>).</li>
+<li><strong><code dir="auto">iperf3</code></strong> for the bandwidth between guests and between nodes, <strong><code dir="auto">fio</code></strong> for storage (<a href="/19-fio-benchmark/">Lab 19</a>).</li>
+<li><strong><code dir="auto">ping -M do -s &lt;dimensione&gt;</code></strong> to find the real MTU of a path (<a href="/29-sdn-vxlan/">Lab 29</a>).</li>
+</ul>
+<div class="sl-heading-wrapper level-h2"><h2 id="references">References</h2><a class="sl-anchor-link" href="#references"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “References”</span></a></div>
+<ul>
+<li><a href="https://pve.proxmox.com/pve-docs/pve-admin-guide.html">Proxmox VE Administration Guide</a></li>
+<li><a href="https://pve.proxmox.com/wiki/FAQ">Proxmox VE – Troubleshooting and FAQ</a></li>
+<li><a href="https://forum.proxmox.com/">Proxmox community forum</a></li>
+<li><a href="https://bugzilla.proxmox.com/">Proxmox Bugzilla</a></li>
+</ul>
+</div><footer class="sl-flex astro-vrpkxuak"><div class="meta sl-flex astro-vrpkxuak"><a href="https://github.com/Next-Guard/Proxmox/edit/main/src/content/docs/c-troubleshooting.md" class="sl-flex print:hidden astro-tmuti2mm"><svg aria-hidden="true" class="astro-tmuti2mm astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a></div><div class="pagination-links print:hidden astro-hkwk2k7q" dir="ltr"><a href="/b-credentials-and-addresses/" rel="prev" class="astro-hkwk2k7q"><svg aria-hidden="true" class="astro-hkwk2k7q astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-hkwk2k7q">Previous<br class="astro-hkwk2k7q"><span class="link-title astro-hkwk2k7q">B Credentials and addresses</span></span></a><a href="/d-rebuild-as-virtual/" rel="next" class="astro-hkwk2k7q"><svg aria-hidden="true" class="astro-hkwk2k7q astro-vr7f5wbx" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-hkwk2k7q">Next<br class="astro-hkwk2k7q"><span class="link-title astro-hkwk2k7q">D Rebuilding the lab as virtual</span></span></a></div></footer><script type="module">var e={en:{open:`Enlarge diagram`,close:`Close`},it:{open:`Ingrandisci lo schema`,close:`Chiudi`}},t=e[document.documentElement.lang.split(`-`)[0]]??e.en,n=`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>`,r;function i(){return r||(r=document.createElement(`dialog`),r.className=`pc-zoom`,r.innerHTML=`<div class="pc-zoom__bar"><button type="button" class="pc-zoom__close">${t.close}</button></div><div class="pc-zoom__canvas"></div>`,r.querySelector(`.pc-zoom__close`).addEventListener(`click`,()=>r.close()),r.addEventListener(`click`,e=>{e.target===r&&r.close()}),document.body.append(r),r)}function a(e){let t=e.querySelector(`svg`);if(!t)return;let n=i(),r=t.cloneNode(!0),a=`${t.id}-zoom`,o=r.querySelector(`style`);o&&t.id&&(o.textContent=o.textContent.split(`#${t.id}`).join(`#${a}`)),r.id=a,r.removeAttribute(`width`),r.style.maxWidth=`none`,r.style.width=t.style.maxWidth,n.querySelector(`.pc-zoom__canvas`).replaceChildren(r),n.showModal()}function o(e){let r=e.querySelector(`svg`);if(!r)return;let i=e.parentElement;i?.classList.contains(`pc-mermaid`)||(i=document.createElement(`div`),i.className=`pc-mermaid`,e.before(i),i.append(e));let o=parseFloat(r.style.maxWidth)||0,s=r.getBoundingClientRect().width,c=i.querySelector(`:scope > .pc-zoom-btn`);o>s*1.1?c||(c=document.createElement(`button`),c.type=`button`,c.className=`pc-zoom-btn`,c.innerHTML=`${n}<span>${t.open}</span>`,c.addEventListener(`click`,()=>a(e)),i.append(c)):c?.remove()}var s=()=>document.querySelectorAll(`pre.mermaid[data-processed]`).forEach(o);new MutationObserver(s).observe(document.body,{subtree:!0,attributes:!0,attributeFilter:[`data-processed`]}),addEventListener(`resize`,s),s();</script><div id="pc-consent" class="pc-consent not-content astro-bm4qem4n" role="dialog" aria-live="polite" aria-label="Statistics cookies." hidden><p class="pc-consent__text astro-bm4qem4n"><strong class="astro-bm4qem4n">Statistics cookies.</strong> With your consent we use Google Analytics to understand which pages are read and improve the manual. Nothing is loaded until you accept, and you can change your mind at any time. <a href="/privacy/" class="astro-bm4qem4n">Privacy &amp; cookies</a></p><div class="pc-consent__actions astro-bm4qem4n"><button type="button" class="pc-consent__btn astro-bm4qem4n" data-pc-consent="denied">Reject</button><button type="button" class="pc-consent__btn pc-consent__btn--primary astro-bm4qem4n" data-pc-consent="granted">Accept</button></div></div><script type="module">var e=`pc-consent`,t=()=>{try{return localStorage.getItem(e)}catch{return null}},n=t=>{try{localStorage.setItem(e,t)}catch{}},r=window;function i(){if(r.__pcGtm)return;r.__pcGtm=!0,r.dataLayer=r.dataLayer||[],r.gtag=function(){r.dataLayer.push(arguments)},r.gtag(`consent`,`default`,{ad_storage:`denied`,ad_user_data:`denied`,ad_personalization:`denied`,analytics_storage:`granted`}),r.dataLayer.push({"gtm.start":Date.now(),event:`gtm.js`});let e=document.createElement(`script`);e.async=!0,e.src=`https://www.googletagmanager.com/gtm.js?id=GTM-WV3M2T5N`,document.head.appendChild(e)}function a(){let e=location.hostname.replace(/^www\./,``);for(let t of document.cookie.split(`;`)){let n=t.split(`=`)[0].trim();if(/^_ga|^_gid|^_gat/.test(n))for(let t of[``,`; domain=`+e,`; domain=.`+e])document.cookie=n+`=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`+t}}var o=document.getElementById(`pc-consent`),s=t();s===`granted`?i():s!==`denied`&&o&&(o.hidden=!1),o?.querySelectorAll(`[data-pc-consent]`).forEach(e=>e.addEventListener(`click`,()=>{let r=e.dataset.pcConsent,s=t();n(r),o.hidden=!0,r===`granted`?i():s===`granted`&&(a(),location.reload())})),document.querySelectorAll(`[data-pc-consent-open]`).forEach(e=>e.addEventListener(`click`,e=>{e.preventDefault(),o&&(o.hidden=!1)}));</script><div class="pc-footer not-content astro-jo6i4kqk"><div class="pc-footer__row astro-jo6i4kqk"><p class="pc-footer__brand astro-jo6i4kqk"><span class="astro-jo6i4kqk">Proxmox Community</span><a href="https://github.com/Next-Guard/Proxmox" class="pc-footer__repo astro-jo6i4kqk"><svg class="pc-icon astro-jo6i4kqk" width="1rem" height="1rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg>Source on GitHub</a></p><p class="pc-footer__credit astro-jo6i4kqk">Content created by <a href="https://www.nextguard.it" class="astro-jo6i4kqk">NextGuard</a></p></div><p class="astro-jo6i4kqk">© 2026 NextGuard and contributors · Content licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/" class="astro-jo6i4kqk">CC BY-SA 4.0</a>, code under <a href="https://opensource.org/license/mit" class="astro-jo6i4kqk">MIT</a>.</p><p class="pc-footer__tm astro-jo6i4kqk">Proxmox® is a registered trademark of Proxmox Server Solutions GmbH. This project is independent and is not affiliated with, sponsored or endorsed by Proxmox Server Solutions GmbH.</p><p class="pc-footer__legal astro-jo6i4kqk"><a href="/privacy/" class="astro-jo6i4kqk">Privacy &amp; cookies</a> · <a href="/privacy/" data-pc-consent-open class="astro-jo6i4kqk">Cookie preferences</a></p></div></div></div></main></div></div></div></div></body></html>

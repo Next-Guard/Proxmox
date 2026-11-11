@@ -1,0 +1,17 @@
+# /etc/netplan/60-lab.yaml su netsvc (Ubuntu Server 24.04)
+# uplink0: scheda verso la rete aziendale o Internet. Adatta questa parte alla
+#          tua rete: qui prende l'indirizzo in DHCP, con il default gateway.
+# lab0:    scheda collegata allo switch del laboratorio, porta di accesso sulla
+#          rete nativa (non taggata): porta entrambe le reti del laboratorio.
+network:
+  version: 2
+  ethernets:
+    uplink:
+      match: {macaddress: "<MAC della scheda uplink>"}
+      set-name: uplink0
+      dhcp4: true
+    lab:
+      match: {macaddress: "<MAC della scheda del laboratorio>"}
+      set-name: lab0
+      dhcp4: false
+      addresses: [172.27.199.250/24, 172.32.199.250/24]

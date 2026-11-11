@@ -1,0 +1,14 @@
+#cloud-config
+hostname: linux-src01
+fqdn: linux-src01.proxmox.community
+ssh_pwauth: true
+users:
+  - name: labuser
+    groups: sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+chpasswd:
+  expire: false
+  users:
+    - {name: labuser, password: "<password-lab>", type: text}
