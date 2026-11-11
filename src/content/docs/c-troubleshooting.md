@@ -85,7 +85,7 @@ When you face a problem, it pays to always proceed the same way:
 | `HEALTH_WARN BLUESTORE_SLOW_OP_ALERT` that persists for hours | Slow disks generate slow operations; by default the warning stays visible for 24 hours | Investigate the disks; in the lab, `bluestore_slow_ops_warn_lifetime 600` | [22](/22-dedicated-networks/) |
 | `OSD bench result … not within the threshold` warnings when the OSDs start | At startup the OSD benchmarks the disk and gets IOPS outside the expected threshold | Ceph uses the default value; measure the disks with `fio` and set `osd_mclock_max_capacity_iops_*` | [18](/18-ceph-growth-maintenance-failures/) |
 | Needless rebalancing during a planned reboot | Without `noout`, the OSDs are marked `out` after 600 s | `ceph osd set noout` before the maintenance, `unset` after it | [18](/18-ceph-growth-maintenance-failures/) |
-| VM I/O stalled for about 27 s when a node fails abruptly | Time Ceph needs to detect the failure | Expected; recovery starts after 600 s if the node does not come back | [18](/18-ceph-growth-maintenance-failures/) |
+| VM I/O stalled for about 27 s when a node fails abruptly | In the test, the stalled write resumed when the monitors marked the node's OSDs *down*, which happens after the heartbeat grace period (20 s) and the failure reports | Expected; compare it with the timeouts of the guests. Recovery starts after 600 s if the node does not come back | [18](/18-ceph-growth-maintenance-failures/) |
 
 ### Cluster and high availability
 
