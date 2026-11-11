@@ -80,6 +80,11 @@ export default defineConfig({
 			},
 			head: [
 				{ tag: 'meta', attrs: { name: 'author', content: 'NextGuard' } },
+				{ tag: 'meta', attrs: { property: 'og:image', content: 'https://proxmox.community/og-image.png' } },
+				{ tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+				{ tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+				{ tag: 'meta', attrs: { property: 'og:image:alt', content: 'Proxmox Community: from zero to hero, one lab at a time. 53 connected hands-on Proxmox VE 9 labs.' } },
+				{ tag: 'meta', attrs: { name: 'twitter:image', content: 'https://proxmox.community/og-image.png' } },
 				{ tag: 'meta', attrs: { name: 'theme-color', content: '#0b1222' } },
 				{
 					tag: 'script',
