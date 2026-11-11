@@ -12,11 +12,10 @@ duration: 1 ora e 30 minuti
 
 ## Obiettivi
 
-- Capire le modalità di bonding di Linux e quali richiedono una configurazione dello switch.
-- Creare un bond di due schede e un bridge VLAN-aware dedicato al traffico delle VM, dalla GUI e dalla riga di comando.
-- Staccare un link con il traffico in corso e misurare cosa vede il guest.
-- Confrontare *active-backup*, *balance-alb* e *802.3ad* sul lab reale, con i contatori delle schede.
-- Verificare l'MTU di una rete prima di usare i *jumbo frame*.
+- `bond0` (`nic3` + `nic4`, *active-backup*, link preferito `nic3`) sotto un bridge `vmbr1` VLAN-aware senza indirizzo IP su `desopve01-03`, creato dalla GUI su un nodo e dalla riga di comando sugli altri, con i container di prova spostati sul nuovo bridge e raggiungibili.
+- Il guasto e il ritorno del link attivo con un ping in corso, con il cambio di link visibile nel log del kernel e i ping persi contati a un intervallo noto.
+- *active-backup*, *balance-alb* e *802.3ad* confrontati con `iperf3` e con i contatori delle schede, sapendo quali modalità richiedono una configurazione dello switch e quale è adatta a un bond che porta un bridge con dei guest.
+- Il pacchetto più grande che la rete delle VM trasporta da un capo all'altro, misurato con `ping -M do` prima di decidere sui jumbo frame.
 
 ## Come funziona
 
@@ -25,7 +24,7 @@ duration: 1 ora e 30 minuti
 Un **bond** (Linux bonding) unisce più schede fisiche in un'unica interfaccia logica, `bond0`. Serve a due cose:
 
 - **ridondanza:** se un cavo, una porta o uno switch si guastano, il traffico prosegue sulle schede rimaste;
-- **banda aggregata**, solo in alcune modalità e solo con molti flussi: **un singolo flusso usa sempre un solo link**.
+- **più banda complessiva**, solo in alcune modalità e solo con molti flussi: nelle modalità che bilanciano per flusso o per destinazione, **un singolo flusso usa un solo link**. Fa eccezione *balance-rr*, che distribuisce i pacchetti di un singolo flusso su tutti i link, a costo di consegnarli fuori ordine.
 
 Il driver controlla lo stato dei link ogni `bond-miimon` millisecondi (qui 100) e smette di usare quelli giù.
 
@@ -38,10 +37,12 @@ Il driver controlla lo stato dei link ogni `bond-miimon` millisecondi (qui 100) 
 | 2 | `balance-xor` | port-channel statico | sì, per flusso (hash) | |
 | 3 | `broadcast` | – | ogni pacchetto su tutti i link | casi molto particolari |
 | 4 | **`802.3ad`** (LACP) | **port-channel LACP** | sì, per flusso (hash) | lo standard dei datacenter; con due switch serve MLAG/vPC |
-| 5 | `balance-tlb` | nessuna | solo in trasmissione | |
-| 6 | `balance-alb` | nessuna | trasmissione e ricezione, **per destinazione** | bilancia la ricezione manipolando le risposte ARP |
+| 5 | `balance-tlb` | nessuna | solo in trasmissione | non adatta a un bond sotto un bridge con guest (vedi sotto) |
+| 6 | `balance-alb` | nessuna | trasmissione e ricezione, **per destinazione** | bilancia la ricezione riscrivendo le risposte ARP del nodo; non adatta a un bond sotto un bridge con guest |
 
 Nelle modalità che bilanciano "per flusso" il link si sceglie con una funzione di *hash* (`bond-xmit-hash-policy`): `layer2` (MAC), `layer2+3` (MAC + IP) o `layer3+4` (IP + porte). Con `layer3+4` due connessioni TCP tra gli stessi due host possono usare link diversi; un trasferimento singolo resta comunque su un link.
+
+**Quali modalità usare con Proxmox VE.** La documentazione di Proxmox VE consiglia *802.3ad* quando lo switch supporta LACP e *active-backup* negli altri casi. Sconsiglia invece *balance-alb* e *balance-tlb* quando il bond porta un bridge Linux con dei guest: queste modalità presuppongono che l'host conosca gli indirizzi locali, mentre gli indirizzi dei guest appartengono alle VM e ai container dietro il bridge. Questo lab usa *balance-alb* al passo 6 solo per osservarne il comportamento, poi torna ad *active-backup*.
 
 ### Il disegno di questo lab
 
@@ -61,6 +62,22 @@ flowchart LR
 
 - `bond0` (`nic3` + `nic4`) è la porta di **`vmbr1`**, un secondo bridge VLAN-aware dedicato al **traffico delle VM**. Gestione, Corosync, storage e Ceph restano sulle loro schede.
 - `vmbr1` **non ha un indirizzo IP**: il nodo non comunica su quella rete, la offre solo ai guest. In questo modo il bond non interferisce con il traffico del nodo.
+
+### Ambiente e versioni della prova
+
+I risultati della procedura vengono da prove eseguite a novembre 2026 (il log del kernel del passo 4 è del 9 novembre) nella configurazione descritta qui sotto. Con schede, switch o versioni diversi, gli stessi comandi possono dare numeri diversi.
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve`, che fornisce anche il driver di bonding ([Lab 04](/it/04-first-access-repositories-updates/)) |
+| Bond | `nic3` + `nic4` su ogni nodo, `miimon 100`, nessun ritardo in salita o in discesa; su `desopve01` entrambi i link a 10000 Mbps full duplex, come riportato da `/proc/net/bonding/bond0` |
+| Switch | le due porte di ogni nodo sullo stesso switch, come trunk VLAN, senza port-channel né LACP su quelle porte ([Lab 01](/it/01-lab-architecture/)) |
+| Bridge | `vmbr1`, VLAN-aware, senza indirizzo IP, MTU 1500 |
+| Container di prova | CT 121 su `desopve01` e CT 122 su `desopve02`, nella VLAN 10: container Debian 13 non privilegiati (`debian-13-standard_13.6-1`), 1 core e 512 MiB di RAM ciascuno, `iperf3` e `iputils-ping` dai pacchetti Debian ([Lab 20](/it/20-bridges-stable-names-vlans/)) |
+| Guasto | simulato su `desopve01` con `ip link set nic3 down` e `up`, non staccando il cavo |
+| Strumenti | `ping` con una sonda ogni 0,2 s (`-i 0.2`), timeout di 1 secondo (`-W 1`) e marca temporale (`-D`); `iperf3` per 10 s con 1 o 4 flussi TCP, server sul CT 122; contatori di trasmissione in `/sys/class/net/<scheda>/statistics/tx_bytes` |
+
+**Cosa misurano le prove e cosa no.** Misurano quello che vede un container su `desopve01` quando parla con un container su `desopve02` attraverso `vmbr1`, i due bond e lo switch. Un ping con una sonda ogni 0,2 secondi non può vedere un'interruzione più breve di quell'intervallo: "0% packet loss" significa che nessuna sonda è rimasta senza risposta, non che l'interruzione è durata zero secondi. Ogni valore di `iperf3` viene da una sola prova di 10 secondi in una direzione (CT 121 → CT 122), senza misurare la CPU: non dice nulla sulla variabilità né su cosa abbia limitato la banda. I contatori sono stati letti solo in trasmissione, e solo su `desopve01`. Il guasto è stato simulato sul nodo: lo stacco del cavo, il guasto di una porta dello switch o la perdita dello switch (nel laboratorio ce n'è uno solo) non sono stati provati, e LACP è stato provato solo senza un partner sullo switch.
 
 ## Procedura
 
@@ -206,7 +223,7 @@ Dalla GUI è lo stesso campo **Bridge** della scheda di rete del container (o de
 
 ### 4. Guasto del link attivo (active-backup)
 
-Il CT 121 manda cinque ping al secondo al CT 122. Nel frattempo, su `desopve01`, si stacca il link attivo `nic3` e, dopo 13 secondi, lo si ricollega. Stacca il cavo di `nic3`, oppure simula il guasto con `ip link set nic3 down`.
+Il CT 121 manda cinque ping al secondo al CT 122 (`-i 0.2`). Nel frattempo, su `desopve01`, il link attivo `nic3` cade e torna dopo 13 secondi. Nella prova riportata qui il guasto è stato simulato con `ip link set nic3 down`. Staccare il cavo di `nic3` è una prova più realistica, perché anche lo switch vede cadere la sua porta; con `ip link` questo dipende dalla scheda e dal suo driver.
 
 ```bash title="root@desopve01"
 pct exec 121 -- bash -c "ping -D -i 0.2 -c 150 -W 1 10.10.10.122 > /root/ab.log" &
@@ -238,7 +255,7 @@ pct exec 121 -- tail -2 /root/ab.log
 rtt min/avg/max/mdev = 0.395/0.868/10.409/0.806 ms
 ```
 
-Nessun pacchetto perso, né al guasto né al ritorno su `nic3` (il *primary*): il ritardo massimo è stato di circa 10 ms. Il kernel registra ogni passaggio:
+Il kernel registra ogni passaggio:
 
 ```bash title="root@desopve01"
 journalctl -k | grep bond0 | tail -4
@@ -251,7 +268,11 @@ Nov 09 19:26:57 desopve01 kernel: bond0: (slave nic3): link status definitely up
 Nov 09 19:26:57 desopve01 kernel: bond0: (slave nic3): making interface the new active one
 ```
 
-Quando il link attivo cambia, lo switch deve reimparare su quale porta si trovano i MAC dei guest. `bond0` e `vmbr1` non hanno indirizzi IP, quindi il bond non manda ARP gratuiti per conto dei guest: lo switch impara ogni MAC dal primo frame che il guest trasmette sul nuovo link. Qui il ping continuo lo fa subito; un guest silenzioso resta irraggiungibile finché non trasmette, o finché la voce non scade nella tabella MAC dello switch.
+- **Misura:** 150 sonde inviate e 150 risposte (`0% packet loss`), con un tempo di andata e ritorno massimo di 10,4 ms (`rtt max`). Il log del kernel mostra `nic4` che subentra alle 19:26:44 e `nic3` (il *primary*) che torna link attivo alle 19:26:57.
+- **Interpretazione:** nessuno dei due cambi di link è costato una sonda. Un'eventuale interruzione è stata abbastanza breve da cadere tra due sonde, o da ritardarne una di non più di 10,4 ms. La prova non dice quanto sia durata, né se i 10,4 ms, il tempo più alto della serie, coincidano con uno dei due passaggi.
+- **Verifica:** in `/root/ab.log`, dentro il CT 121, cerca la riga con il `time=` più alto e confronta la sua marca temporale (`-D`) con il log del kernel; per una risoluzione migliore, ripeti la prova con un ping più fitto, per esempio `-i 0.01`.
+
+**Cosa deve reimparare lo switch.** Dopo un cambio di link, lo switch deve imparare dietro quale porta si trovano ora i MAC dei guest. Secondo la documentazione del kernel, in *active-backup* il bond manda ARP gratuiti sul nuovo link solo per sé stesso e per le interfacce VLAN sopra di lui, e solo se hanno un indirizzo IP. Qui `bond0` non ne ha e i guest stanno dietro il bridge, quindi nessuno annuncia i loro indirizzi. In questa prova il ping continuo ha fatto trasmettere subito il CT 121 sul nuovo link, e tanto basta perché lo switch ne impari l'indirizzo. Il caso di un guest che non trasmette non è stato provato, e l'esito dipende dallo switch. Se lo switch vede cadere la vecchia porta, di norma dimentica gli indirizzi imparati su di essa e inoltra i frame destinati a loro su tutte le porte della VLAN. Se la vecchia porta resta su (un guasto più avanti sul percorso, o un `ip link` che lascia attivo il collegamento fisico), lo switch continua a mandare sulla vecchia porta finché il guest non trasmette o la voce non scade nella sua tabella MAC. Per verificarlo: ferma il traffico del CT 121, porta giù `nic3`, poi fai un ping al CT 121 dal CT 122 e guarda quando arrivano le risposte; sullo switch, confronta la porta associata al MAC del container prima e dopo il cambio.
 
 ### 5. Banda: un flusso, un link
 
@@ -266,9 +287,15 @@ pct exec 121 -- iperf3 -c 10.10.10.122 -t 10 -f g | tail -4
 [  5]   0.00-10.00  sec  6.54 GBytes  5.61 Gbits/sec                  receiver
 ```
 
-In *active-backup* lavora un solo link alla volta: la banda è quella di una scheda.
+- **Misura:** un flusso TCP di 10 secondi dal CT 121 al CT 122: 5,62 Gbit/s al mittente e 5,61 Gbit/s al ricevente, con 191 ritrasmissioni (colonna `Retr`). I link di `desopve01` vanno a 10 Gbit/s.
+- **Interpretazione:** in *active-backup* il traffico passa da un solo link, quindi un flusso non può superare i 10 Gbit/s. Si è fermato a 5,62: la velocità del link, da sola, non spiega il risultato. Il limite può venire dal core unico di ciascun container, dal percorso attraverso `veth`, bridge e bond, dallo switch, o da perdite lungo la strada, a cui fanno pensare le ritrasmissioni: la prova non distingue queste cause. Al passo 6 quattro flussi, tutti su `nic3`, arrivano in totale a 5,72 Gbit/s, più o meno come uno solo. È compatibile con un limite comune a tutti i flussi più che con un limite per flusso, ma la modalità del bond è diversa e ogni valore viene da una sola prova.
+- **Verifica:** durante la prova, osserva l'uso della CPU nei container e sui nodi (`top`): un core fisso al 100% fa pensare a un limite di CPU; leggi i contatori `tx_bytes` di `nic3` e `nic4` per confermare che il flusso passa da un solo link; ripeti la prova con container con più core e confronta.
 
 ### 6. balance-alb: bilanciamento senza configurare lo switch
+
+:::caution[Una prova, non una configurazione da tenere]
+La documentazione di Proxmox VE sconsiglia *balance-alb* e *balance-tlb* quando il bond porta un bridge con dei guest, come fa qui `bond0`. Questo passo usa *balance-alb* solo per vedere come distribuisce il traffico; alla fine del passo 7 il bond torna ad *active-backup*.
+:::
 
 1. Su `desopve01` e `desopve02` cambia la modalità: in `bond0` sostituisci `bond-mode active-backup` con `bond-mode balance-alb` e togli la riga `bond-primary`, così nessuna scheda è preferita. `ifreload -a` applica il cambio a caldo.
 
@@ -300,7 +327,9 @@ In *active-backup* lavora un solo link alla volta: la banda è quella di una sch
    | `nic3` | 7,17 GB |
    | `nic4` | 0,00 GB |
 
-   Tutto il traffico è passato da `nic3`. *balance-alb* bilancia **per destinazione**: tutti i flussi verso lo stesso host usano la stessa scheda. Con molti guest che parlano con molti host diversi, il carico **in trasmissione** si distribuisce sui due link. Il bilanciamento in ricezione (*rlb*, che manipola le risposte ARP) vale invece solo per gli indirizzi IP del nodo, non per i guest dietro il bridge: il traffico che arriva ai guest entra da una scheda sola.
+   - **Misura:** quattro flussi TCP paralleli dal CT 121 al CT 122 per 10 secondi, 5,72 Gbit/s in totale al ricevente (riga `SUM`). Durante la prova `nic3` ha trasmesso 7,17 GB e `nic4` niente.
+   - **Interpretazione:** compatibile con *balance-alb* che sceglie il link di trasmissione **per destinazione**: i quattro flussi vanno allo stesso indirizzo IP, quindi condividono una scheda. Con molti guest che parlano con host diversi, il carico in trasmissione si distribuirebbe sui due link. In ricezione, la documentazione del kernel descrive il bilanciamento (*rlb*) come una riscrittura delle risposte ARP inviate dal sistema locale, e il codice del driver salta il traffico ARP che non viene dal bond stesso o da una VLAN direttamente sopra di lui: i guest dietro il bridge restano esclusi, e il loro traffico entrerebbe da una scheda sola. La prova ha letto solo i contatori di trasmissione, quindi non mostra il lato della ricezione.
+   - **Verifica:** ripeti con flussi verso più host diversi e confronta i contatori delle due schede; per la ricezione, leggi i contatori `rx_bytes` di `nic3` e `nic4` durante una prova nella direzione opposta (`iperf3 -R`).
 
 3. Guasto di `nic3` con il ping in corso:
 
@@ -326,13 +355,15 @@ In *active-backup* lavora un solo link alla volta: la banda è quella di una sch
    100 packets transmitted, 99 received, 1% packet loss, time 20559ms
    ```
 
-   Un pacchetto perso su cento (circa 200 ms): il tempo per spostare il traffico e riannunciare i MAC.
+   - **Misura:** 100 sonde, una ogni 0,2 secondi, e 99 risposte: una sonda persa (`1% packet loss`).
+   - **Interpretazione:** compatibile con una breve interruzione mentre il bond sposta il traffico da `nic3` a `nic4` e lo switch impara la nuova porta, ma la prova non lo dimostra. Non dice quando la sonda è andata persa (alla caduta del link, al suo ritorno o in un altro momento), né quanto è durata l'interruzione: se la perdita viene davvero da un cambio di link, una sola sonda persa, con risposta a quella prima e a quella dopo, indica che è durata meno di circa 0,4 secondi.
+   - **Verifica:** in `/root/alb.log` cerca l'`icmp_seq` mancante e confronta le marche temporali (`-D`) delle sonde vicine con il log del kernel (`journalctl -k | grep bond0`); ripeti con un ping più fitto.
 
 ### 7. LACP (802.3ad) senza uno switch che lo negozia
 
-LACP è la modalità standard nei datacenter: le schede del nodo e le porte dello switch formano un unico canale, e il protocollo LACP verifica continuamente che i due lati siano d'accordo. **Richiede la configurazione dello switch.** Ecco cosa succede se lo switch non la ha.
+LACP è la modalità standard nei datacenter: le schede del nodo e le porte dello switch formano un unico canale, e il protocollo LACP verifica continuamente che i due lati siano d'accordo. **Richiede la configurazione dello switch.** Questo passo mostra cosa succede se lo switch non la ha.
 
-1. Su `desopve01` imposta:
+1. **Configurazione provata.** Solo su `desopve01` (`desopve02` resta in *balance-alb* dal passo 6) imposta:
 
    ```text
    auto bond0
@@ -364,10 +395,14 @@ LACP è la modalità standard nei datacenter: le schede del nodo e le porte dell
    Aggregator ID: 2
    ```
 
-   - **`Partner Mac Address: 00:00:00:00:00:00`**: dall'altra parte nessuno risponde a LACP.
-   - Ogni scheda finisce in un **aggregatore diverso** (1 e 2) e l'aggregatore attivo ha **una sola porta**: il bond funziona, ma come un *active-backup* travestito, senza aggregare banda.
+   **Comportamento osservato:**
 
-3. Il traffico passa, e alla caduta di `nic3` il bond attiva l'altro aggregatore:
+   - **`Partner Mac Address: 00:00:00:00:00:00`**: dall'altra parte nessuno risponde a LACP;
+   - ogni scheda finisce in un **aggregatore diverso** (1 e 2), e l'aggregatore attivo ha **una sola porta**.
+
+   **Interpretazione.** Senza partner, ogni scheda forma un aggregatore a sé e il bond ne usa uno solo: funziona, ma su un link alla volta, come un *active-backup* travestito che non aggiunge banda. Questa lettura viene dallo stato degli aggregatori; la banda in questa modalità non è stata misurata.
+
+3. Il traffico passa, anche mentre `nic3` resta giù per 3 secondi:
 
    ```bash title="root@desopve01"
    pct exec 121 -- ping -c4 -W1 10.10.10.122 | tail -2
@@ -388,15 +423,19 @@ LACP è la modalità standard nei datacenter: le schede del nodo e le porte dell
    75 packets transmitted, 75 received, 0% packet loss, time 15335ms
    ```
 
-   In produzione, con LACP configurato sullo switch, `Partner Mac Address` mostra il MAC dello switch e le due schede stanno nello **stesso** aggregatore (`Number of ports: 2`). Con due switch per la ridondanza, questi devono supportare MLAG/vPC (o stack), perché LACP vede i due switch come uno solo.
+   - **Misura:** 4 ping su 4 con risposta prima del guasto; poi 75 sonde a intervalli di 0,2 secondi, in circa 15 secondi che comprendono i 3 con `nic3` giù, tutte con risposta.
+   - **Interpretazione:** compatibile con il passaggio del bond all'altro aggregatore quando cade l'unica porta di quello attivo, come fa la politica di selezione predefinita (`ad_select stable`) secondo la documentazione del kernel. L'output non mostra il cambio di aggregatore.
+   - **Verifica:** leggi la sezione `Active Aggregator Info` di `/proc/net/bonding/bond0` mentre `nic3` è giù; confronta i contatori `tx_bytes` delle due schede durante un `iperf3 -P 4`: in questo stato dovrebbe crescere solo uno dei due.
 
-4. Torna ad *active-backup* su `desopve01` e `desopve02` (stesso blocco del passo 1, con `bond-primary nic3`) e applica con `ifreload -a`. È la scelta giusta quando non si controlla la configurazione dello switch.
+   **Con LACP configurato sullo switch** (non verificabile in questo laboratorio), `Partner Mac Address` mostra il MAC dello switch e le due schede stanno nello **stesso** aggregatore (`Number of ports: 2`). Con due switch per la ridondanza, questi devono supportare MLAG/vPC (o stack), perché LACP vede i due switch come uno solo.
+
+4. **Decisione.** Torna ad *active-backup* su `desopve01` e `desopve02` (stesso blocco del passo 1, con `bond-primary nic3`) e applica con `ifreload -a`. Se non controlli la configurazione dello switch, è la modalità che non gli chiede niente, ed è quella che la documentazione di Proxmox VE consiglia quando LACP non è disponibile. **Risultato:** `bond0` torna in *active-backup*, con `nic3` preferito, su entrambi i nodi: è la configurazione che resta per i lab successivi.
 
 ### 8. MTU e jumbo frame: verificare prima di usarli
 
-I *jumbo frame* (MTU 9000) riducono il carico della CPU per il traffico storage e di migrazione, ma funzionano solo se **tutto il percorso** li accetta: schede, bond, switch, porte dei guest e guest. Una porta della catena rimasta a 1500 scarta i frame più grandi, e la prova sembra fallire per colpa della rete.
+I *jumbo frame* (MTU 9000) trasportano gli stessi dati in meno pacchetti, e riducono così il lavoro per pacchetto del traffico storage e di migrazione. Funzionano solo se **tutto il percorso** li accetta: schede, bond, switch, porte dei guest e guest. Basta un elemento rimasto a 1500 per scartare i frame più grandi, e il sintomo sembra un generico problema di rete.
 
-Prova temporanea (con `ip link`, quindi non persistente) tra il CT 121 su `desopve01` e il CT 122 su `desopve02`. Su ogni nodo alza l'MTU del bond (che la applica anche a `nic3` e `nic4`), del lato nodo della scheda del container (`veth121i0`, `veth122i0`) e della scheda nel container. Il bridge `vmbr1` non va toccato: per i frame che lo attraversano conta l'MTU delle porte.
+**Configurazione provata.** Prova temporanea (con `ip link`, quindi non persistente) tra il CT 121 su `desopve01` e il CT 122 su `desopve02`. Su ogni nodo alza l'MTU del bond (che la applica anche a `nic3` e `nic4`), del lato nodo della scheda del container (`veth121i0`, `veth122i0`) e della scheda nel container. Il bridge `vmbr1` non va toccato: per i frame che lo attraversano conta l'MTU delle porte.
 
 ```bash title="root@desopve01"
 ip link set bond0 mtu 9000; ip link set veth121i0 mtu 9000
@@ -438,7 +477,13 @@ for s in 4000 8000 8910 8912; do r=$(pct exec 121 -- ping -M do -s $s -c 2 -W 1 
 8912: 0 received
 ```
 
-Lo switch del laboratorio accetta pacchetti fino a 8938 byte (8910 di dati ICMP più 28 di intestazioni), ma non arriva a 9000: con l'MTU 9000 sui nodi, i pacchetti più grandi verrebbero persi in silenzio. Per usare i jumbo frame bisognerebbe scegliere un'MTU comune che passi su tutto il percorso, cioè qui al massimo 8938. In questo laboratorio restiamo a 1500. Riporta tutto com'era:
+**Comportamento osservato.** Con la frammentazione vietata, i pacchetti da 1500 byte (`-s 1472`) passano e quelli da 9000 byte (`-s 8972`) no: 3 inviati, nessuna risposta, e la riga di riepilogo non riporta errori. Con dimensioni crescenti, 8910 byte di dati ICMP (un pacchetto da 8938 byte) passano ancora e 8912 (8940 byte) no; 8911 non è stato provato.
+
+**Interpretazione.** Qualcosa sul percorso tra i due nodi lascia passare i pacchetti IP da 8938 byte e scarta quelli da 8940. Visto che i pacchetti da 8938 byte sono passati, le interfacce dei due nodi erano davvero state portate ben oltre 1500: il limite è compatibile con un elemento esterno ai nodi, come la dimensione massima dei frame dello switch, ma la prova non mostra dove vengono scartati i frame più grandi. Mostra però perché il problema è difficile da individuare: nessuno segnala un errore, i pacchetti più grandi semplicemente spariscono.
+
+**Verifica.** Cattura il traffico su entrambi i nodi (`tcpdump -eni bond0 'icmp and greater 8000'`) mentre il CT 121 manda un pacchetto da 8940 byte (`ping -M do -s 8912`): se il frame esce da `desopve01` e non compare mai su `desopve02`, viene scartato in rete. Controlla anche l'MTU effettiva di ogni interfaccia (`ip link show`), gli errori in ricezione delle schede di `desopve02` (`ip -s link show nic3`) e la dimensione massima dei frame configurata sulle porte dello switch.
+
+**Decisione.** In questo laboratorio restiamo a 1500. Per i jumbo frame servirebbe un'MTU comune che passi su tutto il percorso, qui al massimo 8938, e uno switch configurato di conseguenza. Riporta tutto com'era:
 
 ```bash title="root@desopve01"
 pct exec 121 -- ip link set eth0 mtu 1500; ip link set veth121i0 mtu 1500; ip link set bond0 mtu 1500
@@ -448,19 +493,22 @@ pct exec 121 -- ip link set eth0 mtu 1500; ip link set veth121i0 mtu 1500; ip li
 pct exec 122 -- ip link set eth0 mtu 1500; ip link set veth122i0 mtu 1500; ip link set bond0 mtu 1500
 ```
 
-In produzione l'MTU si imposta nel file di rete (`mtu 9000` sulle schede, sul bond e sul bridge) solo dopo aver verificato lo switch, e si controlla sempre con `ping -M do`.
+**Risultato.** MTU di nuovo a 1500 su tutte le interfacce, come nel resto del manuale. In produzione l'MTU si imposta nel file di rete (`mtu 9000` sulle schede, sul bond e sul bridge) solo dopo aver verificato lo switch, e si controlla sempre con `ping -M do` alla dimensione piena, in entrambe le direzioni.
 
 ## Verifica e test
 
-| Prova | Risultato |
-|---|---|
-| `bond0` + `vmbr1` VLAN-aware su `desopve01-03` | attivi, senza interruzioni per cluster e Ceph |
-| *active-backup*, guasto e ritorno del link attivo | 0 pacchetti persi su 150, ritardo massimo ~10 ms |
-| Banda, un flusso (*active-backup*) | 5,62 Gbit/s |
-| *balance-alb*, 4 flussi verso un solo host | 5,72 Gbit/s, tutto su `nic3` |
-| *balance-alb*, guasto di un link | 1 pacchetto perso su 100 |
-| *802.3ad* senza switch LACP | partner `00:00:00:00:00:00`, aggregatori separati, una porta attiva; nessuna perdita al guasto |
-| Jumbo frame sul percorso | 9000 byte non passano (100% di perdita); il massimo è 8938 byte. Restiamo a 1500 |
+Il lab è riuscito se `bond0` è attivo in *active-backup* sui tre nodi con i container raggiungibili su `vmbr1`, se il guasto del link attivo compare nel log del kernel con i ping persi contati, e se per ogni risultato qui sotto sai dire che cosa è stato misurato e con quale strumento.
+
+| Prova | Criterio di successo | Osservato nel laboratorio |
+|---|---|---|
+| `bond0` + `vmbr1` VLAN-aware su `desopve01-03` | `Currently Active Slave: nic3` e `MII Status: up`; `vlan_filtering` a 1; quorum e stato di Ceph invariati (`pvecm status`, `ceph -s`) | attivi sui tre nodi, senza interruzioni viste da `pvecm status` e `ceph -s` |
+| Container su `vmbr1` | il CT 121 raggiunge il CT 122; `veth121i0` con PVID 10 | 2 ping su 2 con risposta; VLAN 10 senza tag sulla porta |
+| *active-backup*, guasto e ritorno del link attivo | passaggio a `nic4` e ritorno a `nic3` nel log del kernel; ping persi contati a un intervallo noto | 0 sonde perse su 150 (una ogni 0,2 s); tempo di andata e ritorno massimo 10,4 ms |
+| Un flusso TCP (*active-backup*) | un valore di riferimento, con strumento e parametri annotati | 5,62 Gbit/s al mittente, 191 ritrasmissioni, su link a 10 Gbit/s |
+| *balance-alb*, 4 flussi verso un solo host | contatori che mostrano quale scheda ha trasmesso | 5,72 Gbit/s in totale; 7,17 GB su `nic3`, niente su `nic4` |
+| *balance-alb*, guasto di un link | ping persi contati a un intervallo noto | 1 sonda persa su 100 (una ogni 0,2 s) |
+| *802.3ad* senza switch LACP | riconoscere i segni di un partner assente | partner `00:00:00:00:00:00`, aggregatori separati, una porta in quello attivo; 0 sonde perse su 75, a cavallo di un guasto di 3 secondi |
+| MTU sul percorso | `ping -M do -s 8972` con risposta prima di adottare l'MTU 9000 | 100% di perdita a 9000 byte; pacchetto più grande che passa: 8938 byte. L'MTU resta a 1500 |
 
 ## Stato finale del lab
 
@@ -471,15 +519,18 @@ In produzione l'MTU si imposta nel file di rete (`mtu 9000` sulle schede, sul bo
 
 ## Cosa hai imparato
 
-- Un bond dà ridondanza sempre e banda solo con molti flussi: un singolo trasferimento usa un link.
-- *active-backup* non chiede niente allo switch e, nel laboratorio, ha superato guasto e ritorno senza perdere pacchetti.
-- *balance-alb* distribuisce il traffico per destinazione, senza configurare lo switch.
-- *802.3ad* è lo standard, ma solo con LACP configurato sullo switch: senza partner il bond funziona con un link solo. `Partner Mac Address: 00:00:00:00:00:00` è il segnale da riconoscere.
-- Un bridge senza IP sul nodo offre una rete ai guest senza esporre il nodo su quella rete.
-- L'MTU si verifica end-to-end con `ping -M do` prima di attivare i jumbo frame.
+- **Scegliere la modalità del bond in base a quello che offre lo switch.** Se non puoi configurare lo switch, usa *active-backup*, con `bond-primary` quando un link è preferito. Se lo switch ha un port-channel LACP su quelle porte, usa *802.3ad*; con due switch, verifica che supportino MLAG/vPC o lo stack. Tieni *balance-alb* e *balance-tlb* lontane dai bond che portano un bridge con dei guest, come consiglia la documentazione di Proxmox VE.
+- **Avere le aspettative giuste sulla banda.** A parte *balance-rr*, un flusso non usa mai più di un link, e *balance-alb* sceglie la scheda per destinazione, quindi tutto il traffico verso un host passa da una scheda. Prima di dare la colpa ai link per un valore basso, confrontalo con la loro velocità: qui un flusso ha raggiunto 5,62 Gbit/s su link da 10 Gbit/s, quindi la velocità del link da sola non lo spiega.
+- **Riconoscere un bond LACP senza partner:** `Partner Mac Address: 00:00:00:00:00:00`, un aggregatore per scheda e `Number of ports: 1`. Il bond continua a funzionare, ma su un link solo.
+- **Leggere una prova di failover per quello che misura.** L'intervallo del ping fissa la risoluzione: 0% di perdita con una sonda ogni 0,2 secondi significa che nessuna sonda è andata persa, non che l'interruzione è durata zero secondi. Confronta le marche temporali del ping con il log del kernel, e ricorda che la sorte di un guest silenzioso dipende da come lo switch reimpara il suo MAC.
+- **Decidere sui jumbo frame.** Solo dopo che `ping -M do` alla dimensione piena passa da un capo all'altro, in entrambe le direzioni: altrimenti i pacchetti più grandi spariscono senza errori, come a 9000 byte in questo laboratorio.
+- **Tenere il nodo fuori dalla rete dei guest.** Un bridge senza indirizzo IP offre la rete ai guest senza esporre il nodo su quella rete.
 
 ## Riferimenti
 
-- [Proxmox VE – Linux Bond](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysadmin_network_bond)
-- [Linux kernel – Bonding driver](https://docs.kernel.org/networking/bonding.html)
-- [iperf3](https://software.es.net/iperf/)
+- [Proxmox VE – Linux Bond: le modalità, quelle consigliate e *balance-alb*/*balance-tlb* con un bridge](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysadmin_network_bond)
+- [Kernel Linux 7.0 – Opzioni del driver di bonding (`mode`, `miimon`, `primary`, `ad_select`, `num_grat_arp`)](https://www.kernel.org/doc/html/v7.0/networking/bonding.html#bonding-driver-options)
+- [Kernel Linux 7.0 – Bonding: la configurazione dello switch richiesta da ogni modalità](https://www.kernel.org/doc/html/v7.0/networking/bonding.html#switch-configuration)
+- [Linux 7.0 – `bond_alb.c`: bilanciamento in trasmissione per destinazione e risposte ARP escluse da *rlb* (`rlb_arp_xmit`)](https://github.com/torvalds/linux/blob/v7.0/drivers/net/bonding/bond_alb.c)
+- [Debian 13 – `iperf3(1)`: flussi paralleli (`-P`), durata (`-t`), direzione inversa (`-R`)](https://manpages.debian.org/trixie/iperf3/iperf3.1.en.html)
+- [Debian 13 – `ping(8)`: intervallo (`-i`), timeout (`-W`), marca temporale (`-D`), niente frammentazione (`-M do`)](https://manpages.debian.org/trixie/iputils-ping/ping.8.en.html)
