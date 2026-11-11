@@ -17,11 +17,10 @@ duration: 1 hour 30 minutes
 
 ## Objectives
 
-- Understand why a cluster separates the different types of traffic, and why Corosync is the most sensitive one.
-- Move the second Corosync link to a dedicated, non-routed VLAN, without ever losing quorum.
-- Dedicate a network to migrations and verify with the counters that the traffic really goes through it.
-- Simulate the failure of the dedicated Corosync link.
-- Get the complete picture of the lab networks.
+- Corosync link 1 moved to VLAN 40 (10.40.10.0/24, no router) on all three nodes, with the cluster quorate after every step: `corosync-cfgtool -n` shows link 1 on the new addresses.
+- Live migrations carried over VLAN 100 (10.100.10.0/24), proved by the byte counters of the interfaces.
+- Knowing which Corosync link carries the cluster traffic, and what still works when the link on VLAN 40 fails.
+- A table of the lab networks (VLAN, subnet, interface, gateway, use) to plan the following labs.
 
 ## How it works
 
@@ -36,14 +35,16 @@ duration: 1 hour 30 minutes
 | **VMs** | depends on the services | |
 | **Management** | little bandwidth | GUI and SSH unreachable |
 
-The typical risk is a migration or a backup that saturates the link shared with Corosync: the cluster packets arrive late and a healthy node gets excluded. That is why the Proxmox VE documentation recommends **at least one Corosync link on a separate physical network**, plus a second link as a fallback.
+The typical risk is a migration or a backup that saturates the link shared with Corosync: the cluster packets arrive late and a healthy node gets excluded. The Proxmox VE documentation therefore asks for a cluster network with latencies under 5 ms that other traffic does not use heavily, ideally **physically separate**, and advises in particular against sharing it with storage, except as a low-priority fallback link.
 
 ### Corosync with two links
 
-Corosync (*knet* transport) monitors all the links, but in `passive` mode it transmits on only one of them, the working link with the highest priority, and switches to the other as soon as the first one fails. In the lab:
+Corosync (*knet* transport) monitors all the links, but in `passive` mode it sends the cluster traffic over only one of them: the working link with the highest priority. No priority is set in this cluster (in [Lab 06](/06-cluster-corosync/) the log shows `pri: 1` for both links), so the link with the lowest number wins, link 0. In the lab:
 
-- **link 0**: management network (`vmbr0`);
-- **link 1**: so far on `172.32.199.0/24` on `nic1`, the same network as the second iSCSI path, routed by `rtr-core`. In this lab it moves to a **dedicated VLAN, VLAN 40**, without a gateway.
+- **link 0**: management network (`vmbr0`), the link that carries the Corosync traffic;
+- **link 1**: so far on `172.32.199.0/24` on `nic1`, the same network as the second iSCSI path, routed by `rtr-core`. In this lab it moves to a **dedicated VLAN, VLAN 40**, without a gateway. It stays the fallback link, used only if link 0 fails.
+
+To make VLAN 40 the preferred link you would give it a higher `knet_link_priority` than link 0; this lab keeps the default priorities. VLAN 40 is also dedicated only at the addressing level: it shares the physical port `nic1` with the second iSCSI path.
 
 ### VLAN interfaces on a NIC and on a bridge
 
@@ -56,10 +57,23 @@ The two networks have no router: traffic cannot go through `rtr-core` and keep "
 
 ### The migration network
 
-In **Datacenter** → **Options** → **Migration Settings** you choose:
+Unless told otherwise, Proxmox VE sends migrations over the network used for cluster communication: here, the management network, which also carries Corosync link 0. In **Datacenter** → **Options** → **Migration Settings** you choose:
 
 - **Network**: the network (CIDR) over which the nodes exchange memory and disks during migrations;
 - **Type**: `secure` (the default: traffic goes through an encrypted SSH tunnel) or `insecure` (plain TCP, faster, acceptable only on a dedicated, isolated network).
+
+### Test environment and versions
+
+The outputs and measurements in this lab come from tests run in November 2026 with this configuration:
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/04-first-access-repositories-updates/)); Corosync and knet as shipped with that release (versions not recorded: `pveversion -v` lists them) |
+| Corosync | knet transport, `passive` link mode, no link priorities ([Lab 06](/06-cluster-corosync/)) |
+| Network | 10 GbE ports ([Lab 01](/01-lab-architecture/)); `vmbr0` on `nic0`; `nic1` shared by the storage network and VLAN 40; `vmbr1` and VLAN 100 on `bond0` (`nic3` + `nic4`, active-backup, [Lab 21](/21-bonding/)); MTU 1500 everywhere |
+| Migration | `type=secure` (SSH tunnel); VM 100 with 2 GiB of RAM and its disk on `rbd-vm` (Ceph 20.2, [Lab 17](/17-ceph-installation/)), so only the memory is copied |
+
+**What the tests measure, and what they do not.** There is one migration in each direction, with no other load on the networks: the runs show which way the traffic goes, not which network is faster. The failure of link 1 is simulated with `ip link set nic1.40 down` on one node: the `nic1` port stays up, so this is neither a pulled cable nor a switch failure, and it takes away the standby link, not the one in use.
 
 ## Procedure
 
@@ -187,7 +201,7 @@ nessun router su 10.40.10.0/24
    mv /etc/pve/corosync.conf.new /etc/pve/corosync.conf
    ```
 
-3. Corosync rereads the file, but **does not change the address of a link that is already active**, and says so clearly in the log:
+3. Corosync rereads the file but, in this version, **does not change the address of a link that is already active**, and the log says so:
 
    ```bash title="root@desopve01"
    journalctl -u corosync --since "-1min" --no-pager
@@ -200,7 +214,7 @@ nessun router su 10.40.10.0/24
    ... [CFG   ] Cannot configure new interface definitions: To reconfigure an interface it must be deleted and recreated. A working interface needs to be available to corosync at all times
    ```
 
-   The new address takes effect when you restart Corosync, **one node at a time**: while one node restarts, link 0 keeps the other two together and quorum is maintained.
+   **Decision.** The Proxmox VE documentation covers this case: a change that cannot be applied while Corosync is running needs a restart of the service. Restart Corosync **one node at a time**: while one node restarts, the other two stay connected over link 0 and keep 2 votes out of 3. Each command reads the quorum 6 seconds after the restart:
 
    ```bash title="root@desopve03"
    systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
@@ -230,7 +244,7 @@ nessun router su 10.40.10.0/24
    Restarting Corosync is safe only if the cluster has quorum even without that node and if no high-availability resources are in a critical state. With HA active (lab 49) you put the cluster into maintenance first.
    :::
 
-4. Link 1 now uses VLAN 40:
+4. **Result:** link 1 now uses VLAN 40:
 
    ```bash title="root@desopve01"
    corosync-cfgtool -n
@@ -316,13 +330,17 @@ nessun router su 10.40.10.0/24
    | `vmbr1.100` (migration) | 291 MiB |
    | `vmbr0` (management) | 0 MiB |
 
-   All of the VM's memory went through VLAN 100.
+   The migration went through VLAN 100: 291 MiB received on `vmbr1.100`, in line with the 290.4 MiB of VM state in the task log, against 0 MiB (rounded to the MiB) on `vmbr0`.
 
-   The times are almost the same (12 s versus 11 s): both networks have 10 Gbit/s cards and the VM uses little memory (290 MiB out of 2 GiB). The advantage of the dedicated network, here, is that the migration **no longer goes through the management and Corosync network**. In production, on a dedicated 10 or 25 Gbit/s network, a VM with a lot of RAM also migrates much faster.
+   How to read the two migrations:
+
+   - **Measured:** over the management network the task took 12 s and reported 53 ms of downtime; over VLAN 100, 11 s and 9 ms. Both times about 290 MiB of state were transferred out of 2 GiB of RAM.
+   - **Interpretation:** the two runs do not compare the networks. There is one run per direction, in opposite directions, both paths have 10 GbE ports, and a transfer of a few hundred MiB is too short to show a difference; the gap in downtime cannot be put down to the network either. The rates in the log (9.8 GiB/s during the copy, 1.0 GiB/s on average) do not measure the network either: 9.8 GiB/s is more than a 10 Gbit/s port can carry, and at 1.0 GiB/s the 290 MiB would have taken well under the second or two that the log shows for the copy. What crossed the network is measured by the counters.
+   - **What the dedicated network gives here:** migrations no longer cross the management network, the one that carries Corosync link 0. Whether it also makes them faster is a separate question: repeat several runs per direction with a VM that uses much more memory, with and without load on `vmbr0`. A gain is to be expected only if the dedicated network is faster than the shared one, or the shared one is busy.
 
 ### 5. Failure of the dedicated Corosync link
 
-On `desopve03` bring down only VLAN 40 (the `nic1` card stays up, with the iSCSI path):
+With the default priorities link 1 is the standby link: bringing it down removes the redundancy without moving the Corosync traffic (the loss of link 0 is tested in [Lab 06](/06-cluster-corosync/)). On `desopve03` bring down only VLAN 40 (the `nic1` card stays up, with the iSCSI path):
 
 ```bash title="root@desopve03"
 ip link set nic1.40 down
@@ -355,7 +373,7 @@ multipath -ll | grep -c "active ready"
 2
 ```
 
-Link 1 to `desopve03` is no longer `connected`, but the node is still reachable over link 0 and the cluster has all three votes. Storage does not notice: both iSCSI paths are active. Bring the VLAN back up and Corosync picks it up again on its own:
+Link 1 toward `desopve03` is no longer `connected`; the node is still reachable over link 0 and the cluster keeps all three votes. `multipath -ll` still shows both iSCSI paths active: bringing down the VLAN interface did not touch `nic1`. Until link 1 comes back, however, the cluster has a single link toward `desopve03`. Bring the VLAN back up and Corosync picks it up again on its own:
 
 ```bash title="root@desopve03"
 ip link set nic1.40 up
@@ -369,6 +387,8 @@ journalctl -u corosync --since "-2min" --no-pager | grep "host: 3 link: 1"
 Nov 09 19:38:34 desopve01 corosync[120106]:   [KNET  ] link: host: 3 link: 1 is down
 Nov 09 19:38:44 desopve01 corosync[120106]:   [KNET  ] rx: host: 3 link: 1 is up
 ```
+
+The two messages are 10 seconds apart, but that interval includes the time the interface stayed down, which was not recorded: it is neither a detection time nor a recovery time. To measure those, note the time of each command (`date +%T.%N; ip link set nic1.40 down`) and compare it with the timestamps of the `link: 1 is down` and `is up` messages. To confirm which link carries the traffic, read the knet counters on `desopve01` twice, a few seconds apart: `corosync-cmapctl -m stats | grep -E 'node3\.link[01]\.tx_data_bytes'`. The counter that grows belongs to the link in use.
 
 ### 6. The overall picture of the lab networks
 
@@ -399,18 +419,20 @@ flowchart LR
 | Migration | 100 | 10.100.10.0/24 | `vmbr1.100` (`bond0`) | none | migrations |
 | VMs (test) | 10, 20 | 10.10.10.0/24, 10.20.20.0/24 | `vmbr1` (`bond0`) | none (until lab 26) | containers 121-123 |
 
-In production the most critical networks would have their own physical cards: Corosync at least on a dedicated port, Ceph and storage on fast cards separate from VM traffic. In the lab they are separated with VLANs, and the principle is the same.
+In production the most critical networks would have their own physical cards: Corosync at least on a dedicated port, Ceph and storage on fast cards separate from VM traffic. In the lab they are separated with VLANs. A VLAN separates addresses and broadcast domains, and without a gateway its traffic cannot leave it; it does not separate the bandwidth of the port. VLAN 40 shares `nic1` with the second iSCSI path, VLAN 100 shares `bond0` with the VMs. Whether this matters for Corosync was not measured here: you would watch the latency of the link (`corosync-cmapctl -m stats | grep -E 'link1\.latency_(ave|max)'`) while saturating `nic1`.
 
 ## Verification and tests
 
-| Test | Result |
-|---|---|
-| VLAN 40 and 100 interfaces on `desopve01-03` | reachable between the nodes, no router on either network |
-| Reload of `corosync.conf` with new addresses | rejected for the active link: a Corosync restart is needed |
-| Corosync restart, one node at a time | quorum always present, link 1 on 10.40.10.0/24 |
-| Migration before and after | 12 s / 53 ms downtime over management, 11 s / 9 ms downtime over VLAN 100 |
-| Path taken by the migration | 291 MiB on `vmbr1.100`, 0 on `vmbr0` |
-| Failure of link 1 on `desopve03` | link 1 not connected, quorum 3/3, iSCSI with 2 active paths, automatic recovery |
+The lab has succeeded when link 1 runs on 10.40.10.0/24 on every node with the cluster quorate, the migration traffic shows up on the counters of `vmbr1.100`, and the loss of `nic1.40` on one node leaves the cluster quorate over link 0.
+
+| Check | Expected result | Observed in the test |
+|---|---|---|
+| VLAN 40 and 100 interfaces on `desopve01-03` | reachable between the nodes, no router | all reachable; nothing answers on 10.40.10.1 |
+| Reload of `corosync.conf` with new addresses | the address of the active link does not change: restart needed | log: `Internal value was NOT changed` |
+| Corosync restart, one node at a time | cluster quorate | `Quorate: Yes` 6 s after each restart; link 1 on 10.40.10.0/24 |
+| Migration over management, then over VLAN 100 | completed | 12 s and 11 s (task duration); downtime reported by the task 53 ms and 9 ms; one run per direction |
+| Path taken by the migration | bytes on `vmbr1.100`, not on `vmbr0` | 291 MiB on `vmbr1.100`, 0 MiB on `vmbr0` |
+| `nic1.40` down on `desopve03` | link 1 not connected, cluster quorate over link 0, storage unaffected | 3 votes, quorate; 2 active iSCSI paths; link 1 back on its own once the VLAN is up |
 
 ## Final lab state
 
@@ -423,15 +445,18 @@ In production the most critical networks would have their own physical cards: Co
 
 ## What you learned
 
-- Corosync needs low, steady latency: protect it from heavy traffic with a dedicated link, plus a second link as a fallback.
-- You edit `corosync.conf` on a copy, incrementing `config_version`. The address of an active link changes only when you restart Corosync, one node at a time.
-- A VLAN on a card (`nic1.40`) or on a VLAN-aware bridge (`vmbr1.100`) gives the node an extra network without extra cables.
-- Networks without a router stay truly isolated: if they fail, traffic does not find alternative routes.
-- The migration network is chosen for the whole datacenter, and the interface counters tell you which way the traffic really goes.
+- **Which link should carry Corosync:** with no priorities, knet uses link 0. Decide which network has the lowest, steadiest latency and make it the preferred link, by its number or with `knet_link_priority`; check it with the knet counters, not by assuming it.
+- **How to change a Corosync address safely:** edit a copy, increment `config_version`, move it into place, then read the log. If it says the address of an active link was not changed, restart Corosync one node at a time, checking the quorum before moving on.
+- **What a VLAN separates and what it does not:** addresses and broadcast domains, and, without a gateway, routes to other networks; not the bandwidth of the port. For Corosync in production that calls for a dedicated port, not only a dedicated VLAN.
+- **How to prove where the traffic goes:** compare the byte counters of the interfaces before and after; the rates printed by the migration task are not network throughput.
+- **When a dedicated migration network pays off:** always, to keep migration bursts away from the network that carries Corosync; for speed, only if it is faster than the shared one, which you measure with repeated runs.
 
 ## References
 
-- [Proxmox VE – Cluster Network](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_cluster_network)
-- [Proxmox VE – Corosync Redundancy](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_redundancy)
+- [Proxmox VE – Cluster network: requirements and separation](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_cluster_network)
+- [Proxmox VE – Corosync redundancy and link priorities](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_redundancy)
 - [Proxmox VE – Edit corosync.conf](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_edit_corosync_conf)
-- [Proxmox VE – Migration Network](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_migration_network)
+- [Proxmox VE – Migration type: secure and insecure](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_migration_type)
+- [Proxmox VE – Migration network](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_migration_network)
+- [corosync.conf(5) – `link_mode` and `knet_link_priority`](https://manpages.debian.org/trixie/corosync/corosync.conf.5.en.html)
+- [cmap_keys(7) – the `stats.knet` counters](https://manpages.debian.org/trixie/corosync/cmap_keys.7.en.html)
