@@ -4,9 +4,9 @@ title: Chi siamo
 
 ## Il progetto
 
-**Proxmox Community** è un manuale pratico e aperto su Proxmox VE 9, Proxmox Backup Server 4 e Proxmox Datacenter Manager. Il cuore del progetto è un percorso di 53 lab concatenati, svolti su un unico laboratorio reale: server Proxmox VE, un domain controller, un NAS, uno switch con VLAN, un router e un server di servizi di rete.
+**Proxmox Community** è un manuale pratico e aperto su Proxmox VE 9, Proxmox Backup Server 4 e Proxmox Datacenter Manager, pensato per imparare Proxmox VE **facendo**.
 
-L'obiettivo è semplice: imparare Proxmox VE **facendo**, con procedure che funzionano davvero. Ogni comando riporta l'output reale, ogni azione nell'interfaccia web ha il suo screenshot, e i guasti (dischi, nodi, link di rete) sono provati e misurati sul laboratorio.
+Il manuale raccoglie 53 laboratori collegati, dalla preparazione dell'ambiente alla gestione di cluster, storage, reti e backup. Le guide seguono la stessa infrastruttura (server Proxmox VE, un domain controller, un NAS, uno switch con VLAN, un router e un server di servizi di rete) e riportano configurazioni, schermate e risultati delle prove descritte, compresi gli errori incontrati e i passaggi necessari per risolverli. Versioni software e caratteristiche dell'ambiente fanno parte dell'esercizio: ripetendo una prova su un sistema diverso, alcuni output e risultati possono cambiare.
 
 Il progetto è pensato per crescere: oltre al percorso dei lab, chiunque può proporre nuove guide, correzioni e traduzioni. Vedi [Contribuisci](/it/contributing/).
 
@@ -27,4 +27,4 @@ Proxmox® è un marchio registrato di Proxmox Server Solutions GmbH. **Questo pr
 
 Gli altri nomi e marchi citati (per esempio Debian, Ceph, TrueNAS, MikroTik, Microsoft Windows, VMware ESXi) appartengono ai rispettivi proprietari e sono usati solo per descrivere i prodotti.
 
-La documentazione ufficiale di Proxmox VE resta il riferimento: ogni lab rimanda alle pagine ufficiali nella sezione **Riferimenti**.
+La documentazione ufficiale di Proxmox VE resta il riferimento: i lab rimandano alle pagine ufficiali pertinenti nella sezione **Riferimenti**.

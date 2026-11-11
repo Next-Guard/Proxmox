@@ -47,20 +47,22 @@ duration: about N minutes
 
 ## Objectives
 
-- What you will be able to do at the end.
+- The operational result the reader will be able to verify at the end.
 
 ## How it works
 
-The essential theory to understand what happens, with a diagram if it helps.
+Only the theory this test needs, with a diagram if it helps.
+Point to earlier guides for everything else.
 
 ## Procedure
 
-1. Numbered steps. Every action in the web interface has its screenshot,
-   every command has its real output.
+1. Numbered steps. Every meaningful action in the web interface has its
+   screenshot; every command is followed by the output from your system.
 
 ## Verification and tests
 
-Tests that prove it works, also with simulated failures.
+What to check and which result counts as success; simulated failures
+when they help explain the behavior.
 
 ## Final state
 
@@ -68,7 +70,7 @@ What stays configured at the end, for whoever continues with other guides.
 
 ## What you learned
 
-- The key concepts in a few lines.
+- The technical decision the reader can now make.
 
 ## References
 
@@ -107,6 +109,7 @@ Total votes:      3
 ## Rules
 
 - **Real tests.** Only publish procedures you actually ran: commands, output and screenshots must come from your system. State the Proxmox VE version you used.
+- **Measurements and interpretations.** Keep what you measured apart from how you explain it. If the test does not verify an interpretation, say so and name the check that would. For benchmarks, describe the versions, the storage configuration and the cache layers involved.
 - **Screenshots.** PNG format, only the relevant ones, one for every meaningful action. Put them in `src/assets/images/<guide-name>/` and link them with a relative path: `../../assets/images/<guide-name>/01-screen.png` from an English page, `../../../assets/images/<guide-name>/01-screen.png` from an Italian page. The site converts and resizes them.
 - **Links between pages.** Use the page address with the final slash: `/10-zfs/#anchor` in English, `/it/10-zfs/#ancora` in Italian. Downloadable files go in `public/files/<guide-name>/` and are linked as `/files/<guide-name>/file-name`.
 - **No sensitive data.** Never passwords, tokens, keys, public IP addresses or real names of people and companies. Use placeholders such as `<lab-password>` and obscure serial numbers and MAC addresses in the screenshots.

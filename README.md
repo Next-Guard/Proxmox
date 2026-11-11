@@ -2,7 +2,7 @@
 
 **English** · [Italiano](#italiano)
 
-Practical, connected labs on **Proxmox VE 9**, **Proxmox Backup Server 4** and **Proxmox Datacenter Manager**, all run on a single real lab: from empty servers to a complete datacenter with a cluster, shared storage, Ceph, SDN, firewalling, backup, high availability and automation.
+Practical, connected labs on **Proxmox VE 9**, **Proxmox Backup Server 4** and **Proxmox Datacenter Manager**, all built on the same lab infrastructure: from empty servers to a complete datacenter with a cluster, shared storage, Ceph, SDN, firewalling, backup, high availability and automation.
 
 - Website: <https://proxmox.community>
 - Contribute: open an issue or a pull request – see [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -20,7 +20,7 @@ Proxmox® is a registered trademark of Proxmox Server Solutions GmbH. This proje
 
 ## Italiano
 
-Laboratori pratici e concatenati su **Proxmox VE 9**, **Proxmox Backup Server 4** e **Proxmox Datacenter Manager**, svolti su un unico laboratorio reale: da server vuoti a un datacenter completo con cluster, storage condiviso, Ceph, SDN, firewall, backup, alta disponibilità e automazione.
+Laboratori pratici e concatenati su **Proxmox VE 9**, **Proxmox Backup Server 4** e **Proxmox Datacenter Manager**, svolti sulla stessa infrastruttura di laboratorio: da server vuoti a un datacenter completo con cluster, storage condiviso, Ceph, SDN, firewall, backup, alta disponibilità e automazione.
 
 - Sito: <https://proxmox.community/it/>
 - Contribuisci: apri una issue o una pull request – vedi [CONTRIBUTING.md](CONTRIBUTING.md)

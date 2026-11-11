@@ -47,20 +47,22 @@ duration: circa N minuti
 
 ## Obiettivi
 
-- Cosa saprai fare alla fine.
+- Il risultato operativo che il lettore potrà verificare alla fine.
 
 ## Come funziona
 
-La teoria essenziale per capire cosa succede, con uno schema se aiuta.
+Solo la teoria che serve per questa prova, con uno schema se aiuta.
+Per il resto rimanda alle guide precedenti.
 
 ## Procedura
 
-1. Passi numerati. Ogni azione nell'interfaccia web ha il suo screenshot,
-   ogni comando ha il suo output reale.
+1. Passi numerati. Ogni azione significativa nell'interfaccia web ha il suo
+   screenshot; ogni comando è seguito dall'output ottenuto sul tuo sistema.
 
 ## Verifica e test
 
-Prove che dimostrano che funziona, anche con guasti simulati.
+Cosa controllare e quale risultato vale come successo; guasti simulati,
+se servono a capire il comportamento.
 
 ## Stato finale
 
@@ -68,7 +70,7 @@ Cosa resta configurato alla fine, per chi prosegue con altre guide.
 
 ## Cosa hai imparato
 
-- I concetti chiave in poche righe.
+- La decisione tecnica che il lettore ora sa prendere.
 
 ## Riferimenti
 
@@ -107,6 +109,7 @@ Total votes:      3
 ## Regole
 
 - **Prove reali.** Pubblica solo procedure eseguite davvero: comandi, output e screenshot devono venire dal tuo sistema. Indica la versione di Proxmox VE usata.
+- **Misure e interpretazioni.** Tieni separato ciò che hai misurato da come lo spieghi. Se un'interpretazione non è verificata dalla prova, dillo e indica quale verifica servirebbe. Per i benchmark descrivi versioni, configurazione dello storage e livelli di cache.
 - **Screenshot.** Formato PNG, solo quelli rilevanti, uno per ogni azione significativa. Mettili in `src/assets/images/<nome-guida>/` e collegali con un percorso relativo: `../../../assets/images/<nome-guida>/01-schermata.png` da una pagina italiana, `../../assets/images/<nome-guida>/01-schermata.png` da una pagina inglese. Il sito li converte e li ridimensiona.
 - **Link tra le pagine.** Usa l'indirizzo della pagina con la barra finale: `/it/10-zfs/#ancora` in italiano, `/10-zfs/#anchor` in inglese. I file da scaricare vanno in `public/files/<nome-guida>/` e si collegano come `/files/<nome-guida>/nome-file`.
 - **Nessun dato sensibile.** Mai password, token, chiavi, indirizzi IP pubblici o nomi reali di persone e aziende. Usa segnaposto come `<password-lab>` e oscura negli screenshot numeri di serie e indirizzi MAC.

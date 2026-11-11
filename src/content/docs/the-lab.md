@@ -4,13 +4,17 @@ title: The lab and the path
 
 A hands-on path through **Proxmox VE 9.2**: you start from an empty lab and end up with a complete datacenter with a cluster, shared storage, Ceph, SDN, backup and high availability.
 
-Every lab follows the same structure:
+The labs share a common structure, shaped around the topic of each one:
 
-- **Dependencies**: the labs to complete first, the machines and services you need;
-- **Objectives** and **How it works**: the essential theory to understand what happens;
-- **Procedure**: numbered steps, every action in the web interface with its screenshot and every command with its real output;
-- **Verification and tests**, including simulated failures;
-- **Final lab state**: what stays configured for the following labs.
+- **Dependencies**: the labs to complete first, and the machines and services you need;
+- **Objectives**: the operational result you will be able to verify at the end;
+- **How it works**: only the theory the test needs, with pointers to earlier labs;
+- **Procedure**: numbered steps, with the configurations, screenshots and outputs of the tests described;
+- **Verification and tests**: what to check and which result counts as success, sometimes with deliberately induced failures;
+- **Final lab state**: what stays configured for the following labs;
+- **What you learned**: the technical decisions you can now make.
+
+Software versions and the characteristics of the environment are part of the exercise: if you repeat a test on a different system, some outputs and results may differ.
 
 The credentials and addresses used throughout the manual are in [Appendix B](/b-credentials-and-addresses/).
 
@@ -19,7 +23,7 @@ The credentials and addresses used throughout the manual are in [Appendix B](/b-
 - **Lab.** All the labs take place on the same lab, described and prepared in [Lab 01](/01-lab-architecture/): physical servers, a switch with VLANs, a router and a network services server. To rebuild it as virtual machines on a single Proxmox VE server, see [Appendix D](/d-rebuild-as-virtual/).
 - **Password.** `<lab-password>` stands for the single lab password, which you choose: see [Appendix B](/b-credentials-and-addresses/#the-lab-password).
 - **Redacted hardware data.** In the screenshots, the data that identify the lab hardware are redacted: disk serial numbers, MAC addresses of the servers' network cards, CPU and disk models. In the text output, the same data are replaced by placeholders such as `<seriale-disco-1>`. On your hardware you will see different values.
-- **Output.** The code blocks show real commands and output from the lab; the prompts (`root@desopve01:~#`, `PS C:\>`) show where to run each command.
+- **Commands and output.** The title of a command block (for example `root@desopve01`) tells you where to run it, and the copy button copies only the command. Output appears in separate blocks, without a copy button, and shows what the documented test produced.
 
 ## How it is organized
 

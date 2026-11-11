@@ -4,9 +4,9 @@ title: About
 
 ## The project
 
-**Proxmox Community** is a practical, open manual about Proxmox VE 9, Proxmox Backup Server 4 and Proxmox Datacenter Manager. At its core is a path of 53 connected labs, all run on a single real lab: Proxmox VE servers, a domain controller, a NAS, a switch with VLANs, a router and a network-services server.
+**Proxmox Community** is a practical, open manual about Proxmox VE 9, Proxmox Backup Server 4 and Proxmox Datacenter Manager, written for people who want to learn Proxmox VE **by doing**.
 
-The goal is simple: learn Proxmox VE **by doing**, with procedures that actually work. Every command shows its real output, every action in the web interface has its screenshot, and failures (disks, nodes, network links) are tested and measured on the lab.
+The manual is a sequence of 53 connected labs, from preparing the environment to running clusters, storage, networking and backups. All the guides work on the same infrastructure (Proxmox VE servers, a domain controller, a NAS, a switch with VLANs, a router and a network-services server) and document the configurations, screenshots and results of the tests they describe, including the errors met along the way and the steps taken to fix them. Software versions and the characteristics of the environment are part of the exercise: if you repeat a test on a different system, some outputs and results may differ.
 
 The project is designed to grow: besides the lab path, anyone can propose new guides, fixes and translations. See [Contribute](/contributing/).
 
@@ -27,4 +27,4 @@ Proxmox® is a registered trademark of Proxmox Server Solutions GmbH. **This pro
 
 Other names and trademarks mentioned (for example Debian, Ceph, TrueNAS, MikroTik, Microsoft Windows, VMware ESXi) belong to their respective owners and are used only to describe the products.
 
-The official Proxmox VE documentation remains the reference: every lab links to the official pages in its **References** section.
+The official Proxmox VE documentation remains the reference: the labs link to the relevant official pages in their **References** section.

@@ -1,11 +1,11 @@
 ---
 title: Proxmox VE 9 labs, from zero to hero
-description: 53 hands-on, connected Proxmox VE 9 labs on a single real lab, from empty servers to a complete datacenter with a cluster, Ceph, SDN, firewalling, backup, high availability and automation.
+description: 53 hands-on, connected Proxmox VE 9 labs built on the same lab infrastructure, from empty servers to a complete datacenter with a cluster, Ceph, SDN, firewalling, backup, high availability and automation.
 template: splash
 editUrl: false
 hero:
   title: Proxmox VE&nbsp;9 from zero to hero, <span class="pc-gradient">on a real lab.</span>
-  tagline: 53 hands-on, connected labs that take you from empty servers to a complete datacenter. Every step was actually performed — the screenshots and the command output are the real ones.
+  tagline: 53 hands-on, connected labs that take you from empty servers to a complete datacenter. Each guide documents the configurations, screenshots and results of its tests, including the errors met along the way and how they were fixed.
   actions:
     - text: Start with Lab 01
       link: /01-lab-architecture/
@@ -94,20 +94,22 @@ The four tracks are meant to be followed in this order. Before each lab, check i
 
 </Section>
 
-<Section id="lab-structure" eyebrow="Every lab">
+<Section id="lab-structure" eyebrow="Lab structure">
 
-## How every lab is organized
+## How the labs are organized
 
-Every lab has the same structure, so you always know where to look.
+The labs share a common structure, shaped around each topic, so you know where to look.
 
 <FeatureGrid>
-  <Feature icon="dependencies" title="Dependencies">The labs to complete first, the machines and services you need.</Feature>
-  <Feature icon="objectives" title="Objectives and How it works">The essential theory to understand what happens.</Feature>
-  <Feature icon="procedure" title="Procedure">Numbered steps: every action in the web interface with its screenshot, every command with its real output.</Feature>
-  <Feature icon="verify" title="Verification and tests">Often with simulated and measured failures.</Feature>
+  <Feature icon="dependencies" title="Dependencies">The labs to complete first, and the machines and services you need.</Feature>
+  <Feature icon="objectives" title="Objectives and How it works">The result you will verify at the end, and only the theory needed to get there.</Feature>
+  <Feature icon="procedure" title="Procedure">Numbered steps, with the configurations, screenshots and outputs of the tests described.</Feature>
+  <Feature icon="verify" title="Verification and tests">What to check and which result counts as success, sometimes with deliberately induced failures.</Feature>
   <Feature icon="state" title="Final state">What stays configured for the following labs.</Feature>
-  <Feature icon="learned" title="What you learned">The key concepts, plus References to the official documentation.</Feature>
+  <Feature icon="learned" title="What you learned">The technical decisions you can now make, plus References to the official documentation.</Feature>
 </FeatureGrid>
+
+Software versions and the characteristics of the environment are part of the exercise: if you repeat a test on a different system, some outputs and results may differ.
 
 </Section>
 
