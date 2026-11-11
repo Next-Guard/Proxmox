@@ -17,7 +17,7 @@ duration: 1 hour 30 minutes
   - nodes `desopve01`, `desopve02`, `desopve03`;
   - VMs 104 `web01`, 105 `web02`, 106 `web03` (172.27.199.104-106, nginx on port 80), all on `rbd-vm`;
   - CT 122 `vlan-ct2` (10.10.10.122 on VLAN 10), on `rbd-vm`.
-- **Measurements:** from the management network, one HTTP request per second to `web03` and the `ha-manager` status every 5 s, with two loops left running in two terminals:
+- **Measurements:** from the management network, one HTTP request per second to `web03` (with a 1-second timeout) and the `ha-manager` status every 5 s, with two loops left running in two terminals:
 
   ```bash
   while :; do printf '%s ' "$(date +%T)"; curl -s -m 1 -o /dev/null -w '%{http_code}\n' http://172.27.199.106/; sleep 1; done
@@ -30,19 +30,18 @@ duration: 1 hour 30 minutes
 
 ## Objectives
 
-- Understand how Proxmox VE HA makes decisions, monitors the nodes and fences them (*fencing*).
-- Put VMs and containers under HA, from the GUI and from the CLI.
-- Use the PVE 9 **affinity rules** (node affinity and resource affinity) instead of HA groups.
-- Enable the **dynamic CRS** and watch **automatic rebalancing** move a VM on its own.
-- Put a node in **maintenance mode** and find out when evacuation is not possible.
-- Use HA **arm/disarm** for work on the whole cluster.
-- Abruptly power off a node and measure fencing, recovery and the return of the service.
+- VMs 104-106 and CT 122 under HA, with `ha-manager status` showing fencing `armed` and the watchdog active on all three nodes.
+- The PVE 9 **affinity rules** in place: node affinity for `web01`, a negative resource affinity rule for the web servers and a positive one for `web02` and CT 122, knowing why the first combination you try is refused.
+- The **dynamic CRS** with **automatic rebalancing** enabled, and a rebalancing migration found in the CRM log.
+- A node drained with **maintenance mode** and repopulated at the end, once the rule that blocked the evacuation has been reduced.
+- HA **disarmed** and armed again for work on the whole cluster, with the watchdogs released and then active again.
+- A node failure handled without manual intervention: `web03` restarted on another node, with the fencing and recovery times read from the master's log and kept separate from the service interruption measured from the network.
 
 ## How it works
 
 **Two daemons.** Every node runs the *Local Resource Manager* (`pve-ha-lrm`), which starts, stops and migrates the resources of its own node. The *Cluster Resource Manager* (`pve-ha-crm`) also runs on every node, but only one of them is the **master**: it decides where each resource must run. The shared state lives in `/etc/pve/ha/` (`resources.cfg`, `rules.cfg`, `manager_status`), so it is valid only as long as the cluster has **quorum**.
 
-**Self-fencing with the watchdog.** A node that hosts HA resources keeps a *watchdog* armed: `watchdog-mux` opens it and the LRM renews it at every cycle. If the node loses quorum it can no longer renew it, and after 60 s the watchdog reboots it: the node "fences" itself. The other nodes wait for its *lock* in the cluster file system to expire; at that point they are sure that the node is no longer writing to the shared disks, and they restart its resources elsewhere (*recovery*). The default watchdog is `softdog`, a software watchdog in the kernel; with a hardware watchdog (for example `ipmi_watchdog`) you choose the module in `/etc/default/pve-ha-manager`.
+**Self-fencing with the watchdog.** A node that hosts HA resources keeps a *watchdog* armed: `watchdog-mux` opens it and the LRM renews it at every cycle. If the node loses quorum it can no longer renew it, and after 60 s the watchdog reboots it: the node "fences" itself. The other nodes wait for its *lock* in the cluster file system to expire; at that point they are sure that the node is no longer writing to the shared disks, and they restart its resources elsewhere (*recovery*). The documentation gives about 2 minutes as the typical time for detecting a failure and failing over. The default watchdog is `softdog`, a software watchdog in the kernel; with a hardware watchdog (for example `ipmi_watchdog`) you choose the module in `/etc/default/pve-ha-manager`.
 
 **Requirements:** at least 3 votes in the cluster (with an even number of nodes you add a *QDevice*, `pvecm qdevice setup <ip>`, which gives one extra vote to one of the two sides), shared storage for the resources, and reliable networks for Corosync.
 
@@ -59,7 +58,23 @@ duration: 1 hour 30 minutes
 - `static`: uses the *configured* CPU and RAM of the resources;
 - `dynamic` (new in 9.2): also uses the *actual* CPU and RAM usage of the nodes.
 
-With **Automatic Rebalance**, the CRS moves resources on its own when the imbalance between the nodes exceeds a threshold (default 30%) for a certain number of HA cycles (default 3) and the move reduces it by at least a margin (default 10%).
+With **Automatic Rebalance**, the CRS moves resources on its own when the imbalance between the nodes exceeds a threshold (default 30%) for a certain number of HA rounds (default 3) and the move reduces it by at least a margin (default 10%). Each HA round lasts about 10 seconds.
+
+### Test environment and versions
+
+The times and outputs in this lab come from a run carried out on 10 November 2026 (last checked in November 2026), with this configuration:
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/04-first-access-repositories-updates/)), on the three cluster nodes |
+| Cluster | `deso-cluster`, three nodes with one vote each; Corosync link 0 on the management network, link 1 on VLAN 40 ([Lab 06](/06-cluster-corosync/), [Lab 22](/22-dedicated-networks/)) |
+| Watchdog | `softdog`, the default (step 1) |
+| Shared storage | `rbd-vm`: Ceph 20.2.5 (tentacle), replicated pool `size 3` / `min_size 2`, OSDs on all three nodes ([Lab 17](/17-ceph-installation/), [Lab 18](/18-ceph-growth-maintenance-failures/)) |
+| Migrations | network on VLAN 100, type `secure` ([Lab 22](/22-dedicated-networks/)) |
+| HA resources | VMs 104-106: Debian 13 from template 9000, 2 GiB of RAM, nginx ([Lab 40](/40-templates-cloud-init-clones/)); CT 122 ([Lab 20](/20-bridges-stable-names-vlans/)) |
+| CRS | `dynamic`, with rebalance on start and automatic rebalancing at the default thresholds (step 4) |
+
+**What the test measures, and what it does not.** The times of the HA events come from the log of the CRM master. Since the HA manager works in rounds of about 10 seconds, their resolution is of that order. The `+N s` lines come from a `ha-manager status` read every 5 seconds. The service check sends one HTTP request per second, with a 1-second timeout, from the management network: it tells you when nginx answers again, not when the VM finished booting. The failure was simulated once, by powering a node off. The test therefore does not cover a node that keeps running but loses the network, the case where the watchdog's self-fencing comes into play, and a single run does not show how much the times vary.
 
 ## Procedure
 
@@ -135,7 +150,7 @@ cannot create group: ha groups have been migrated to rules
 
    ![Negative resource affinity rule on the three web servers](../../assets/images/49/03-regola-resource-affinity.png)
 
-   Saving fails. The same rule created from the CLI shows the reason:
+   **Error observed.** Saving fails. The same rule created from the CLI shows the reason:
 
    ```bash
    ha-manager rules add resource-affinity web-separati --resources vm:104,vm:105,vm:106 --affinity negative
@@ -146,7 +161,9 @@ cannot create group: ha groups have been migrated to rules
    resources: resources are in node affinity rules with multiple priorities
    ```
 
-   A resource that is in a node affinity rule **with multiple priorities** cannot also be in a resource affinity rule. Simplify the node affinity to a single priority level and add the two resource affinity rules:
+   A resource that is in a node affinity rule **with multiple priorities** cannot also be in a resource affinity rule: it is one of the feasibility checks that the documentation lists for HA rules.
+
+   **Decision.** Simplify the node affinity rule to a single priority level, then add the two resource affinity rules:
 
    ```bash
    # the ID of the rule created in the GUI is generated: read yours with 'ha-manager rules config'
@@ -167,6 +184,8 @@ cannot create group: ha groups have been migrated to rules
    │ 1       │ in use │ web-separati          │ resource-affinity │ vm:104,vm:105,vm:106 │ i tre web server mai sullo stesso nodo │
    └─────────┴────────┴───────────────────────┴───────────────────┴──────────────────────┴────────────────────────────────────────┘
    ```
+
+   **Result.** All three rules are accepted and `in use`.
 
 ### 4. Dynamic CRS
 
@@ -204,15 +223,15 @@ pve-ha-crm[1679]: switching scheduler mode from 'basic' to 'dynamic'
    service vm:106 (desopve03, started)
    ```
 
-   `web03` **does not move**: `desopve01` hosts `web01`, `desopve02` hosts `web02`, and the rule forbids placing it next to them. The node is in maintenance mode, but it cannot be shut down.
+   **Behavior observed.** `web03` **does not move**: after 100 seconds it is still `started` on `desopve03`. `desopve01` hosts `web01`, `desopve02` hosts `web02`, and the rule forbids placing `web03` next to either of them. The node is in maintenance mode, but it cannot be shut down yet.
 
    ![Node in maintenance mode with web03 still on it](../../assets/images/49/05-manutenzione-bloccata.png)
 
    :::note
-   A *Keep Separate* rule with as many resources as there are nodes leaves **zero** headroom: no evacuation for maintenance and no recovery after a failure. On 3 nodes, keep at most 2 resources apart.
+   A *Keep Separate* rule with as many resources as there are nodes leaves **zero** headroom. In this lab it blocked the evacuation for maintenance. After a failure, according to the documentation, a resource that cannot satisfy its resource affinity rule stays in the `recovery` state: this lab did not test that case. On 3 nodes, keep at most 2 resources apart.
    :::
 
-2. Reduce the rule to two VMs. `web03` is evacuated immediately:
+2. **Decision.** Reduce the rule to two VMs:
 
    ```bash
    ha-manager rules set resource-affinity web-separati --resources vm:104,vm:105
@@ -223,7 +242,9 @@ pve-ha-crm[1679]: switching scheduler mode from 'basic' to 'dynamic'
    06:30:06 pve-ha-crm[1679]: service 'vm:106': state changed from 'migrate' to 'started'  (node = desopve02)
    ```
 
-3. End of maintenance: the resources move back on their own to the node they came from.
+   **Result.** `web03` is evacuated straight away: 20 seconds pass in the CRM log between the migration order and the `started` state on `desopve02`. Changing the rule alone was enough to unblock the evacuation.
+
+3. End of maintenance: the resources move back on their own to the node they came from, here in 20 seconds according to the CRM log.
 
    ```bash
    ha-manager crm-command node-maintenance disable desopve03
@@ -260,7 +281,7 @@ pve-ha-crm[1679]: switching scheduler mode from 'basic' to 'dynamic'
    06:33:07 pve-ha-crm[1679]: service 'vm:106': state changed from 'migrate' to 'started'  (node = desopve03)
    ```
 
-   After a few HA cycles above the threshold (`ha-auto-rebalance-hold-duration`, default 3), the CRS chose on its own the VM to move and the target node, with a 20 s live migration. `web01` stayed on `desopve01` because of its node affinity.
+   The imbalance stayed above the threshold for a few HA rounds (`ha-auto-rebalance-hold-duration`, 3 by default); then the CRS chose on its own the VM to move and the target node. The live migration took 20 seconds in the CRM log. `web01` stayed on `desopve01`, the node its affinity rule prefers.
 
 ### 7. Arming and disarming HA
 
@@ -329,20 +350,26 @@ lrm desopve01 (active, watchdog active, Tue Nov 10 06:34:51 2026)
    06:37:44 pve-ha-crm[1679]: service 'vm:106': state changed from 'recovery' to 'started'  (node = desopve02)
    ```
 
-4. The measured sequence:
+4. The measured sequence, with the source of each time:
 
-   | Time | Event | Since power-off |
-   |---|---|---|
-   | 06:35:36 | `desopve03` powered off | 0 s |
-   | 06:35:38 | first failed HTTP request | 2 s |
-   | 06:35:54 | the master sees the node as `unknown` | 18 s |
-   | 06:36:44 | node and resource in `fence`, notification sent | 68 s |
-   | 06:37:44 | node lock acquired: fencing confirmed, recovery on `desopve02` | 128 s |
-   | 06:38:46 | the nginx of `web03` responds again | 190 s |
-
-   About two minutes are needed to be **certain** that the lost node is no longer writing to the disks (the expiry of its lock); the rest is the boot of the VM. It is the price of data safety: no *split brain*.
+   | Time | Event | Since power-off | Source |
+   |---|---|---|---|
+   | 06:35:36 | `desopve03` powered off | 0 s | start of the test |
+   | 06:35:38 | first failed HTTP request | 2 s | HTTP loop |
+   | 06:35:54 | the master sees the node as `unknown` | 18 s | CRM log |
+   | 06:36:44 | node and resource in `fence`, notification sent | 68 s | CRM log |
+   | 06:37:44 | node lock acquired: fencing confirmed, recovery on `desopve02` | 128 s | CRM log |
+   | 06:38:46 | the nginx of `web03` responds again | 190 s | HTTP loop |
 
    ![VM 106 restarted on desopve02 with desopve03 powered off](../../assets/images/49/07-failover-nodo-spento.png)
+
+   The table holds three different observations, which are worth reading separately:
+
+   - **Fencing confirmed after 128 seconds (CRM log).** This part does not depend on the VM: the CRM can restart the resources of the lost node only once it has acquired that node's lock, which is possible only after the lock has expired. The figure is consistent with the typical time of about 2 minutes that the documentation gives for detection and failover. With a single run, the test does not show how much it varies, and the log has the resolution of an HA round (about 10 seconds). To check it, repeat the test a few times and compare the time of the power-off with the CRM log on the master (`journalctl -u pve-ha-crm`).
+   - **62 more seconds before nginx answers (HTTP loop).** They are compatible with the start of the VM on `desopve02` and the boot of Debian up to nginx, but the test does not break them down. To check it, read the start time of the VM in the task list of `desopve02`, look at the boot of the guest (`systemd-analyze`, `journalctl -b -u nginx`), and run a `ping` to the VM alongside the HTTP loop, to tell the moment the guest's network comes up from the moment nginx answers.
+   - **Service unreachable for about three minutes**, from the first failed request (06:35:38) to the first successful one (06:38:46), with the 1-2 second resolution of the HTTP loop. This is what a client sees.
+
+   Waiting for the lock is the price of data safety: the VM can never run on two nodes at the same time (no *split brain*).
 
 5. The rest of the cluster during the failure:
 
@@ -354,20 +381,20 @@ lrm desopve01 (active, watchdog active, Tue Nov 10 06:34:51 2026)
        osd: 7 osds: 4 up (since 3m), 7 in (since 12h)
    ```
 
-   Quorum with 2 votes out of 3, and Ceph degraded but working (`min_size 2`): the VMs on the other nodes never stopped. The guests on `desopve03` that are **not** under HA (CT 123, 292, 302), on the other hand, stayed off: HA protects only what you entrust to it.
+   Quorum with 2 votes out of 3, and Ceph degraded but working (`min_size 2`): the VMs on the other nodes kept running and were not restarted. This test did not measure their disk I/O: in [Lab 18](/18-ceph-growth-maintenance-failures/), a similar power-off of a Ceph node made a VM's writes wait for 26.8 seconds. The guests on `desopve03` that are **not** under HA (CT 123, 292, 302), on the other hand, stayed off: HA protects only what you entrust to it.
 
 ### 9. Bringing the node back and restoring the distribution
 
-1. Power `desopve03` back on with the power button or from the remote management console (IPMI/iDRAC/iLO). In the lab it was powered on at 06:42:34 and rejoined the cluster 30 s later:
+1. Power `desopve03` back on with the power button or from the remote management console (IPMI/iDRAC/iLO). In the lab it was powered on at 06:42:34, and the master logged it as `online` 30 seconds later:
 
    ```text
    06:43:04 pve-ha-crm[1679]: node 'desopve03': state changed from 'unknown' => 'online'
    06:43:04 pve-ha-crm[1679]: fallback to 'basic' scheduler mode, init for 'dynamic' failed - did not get dynamic node usage information for 'desopve03'
    ```
 
-   Until the node that has just come back publishes its load data, the CRS falls back to `basic` mode for one cycle.
+   As the second line says, the CRS falls back to `basic` mode because it has no load data yet for the node that has just come back.
 
-2. `web03` **stays** on `desopve02`: no node affinity calls it back, and the imbalance (13.5%) is below the rebalancing threshold. The CTs that are not under HA must be started by hand (they do not have `onboot`):
+2. `web03` **stays** on `desopve02`. This is consistent with the configuration: no node affinity calls it back, and the imbalance (13.5%) is below the 30% rebalancing threshold. The CTs that are not under HA must be started by hand (they do not have `onboot`):
 
    ```bash
    for c in 123 292 302; do pct start $c; done
@@ -384,16 +411,18 @@ lrm desopve01 (active, watchdog active, Tue Nov 10 06:34:51 2026)
 
 ## Verification and tests
 
-| Test | Result in the lab |
-|---|---|
-| HA groups in PVE 9 | refused: `ha groups have been migrated to rules` |
-| Resource affinity on a resource with a multi-priority node affinity | refused: `resources are in node affinity rules with multiple priorities` |
-| Automatic rebalancing (dynamic CRS) | imbalance 54.8% → automatic migration of `web03`, expected 27.3% |
-| Maintenance with *Keep Separate* on 3 resources and 3 nodes | `web03` stuck on the node for over 100 s |
-| Maintenance with the reduced rule | evacuation in 20 s, automatic return in 20 s |
-| Disarm `freeze` | watchdogs released on all nodes, resources in `freeze` |
-| Node powered off abruptly | fencing confirmed at 128 s, service reachable again at 190 s |
-| Non-HA guests on the failed node | off until started by hand |
+The lab has succeeded when `ha-manager status` shows the four resources `started` with fencing `armed`, the three rules are `in use`, and after the power-off of a node `web03` answers again from another node without anyone intervening.
+
+| Test | Success criterion | Result in the lab |
+|---|---|---|
+| HA groups in PVE 9 | creation refused | `ha groups have been migrated to rules` |
+| Resource affinity on a resource with a multi-priority node affinity | rule refused, with the reason | `resources are in node affinity rules with multiple priorities` |
+| Automatic rebalancing (dynamic CRS) | a rebalancing migration in the CRM log | imbalance 54.8% → migration of `web03`, expected imbalance 27.3% |
+| Maintenance with *Keep Separate* on 3 resources and 3 nodes | the trap shows: the resource cannot be evacuated | `web03` still on the node after 100 s |
+| Maintenance with the reduced rule | evacuation and automatic return | 20 s for each, in the CRM log |
+| Disarm `freeze` | watchdogs released on all nodes | `watchdog released` on the three LRMs, resources in `freeze` |
+| Node powered off abruptly | `web03` restarted on another node on its own | fencing confirmed after 128 s (CRM log); nginx answering again after 190 s (HTTP loop) |
+| Non-HA guests on the failed node | not restarted by HA | off until started by hand |
 
 ## Final lab state
 
@@ -409,16 +438,20 @@ lrm desopve01 (active, watchdog active, Tue Nov 10 06:34:51 2026)
 
 ## What you learned
 
-- Proxmox VE HA is based on quorum, shared storage and **self-fencing** with the watchdog: a node without quorum reboots itself, and the other nodes restart its resources only after its lock has expired.
-- In PVE 9, groups have become **affinity rules**: node affinity for the preferred nodes, resource affinity to keep resources together or apart.
-- A *Keep Separate* rule that is too tight can prevent both maintenance and recovery.
-- The **dynamic CRS** with automatic rebalancing moves VMs based on the actual load.
-- **Maintenance mode** drains a node and repopulates it at the end; **disarm/arm** suspends HA on the whole cluster.
-- A real failover takes minutes, not seconds: two of them are needed to guarantee that the lost node has really stopped.
+- **What to put under HA, and what a failover costs.** HA restarts only the resources entrusted to it, and only once the lost node is certainly fenced: in this lab the fencing was confirmed after 128 seconds and the service answered again after 190. A service that cannot tolerate minutes of interruption needs redundancy in the application as well, not only HA.
+- **How to write the placement rules, which in PVE 9 replace the HA groups.** Node affinity for the preferred nodes, with a single priority level if the resource is also in a resource affinity rule; resource affinity to keep resources together or apart. With N nodes, keep at most N-1 resources apart, otherwise maintenance cannot evacuate a node.
+- **Which tool for which maintenance.** Maintenance mode for a single node, which it drains and repopulates at the end; `disarm-ha` for work on the whole cluster or on the Corosync network, where a loss of quorum would otherwise make the nodes fence themselves.
+- **When to let the CRS rebalance.** The dynamic CRS with automatic rebalancing moves HA resources according to the actual load, within the affinity rules, once the imbalance has stayed above the threshold for a few rounds.
+- **How to read the times of a failover.** Keep the times in the CRM log (fencing, recovery) apart from what clients see (the service reachable again), and attribute the difference to the boot of the VM only after checking it.
 
 ## References
 
 - [Proxmox VE – High Availability](https://pve.proxmox.com/pve-docs/chapter-ha-manager.html)
+- [Proxmox VE – HA: fencing and recovery of fenced services](https://pve.proxmox.com/pve-docs/chapter-ha-manager.html#ha_manager_fencing)
+- [Proxmox VE – HA rules: node affinity, resource affinity and conflicts](https://pve.proxmox.com/pve-docs/chapter-ha-manager.html#ha_manager_rules)
+- [Proxmox VE – HA: node maintenance](https://pve.proxmox.com/pve-docs/chapter-ha-manager.html#ha_manager_node_maintenance)
+- [Proxmox VE – HA: disarming HA for cluster maintenance](https://pve.proxmox.com/pve-docs/chapter-ha-manager.html#ha_manager_disarm)
+- [Proxmox VE – HA: Cluster Resource Scheduling and load balancer](https://pve.proxmox.com/pve-docs/chapter-ha-manager.html#ha_manager_crs)
 - [Proxmox VE – ha-manager(1)](https://pve.proxmox.com/pve-docs/ha-manager.1.html)
 - [Proxmox VE – datacenter.cfg, crs option](https://pve.proxmox.com/pve-docs/datacenter.cfg.5.html)
 - [Proxmox VE – Corosync External Vote Support (QDevice)](https://pve.proxmox.com/pve-docs/chapter-pvecm.html#_corosync_external_vote_support)
