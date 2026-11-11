@@ -20,11 +20,10 @@ duration: 1 hour
 
 ## Objectives
 
-- Understand what Open vSwitch is and how it differs from the Linux bridge.
-- Install OVS and build, from the GUI, an OVS bridge with an OVS bond and an internal port on a VLAN.
-- Connect a container to a VLAN of the OVS bridge and have it talk to a guest that sits on a Linux bridge on another node.
-- Try out the OVS bond modes: active-backup, balance-slb and LACP, including without a partner.
-- Read the OVS state with `ovs-vsctl`, `ovs-appctl` and `ovs-ofctl`.
+- On `desopve04`, an OVS bridge `vmbr2` built from the GUI, with the bond `bond1` (`nic2` + `nic3`) and the internal port `vlan10` (10.10.10.24/24): `ovs-vsctl show` lists the ports and their tags.
+- A container on VLAN 10 of the OVS bridge that reaches CT 122, which sits on a Linux bridge on another node.
+- For each OVS bond mode tried (active-backup, balance-slb, balance-tcp with LACP), knowing what the switch has to provide and what happens when a member, or the LACP partner, is missing, as read with `ovs-appctl bond/show` and `lacp/show`.
+- Knowing where an OVS setting has to live to stay in place: in `/etc/network/interfaces`, not only in the OVS database.
 
 ## How it works
 
@@ -59,10 +58,27 @@ The NICs that join an OVS bond stay configured as `inet manual`, with no other o
 | Mode | How it works | Switch configuration needed? |
 |---|---|---|
 | `active-backup` | only one member transmits, the other takes over if the first one fails | no |
-| `balance-slb` | distributes the source MACs among the members and rebalances them every 10 s | no |
+| `balance-slb` | assigns each source MAC and VLAN to one member and, every 10 s by default, moves some of them to balance the load | no |
 | `balance-tcp` | distributes per flow (L3/L4) | yes: it requires LACP |
 
-With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. If nobody answers on the other side, the members stay disabled. The `lacp-fallback-ab` option makes the bond fall back to active-backup when the negotiation fails.
+With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. According to the OVS documentation, if no partner answers the bond is disabled, unless the `lacp-fallback-ab` option makes it fall back to active-backup. The lab switch has no LACP configured toward the nodes ([Lab 01](/01-lab-architecture/)), so step 5 shows exactly this case.
+
+OVS detects that a member has failed by watching the carrier of its interface (`bond-detect-mode=carrier`, the default). A fault that leaves the carrier up, for example beyond the switch port, is not detected by the bond.
+
+### Test environment and versions
+
+The outputs in this lab come from tests run in November 2026 with this configuration:
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve`, on the standalone node `desopve04` ([Lab 04](/04-first-access-repositories-updates/)) |
+| Open vSwitch | 3.5.0 (`openvswitch-switch` 3.5.0-1+b1) |
+| Bond | `bond1` on `nic2` and `nic3`, two single-port cards with 10 GbE ports ([Lab 01](/01-lab-architecture/)); OVS defaults: failure detection by carrier, no primary member, `lacp-fallback-ab` off |
+| Switch | node ports as 802.1Q trunks, no LACP and no port-channel ([Lab 01](/01-lab-architecture/)) |
+| Ping target | CT 122 on `desopve02`, behind the Linux bridge `vmbr1` and `bond0` ([Lab 20](/20-bridges-stable-names-vlans/), [Lab 21](/21-bonding/)) |
+| Traffic | `ping` from CT 401 (Debian 13 template): 5 requests per second during the failure of a member, 2 or 3 requests in the other checks |
+
+**What the tests measure, and what they do not.** The failure of a member is simulated with `ip link set nic3 down`, which OVS sees as a loss of carrier. The only traffic comes from one container, that is from a single source MAC: enough to see a failover, not to judge how balance-slb spreads the load. The outputs show one run of each test.
 
 ## Procedure
 
@@ -327,7 +343,11 @@ With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. If nobody answ
      may_enable: false
    ```
 
-   No packets lost: OVS moved the traffic to `nic2`. When `nic3` comes back (`ip link set nic3 up`) the traffic **stays** on `nic2`: without a primary member (`active-backup primary: <none>`), OVS does not switch back, which avoids a second move.
+   - **Measured:** 75 requests at 200 ms intervals, 75 replies, highest round-trip time 1.016 ms; after the failure, `bond/show` reports `nic2` as the active member and `nic3` disabled.
+   - **Interpretation:** OVS moved the traffic to `nic2` without losing any request. If there was an interruption, it was shorter than the 200 ms between two requests.
+   - **How to check more finely:** a denser ping from the container, for example every 10 ms (`ping -i 0.01 -D -O`), or a capture with timestamps on the surviving member (`tcpdump -ttt -ni nic2 vlan 10 and icmp`), to see when the first request leaves through it.
+
+   When `nic3` comes back (`ip link set nic3 up`), the active member **stays** `nic2` (check it with `ovs-appctl bond/show bond1 | grep "active member"`): with no primary member (`active-backup primary: <none>`), OVS has no reason to switch back. With `other_config:bond-primary=nic3` the traffic would return to `nic3` as soon as it is up again, at the cost of a second move.
 
 2. **balance-slb.** You can change the mode on the fly too:
 
@@ -352,7 +372,7 @@ With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. If nobody answ
      hash 122: 1 kB load
    ```
 
-   Now both members transmit: OVS assigns the source addresses (the *hashes*) to the members and periodically rebalances them according to the load. It works without any configuration on the switch, like `balance-alb` on the Linux bond (lab 21).
+   Both members are enabled; the output shows the MAC hash 122 assigned to `nic3` with 1 kB of load, and the next rebalance due in 522 ms. SLB maps each source MAC and VLAN to a hash, assigns the hashes to the members and moves them periodically according to the load, so the load spreads only when there are several sources. With a single container generating traffic, this output does not show the load shared by the two members. To see it, generate traffic from several guests and compare the transmit counters of the members before and after (`ovs-vsctl get interface nic2 statistics:tx_bytes`, and the same for `nic3`). Like `balance-alb` on the Linux bond ([Lab 21](/21-bonding/)), SLB needs no configuration on the switch, but it splits the traffic by a different criterion: the source MAC here, the destination there.
 
 3. **LACP without a partner.** `balance-tcp` requires LACP:
 
@@ -388,7 +408,7 @@ With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. If nobody answ
    3 packets transmitted, 0 received, 100% packet loss, time 2083ms
    ```
 
-   The lab switch does not answer LACP (`partner sys_id` all zeros): OVS **disables both members** and the network goes down. In the same situation, the Linux bond in `802.3ad` mode kept one link up (lab 21): OVS is stricter.
+   The lab switch does not answer LACP (`partner sys_id` all zeros): OVS **disables both members** (`may_enable: false`) and the container loses the network: 3 requests, no replies. This is what the OVS documentation describes for `lacp-fallback-ab` set to `false`, the default: without a partner the bond is disabled. On the same switch, the Linux bond in `802.3ad` mode kept one member active in its own aggregator ([Lab 21](/21-bonding/)): the two implementations handle a missing partner differently, and with OVS the whole bond goes down.
 
 4. **Falling back to active-backup.** With `lacp-fallback-ab` the bond works again even without a partner:
 
@@ -412,7 +432,9 @@ With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. If nobody answ
    rtt min/avg/max/mdev = 0.639/0.684/0.753/0.049 ms
    ```
 
-5. **Back to the configuration in the file.** The changes made with `ovs-vsctl` live in the OVS database, not in `/etc/network/interfaces`: you must undo them by hand, or write them into the file with `ovs_options` (for example `ovs_options bond_mode=balance-tcp lacp=active other_config:lacp-fallback-ab=true`).
+   The fallback keeps the bond up while the switch is not configured, but it also hides the problem: the bond works, without aggregating anything, and nothing fails. If you use it, check that `lacp_status` reads `negotiated` once the switch has been configured; here it stays `configured`, the sign that no partner has answered.
+
+5. **Back to the configuration in the file.** The changes made with `ovs-vsctl` are stored in the OVS database, not in `/etc/network/interfaces`, the file that Proxmox VE shows in the GUI and applies: the running bond and the file can disagree without the GUI showing it. Undo the changes by hand, or write them into the file with `ovs_options` (for example `ovs_options bond_mode=balance-tcp lacp=active other_config:lacp-fallback-ab=true`).
 
    ```bash title="root@desopve04"
    ovs-vsctl set port bond1 lacp=off bond_mode=active-backup -- remove port bond1 other_config lacp-fallback-ab
@@ -438,16 +460,19 @@ With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. If nobody answ
 
 ## Verification and tests
 
-| Test | Result |
-|---|---|
-| OVS bridge, bond and internal port created from the GUI | `vmbr2` with `bond1` (nic2 + nic3) and `vlan10` 10.10.10.24/24 |
-| CT on `vmbr2` with tag 10 to a CT on a Linux bridge on another node | reachable, 0% loss |
-| VLAN 20 from the CT in VLAN 10 | unreachable without a router |
-| Failure of the active member in active-backup | 75 pings out of 75, no loss, traffic on `nic2` |
-| Return of `nic3` | traffic stays on `nic2` (no primary member) |
-| balance-slb | both members active, hashes distributed |
-| LACP without a partner | both members disabled, 100% loss |
-| LACP with `lacp-fallback-ab` | fallback to active-backup, 0% loss |
+The lab has succeeded when CT 401 reaches CT 122 over VLAN 10, every bond test in the table gives the expected result, and at the end `bond1` is back in active-backup without LACP.
+
+| Check | Expected result | Observed in the test |
+|---|---|---|
+| OVS bridge, bond and internal port created from the GUI | `vmbr2` with `bond1` and `vlan10` | `bond1` on `nic2` + `nic3`, `vlan10` 10.10.10.24/24 |
+| CT on `vmbr2` with tag 10 to a CT on a Linux bridge on another node | replies | 3 out of 3, 0% loss |
+| VLAN 20 from the CT in VLAN 10 | no route without a router | `Network is unreachable` |
+| Failure of the active member in active-backup | traffic moved to the other member | 75 replies out of 75 at 200 ms intervals; `nic2` active |
+| Return of `nic3` | active member unchanged, with no primary member | `nic2` still active |
+| balance-slb | both members enabled, hashes assigned | hash 122 on `nic3`; how the load is shared was not measured |
+| balance-tcp with LACP, no partner | bond disabled | both members disabled, partner `00:00:00:00:00:00`, 100% loss |
+| LACP with `lacp-fallback-ab` | fallback to active-backup | one active member, 0% loss |
+| Back to the file configuration | active-backup, LACP off | `active-backup`, `off`, `{}` |
 
 ## Final lab state
 
@@ -461,15 +486,16 @@ With `lacp=active` OVS negotiates LACP (802.3ad) with the switch. If nobody answ
 
 ## What you learned
 
-- Open vSwitch is an alternative to the Linux bridge, with bonds, internal ports and flows managed inside the switch; Proxmox configures it from the GUI and through `/etc/network/interfaces`.
-- A VLAN tag added by OVS and one added by a Linux bridge are the same 802.1Q tag: the two switches coexist on the same network.
-- The OVS bond in active-backup fails over to the other member without losses and does not switch back if there is no primary.
-- `balance-tcp` requires LACP: without a partner OVS shuts the bond down, unless `lacp-fallback-ab` is set.
-- `ovs-vsctl` changes the OVS database immediately, but permanent changes belong in the network file.
+- **Linux bridge or OVS:** the Linux bridge by default; OVS when you need what it adds (OpenFlow flows, port mirroring, ports and bonds managed inside the switch) or when the network is already run with OVS. The 802.1Q tag is the same on both, so they can share a network.
+- **Which OVS bond mode, given the switch:** with no LACP on the switch, active-backup, which the OVS documentation prefers in that case, while balance-slb helps only when many guests send traffic; with LACP configured on the switch, balance-tcp with `lacp=active`.
+- **Whether to enable `lacp-fallback-ab`:** it keeps the bond up while the switch is not ready, at the price of hiding a configuration error; if you enable it, monitor that `lacp_status` reads `negotiated`.
+- **Whether to set a primary member:** without one, OVS stays on the surviving member after a recovery, one move only; with `bond-primary`, traffic returns to the preferred member, with a second move.
+- **Where an OVS setting belongs:** a change made with `ovs-vsctl` takes effect at once but lives outside the network file; anything meant to stay goes into `ovs_options` in `/etc/network/interfaces`.
 
 ## References
 
-- [Proxmox VE – Open vSwitch](https://pve.proxmox.com/wiki/Open_vSwitch)
+- [Proxmox VE wiki – Open vSwitch](https://pve.proxmox.com/wiki/Open_vSwitch)
 - [Proxmox VE – Network Configuration](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysadmin_network_configuration)
-- [Open vSwitch – documentation](https://docs.openvswitch.org/)
-- [ovs-vswitchd.conf.db – bond and LACP options](https://www.openvswitch.org/support/dist-docs/ovs-vswitchd.conf.db.5.html)
+- [Open vSwitch – Bonding: active-backup, SLB and the LACP fallback (current documentation)](https://docs.openvswitch.org/en/latest/topics/bonding/)
+- [ovs-vswitchd.conf.db(5), Open vSwitch 3.5 – bond, failure detection and LACP options](https://manpages.debian.org/trixie/openvswitch-switch/ovs-vswitchd.conf.db.5.en.html)
+- [ovs-vswitchd(8), Open vSwitch 3.5 – the `bond/show` and `lacp/show` commands](https://manpages.debian.org/trixie/openvswitch-switch/ovs-vswitchd.8.en.html)
