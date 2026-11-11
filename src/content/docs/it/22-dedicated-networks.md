@@ -17,11 +17,10 @@ duration: 1 ora e 30 minuti
 
 ## Obiettivi
 
-- Capire perché in un cluster si separano i tipi di traffico, e perché Corosync è il più delicato.
-- Spostare il secondo link di Corosync su una VLAN dedicata e non instradata, senza mai perdere il quorum.
-- Dedicare una rete alle migrazioni e verificare con i contatori che il traffico passi davvero da lì.
-- Simulare la caduta del link dedicato di Corosync.
-- Avere il quadro completo delle reti del laboratorio.
+- Il link 1 di Corosync spostato sulla VLAN 40 (10.40.10.0/24, senza router) su tutti e tre i nodi, con il cluster in quorum dopo ogni passo: `corosync-cfgtool -n` mostra il link 1 sui nuovi indirizzi.
+- Le migrazioni a caldo fatte passare dalla VLAN 100 (10.100.10.0/24), con la prova dei contatori di byte delle interfacce.
+- Sapere quale link di Corosync porta il traffico del cluster, e cosa continua a funzionare quando cade il link sulla VLAN 40.
+- Una tabella delle reti del laboratorio (VLAN, subnet, interfaccia, gateway, uso) per preparare i lab successivi.
 
 ## Come funziona
 
@@ -36,14 +35,16 @@ duration: 1 ora e 30 minuti
 | **VM** | dipende dai servizi | |
 | **Gestione** | poca banda | GUI e SSH irraggiungibili |
 
-Il rischio tipico è una migrazione o un backup che satura il link condiviso con Corosync: i pacchetti del cluster arrivano in ritardo e un nodo sano viene escluso. Per questo la documentazione di Proxmox VE raccomanda **almeno un link di Corosync su una rete fisica separata**, più un secondo link di riserva.
+Il rischio tipico è una migrazione o un backup che satura il link condiviso con Corosync: i pacchetti del cluster arrivano in ritardo e un nodo sano viene escluso. Per questo la documentazione di Proxmox VE chiede per il cluster una rete con latenze sotto i 5 ms, poco usata da altro traffico, idealmente **separata fisicamente**, e sconsiglia in particolare di condividerla con lo storage, salvo come link di riserva a bassa priorità.
 
 ### Corosync con due link
 
-Corosync (trasporto *knet*) tiene sotto controllo tutti i link, ma in modalità `passive` trasmette su uno solo, quello con la priorità più alta tra quelli funzionanti, e passa all'altro appena il primo cade. Nel laboratorio:
+Corosync (trasporto *knet*) tiene sotto controllo tutti i link, ma in modalità `passive` fa passare il traffico del cluster su uno solo: quello funzionante con la priorità più alta. In questo cluster non è impostata alcuna priorità (nel [Lab 06](/it/06-cluster-corosync/) il log mostra `pri: 1` per entrambi i link), quindi vince il link con il numero più basso, il link 0. Nel laboratorio:
 
-- **link 0**: rete di gestione (`vmbr0`);
-- **link 1**: finora sulla `172.32.199.0/24` di `nic1`, la stessa rete del secondo percorso iSCSI e instradata da `rtr-core`. In questo lab va su una **VLAN dedicata, la 40**, senza gateway.
+- **link 0**: rete di gestione (`vmbr0`), il link che porta il traffico di Corosync;
+- **link 1**: finora sulla `172.32.199.0/24` di `nic1`, la stessa rete del secondo percorso iSCSI e instradata da `rtr-core`. In questo lab va su una **VLAN dedicata, la 40**, senza gateway. Resta il link di riserva, usato solo se cade il link 0.
+
+Per rendere la VLAN 40 il link preferito bisognerebbe darle un `knet_link_priority` più alto di quello del link 0; questo lab lascia le priorità predefinite. La VLAN 40, inoltre, è dedicata solo a livello di indirizzi: condivide la porta fisica `nic1` con il secondo percorso iSCSI.
 
 ### Interfacce VLAN su una scheda e su un bridge
 
@@ -56,10 +57,23 @@ Le due reti non hanno router: il traffico non può passare da `rtr-core` e resta
 
 ### La rete di migrazione
 
-In **Datacenter** → **Options** → **Migration Settings** si sceglie:
+Se non si indica altro, Proxmox VE fa passare le migrazioni sulla rete usata per la comunicazione del cluster: qui la rete di gestione, che porta anche il link 0 di Corosync. In **Datacenter** → **Options** → **Migration Settings** si sceglie:
 
 - **Network**: la rete (CIDR) su cui i nodi si scambiano la memoria e i dischi durante le migrazioni;
 - **Type**: `secure` (predefinito: il traffico passa in un tunnel SSH cifrato) oppure `insecure` (TCP in chiaro, più veloce, accettabile solo su una rete dedicata e isolata).
+
+### Ambiente e versioni della prova
+
+Gli output e le misure di questo lab vengono da prove eseguite a novembre 2026 in questa configurazione:
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)); Corosync e knet nelle versioni di quella release (non registrate: le elenca `pveversion -v`) |
+| Corosync | trasporto knet, modalità dei link `passive`, nessuna priorità sui link ([Lab 06](/it/06-cluster-corosync/)) |
+| Rete | porte 10 GbE ([Lab 01](/it/01-lab-architecture/)); `vmbr0` su `nic0`; `nic1` condivisa da rete dello storage e VLAN 40; `vmbr1` e VLAN 100 su `bond0` (`nic3` + `nic4`, active-backup, [Lab 21](/it/21-bonding/)); MTU 1500 ovunque |
+| Migrazione | `type=secure` (tunnel SSH); VM 100 con 2 GiB di RAM e disco su `rbd-vm` (Ceph 20.2, [Lab 17](/it/17-ceph-installation/)), quindi si copia solo la memoria |
+
+**Cosa misurano le prove e cosa no.** C'è una migrazione per direzione, senza altro carico sulle reti: le prove mostrano da dove passa il traffico, non quale rete sia più veloce. La caduta del link 1 è simulata con `ip link set nic1.40 down` su un nodo: la porta `nic1` resta attiva, quindi non è né un cavo staccato né un guasto dello switch, e toglie il link di riserva, non quello in uso.
 
 ## Procedura
 
@@ -187,7 +201,7 @@ nessun router su 10.40.10.0/24
    mv /etc/pve/corosync.conf.new /etc/pve/corosync.conf
    ```
 
-3. Corosync rilegge il file, ma **non cambia l'indirizzo di un link già attivo**, e lo dice chiaramente nel log:
+3. Corosync rilegge il file ma, in questa versione, **non cambia l'indirizzo di un link già attivo**, e il log lo dice:
 
    ```bash title="root@desopve01"
    journalctl -u corosync --since "-1min" --no-pager
@@ -200,7 +214,7 @@ nessun router su 10.40.10.0/24
    ... [CFG   ] Cannot configure new interface definitions: To reconfigure an interface it must be deleted and recreated. A working interface needs to be available to corosync at all times
    ```
 
-   Il nuovo indirizzo si applica riavviando Corosync, **un nodo alla volta**: mentre un nodo si riavvia, il link 0 tiene uniti gli altri due e il quorum resta.
+   **Decisione.** La documentazione di Proxmox VE prevede questo caso: una modifica che non si può applicare con Corosync in funzione richiede il riavvio del servizio. Si riavvia Corosync **un nodo alla volta**: mentre un nodo si riavvia, gli altri due restano collegati sul link 0 e mantengono 2 voti su 3. Ogni comando legge il quorum 6 secondi dopo il riavvio:
 
    ```bash title="root@desopve03"
    systemctl restart corosync; sleep 6; pvecm status | grep ^Quorate
@@ -230,7 +244,7 @@ nessun router su 10.40.10.0/24
    Riavviare Corosync è sicuro solo se il cluster ha quorum anche senza quel nodo e se non ci sono risorse in alta disponibilità in situazioni critiche. Con l'HA attiva (lab 49) si mette prima il cluster in manutenzione.
    :::
 
-4. Ora il link 1 usa la VLAN 40:
+4. **Risultato:** ora il link 1 usa la VLAN 40:
 
    ```bash title="root@desopve01"
    corosync-cfgtool -n
@@ -316,13 +330,17 @@ nessun router su 10.40.10.0/24
    | `vmbr1.100` (migrazione) | 291 MiB |
    | `vmbr0` (gestione) | 0 MiB |
 
-   La memoria della VM è passata tutta dalla VLAN 100.
+   La migrazione è passata dalla VLAN 100: 291 MiB ricevuti su `vmbr1.100`, in linea con i 290,4 MiB di stato della VM indicati dal task, contro 0 MiB (arrotondati al MiB) su `vmbr0`.
 
-   I tempi sono quasi uguali (12 s contro 11 s): entrambe le reti hanno schede da 10 Gbit/s e la VM ha poca memoria occupata (290 MiB su 2 GiB). Il vantaggio della rete dedicata, qui, è che la migrazione **non passa più dalla rete di gestione e di Corosync**. In produzione, su una rete dedicata da 10 o 25 Gbit/s, una VM con molta RAM migra anche molto più in fretta.
+   Come leggere le due migrazioni:
+
+   - **Misura:** sulla rete di gestione il task dura 12 s e riporta un fermo di 53 ms; sulla VLAN 100, 11 s e 9 ms. In entrambi i casi vengono trasferiti circa 290 MiB di stato su 2 GiB di RAM.
+   - **Interpretazione:** le due prove non confrontano le reti. C'è una sola prova per direzione, in direzioni opposte, i due percorsi hanno porte 10 GbE e un trasferimento di qualche centinaio di MiB è troppo breve per mostrare una differenza; anche lo scarto nel fermo non si può attribuire alla rete. Nemmeno le velocità del log (9,8 GiB/s durante la copia, 1,0 GiB/s in media) misurano la rete: 9,8 GiB/s sono più di quanto possa portare una porta da 10 Gbit/s, e a 1,0 GiB/s i 290 MiB avrebbero richiesto molto meno del secondo o due che il log mostra per la copia. Quello che è passato in rete lo misurano i contatori.
+   - **Cosa dà qui la rete dedicata:** le migrazioni non attraversano più la rete di gestione, quella che porta il link 0 di Corosync. Se le renda anche più veloci è un'altra domanda: servono più prove per direzione, con una VM che usa molta più memoria, con e senza carico su `vmbr0`. Un guadagno è da aspettarsi solo se la rete dedicata è più veloce di quella condivisa, o se quella condivisa è occupata.
 
 ### 5. Caduta del link dedicato di Corosync
 
-Su `desopve03` spegni solo la VLAN 40 (la scheda `nic1` resta attiva, con il percorso iSCSI):
+Con le priorità predefinite il link 1 è quello di riserva: spegnerlo toglie la ridondanza senza spostare il traffico di Corosync (la perdita del link 0 si prova nel [Lab 06](/it/06-cluster-corosync/)). Su `desopve03` spegni solo la VLAN 40 (la scheda `nic1` resta attiva, con il percorso iSCSI):
 
 ```bash title="root@desopve03"
 ip link set nic1.40 down
@@ -355,7 +373,7 @@ multipath -ll | grep -c "active ready"
 2
 ```
 
-Il link 1 verso `desopve03` non è più `connected`, ma il nodo resta raggiungibile sul link 0 e il cluster ha tutti e tre i voti. Lo storage non se ne accorge: i due percorsi iSCSI sono attivi. Riaccendi la VLAN e Corosync la riprende da solo:
+Il link 1 verso `desopve03` non è più `connected`; il nodo resta raggiungibile sul link 0 e il cluster mantiene tutti e tre i voti. `multipath -ll` mostra ancora attivi i due percorsi iSCSI: spegnere l'interfaccia VLAN non ha toccato `nic1`. Finché il link 1 non torna, però, il cluster ha un solo link verso `desopve03`. Riaccendi la VLAN e Corosync la riprende da solo:
 
 ```bash title="root@desopve03"
 ip link set nic1.40 up
@@ -369,6 +387,8 @@ journalctl -u corosync --since "-2min" --no-pager | grep "host: 3 link: 1"
 Nov 09 19:38:34 desopve01 corosync[120106]:   [KNET  ] link: host: 3 link: 1 is down
 Nov 09 19:38:44 desopve01 corosync[120106]:   [KNET  ] rx: host: 3 link: 1 is up
 ```
+
+I due messaggi distano 10 secondi, ma l'intervallo comprende il tempo in cui l'interfaccia è rimasta spenta, che non è stato registrato: non è un tempo di rilevamento né un tempo di ripresa. Per misurarli, annota l'ora di ogni comando (`date +%T.%N; ip link set nic1.40 down`) e confrontala con l'ora dei messaggi `link: 1 is down` e `is up`. Per verificare quale link porta il traffico, leggi due volte su `desopve01`, a qualche secondo di distanza, i contatori di knet: `corosync-cmapctl -m stats | grep -E 'node3\.link[01]\.tx_data_bytes'`. Il contatore che cresce è quello del link in uso.
 
 ### 6. Il quadro delle reti del laboratorio
 
@@ -399,18 +419,20 @@ flowchart LR
 | Migrazione | 100 | 10.100.10.0/24 | `vmbr1.100` (`bond0`) | nessuno | migrazioni |
 | VM (prova) | 10, 20 | 10.10.10.0/24, 10.20.20.0/24 | `vmbr1` (`bond0`) | nessuno (fino al lab 26) | container 121-123 |
 
-In produzione le reti più critiche avrebbero schede fisiche proprie: Corosync almeno su una porta dedicata, Ceph e storage su schede veloci separate dal traffico delle VM. Nel laboratorio sono separate con le VLAN, e il principio è lo stesso.
+In produzione le reti più critiche avrebbero schede fisiche proprie: Corosync almeno su una porta dedicata, Ceph e storage su schede veloci separate dal traffico delle VM. Nel laboratorio sono separate con le VLAN. Una VLAN separa gli indirizzi e i domini di broadcast, e senza gateway il suo traffico non può uscirne; non separa invece la banda della porta. La VLAN 40 condivide `nic1` con il secondo percorso iSCSI, la VLAN 100 condivide `bond0` con le VM. Se questo conti per Corosync qui non è stato misurato: bisognerebbe osservare la latenza del link (`corosync-cmapctl -m stats | grep -E 'link1\.latency_(ave|max)'`) mentre si satura `nic1`.
 
 ## Verifica e test
 
-| Prova | Risultato |
-|---|---|
-| Interfacce VLAN 40 e 100 su `desopve01-03` | raggiungibili tra i nodi, nessun router sulle due reti |
-| Ricarica di `corosync.conf` con indirizzi nuovi | rifiutata per il link attivo: serve il riavvio di Corosync |
-| Riavvio di Corosync un nodo alla volta | quorum sempre presente, link 1 su 10.40.10.0/24 |
-| Migrazione prima e dopo | 12 s / downtime 53 ms sulla gestione, 11 s / downtime 9 ms sulla VLAN 100 |
-| Dove passa la migrazione | 291 MiB su `vmbr1.100`, 0 su `vmbr0` |
-| Caduta del link 1 su `desopve03` | link 1 non connesso, quorum 3/3, iSCSI con 2 percorsi attivi, ripresa automatica |
+Il lab è riuscito se il link 1 lavora sulla 10.40.10.0/24 su ogni nodo con il cluster in quorum, se il traffico della migrazione compare nei contatori di `vmbr1.100` e se la perdita di `nic1.40` su un nodo lascia il cluster in quorum sul link 0.
+
+| Controllo | Risultato atteso | Osservato nella prova |
+|---|---|---|
+| Interfacce VLAN 40 e 100 su `desopve01-03` | raggiungibili tra i nodi, nessun router | tutte raggiungibili; nessuna risposta da 10.40.10.1 |
+| Ricarica di `corosync.conf` con indirizzi nuovi | l'indirizzo del link attivo non cambia: serve il riavvio | log: `Internal value was NOT changed` |
+| Riavvio di Corosync un nodo alla volta | cluster in quorum | `Quorate: Yes` 6 s dopo ogni riavvio; link 1 su 10.40.10.0/24 |
+| Migrazione sulla gestione, poi sulla VLAN 100 | completata | 12 s e 11 s (durata del task); fermo riportato dal task 53 ms e 9 ms; una prova per direzione |
+| Dove passa la migrazione | byte su `vmbr1.100`, non su `vmbr0` | 291 MiB su `vmbr1.100`, 0 MiB su `vmbr0` |
+| `nic1.40` spenta su `desopve03` | link 1 non connesso, cluster in quorum sul link 0, storage non coinvolto | 3 voti, quorum; 2 percorsi iSCSI attivi; link 1 ripreso da solo alla riaccensione della VLAN |
 
 ## Stato finale del lab
 
@@ -423,15 +445,18 @@ In produzione le reti più critiche avrebbero schede fisiche proprie: Corosync a
 
 ## Cosa hai imparato
 
-- Corosync vuole latenza bassa e costante: va protetto dal traffico intenso con un link dedicato e un secondo link di riserva.
-- `corosync.conf` si modifica su una copia, incrementando `config_version`. Un indirizzo di un link attivo cambia solo riavviando Corosync, un nodo alla volta.
-- Una VLAN su una scheda (`nic1.40`) o su un bridge VLAN-aware (`vmbr1.100`) dà al nodo una rete in più senza cavi in più.
-- Le reti senza router restano davvero isolate: se cadono, il traffico non trova strade alternative.
-- La rete di migrazione si sceglie per il datacenter, e i contatori delle interfacce dicono da dove passa davvero il traffico.
+- **Quale link deve portare Corosync:** senza priorità knet usa il link 0. Decidi quale rete ha la latenza più bassa e costante e rendila il link preferito, con il numero o con `knet_link_priority`; verificalo con i contatori di knet, senza darlo per scontato.
+- **Come cambiare un indirizzo di Corosync senza rischi:** modifichi una copia, incrementi `config_version`, la metti al suo posto e leggi il log. Se dice che l'indirizzo di un link attivo non è cambiato, riavvii Corosync un nodo alla volta, controllando il quorum prima di passare al successivo.
+- **Cosa separa una VLAN e cosa no:** indirizzi e domini di broadcast e, senza gateway, le strade verso altre reti; non la banda della porta. Per Corosync in produzione serve quindi una porta dedicata, non solo una VLAN dedicata.
+- **Come dimostrare da dove passa il traffico:** confronti i contatori di byte delle interfacce prima e dopo; le velocità stampate dal task di migrazione non sono il throughput della rete.
+- **Quando conviene una rete di migrazione dedicata:** sempre, per tenere le raffiche delle migrazioni lontane dalla rete che porta Corosync; per la velocità, solo se è più veloce di quella condivisa, e lo misuri con più prove.
 
 ## Riferimenti
 
-- [Proxmox VE – Cluster Network](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_cluster_network)
-- [Proxmox VE – Corosync Redundancy](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_redundancy)
+- [Proxmox VE – Cluster network: requisiti e separazione](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_cluster_network)
+- [Proxmox VE – Corosync redundancy e priorità dei link](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_redundancy)
 - [Proxmox VE – Edit corosync.conf](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_edit_corosync_conf)
-- [Proxmox VE – Migration Network](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_migration_network)
+- [Proxmox VE – Migration type: secure e insecure](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_migration_type)
+- [Proxmox VE – Migration network](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#pvecm_migration_network)
+- [corosync.conf(5) – `link_mode` e `knet_link_priority`](https://manpages.debian.org/trixie/corosync/corosync.conf.5.en.html)
+- [cmap_keys(7) – i contatori `stats.knet`](https://manpages.debian.org/trixie/corosync/cmap_keys.7.en.html)

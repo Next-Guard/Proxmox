@@ -21,11 +21,10 @@ duration: 1 ora e 15 minuti
 
 ## Obiettivi
 
-- Importare in Proxmox VE un'immagine disco già pronta e creare una VM "appliance".
-- Portare più VLAN dentro una sola scheda della VM (trunk) e limitarle con l'opzione `trunks`.
-- Configurare un router tra VLAN con DHCP, NAT verso la rete del laboratorio e un firewall stateful.
-- Vedere cosa succede ai guest quando il router si ferma.
-- Conoscere i limiti della licenza gratuita di CHR e l'alternativa OPNsense.
+- Una VM router, `router01` (MikroTik CHR), creata da un'immagine disco già pronta, con una sola scheda in trunk che riceve solo le VLAN 10 e 20: `bridge vlan show` lo conferma.
+- Il routing tra la VLAN 10 e la VLAN 20 attraverso il router, con DHCP, NAT verso la rete del laboratorio e un firewall che blocca VLAN 20 → VLAN 10, verificato con `ping`, `tcpdump` e i contatori delle regole.
+- Sapere cosa smette di funzionare quando il router è fermo, e quanto ci è voluto in questo laboratorio per tornare a instradare dopo un avvio.
+- Sapere quanto traffico instradato lascia passare la licenza gratuita di CHR, come misurarlo e quando conviene OPNsense.
 
 ## Come funziona
 
@@ -72,7 +71,7 @@ In questo lab la politica è:
 
 ### Licenza di CHR
 
-CHR si scarica e si usa gratis, ma con la licenza **free** ogni interfaccia è limitata a **1 Mbit/s** in uscita. Con un account su mikrotik.com si attiva una licenza di prova di 60 giorni senza limiti; in produzione si acquista una licenza permanente. Per imparare la configurazione basta la versione free, ma i test di banda la mostrano subito, come vedremo.
+CHR si scarica e si usa gratis. Secondo la documentazione di MikroTik, la licenza **free** limita ogni interfaccia a **1 Mbit/s** in uscita (upload) e lascia tutte le altre funzioni senza restrizioni. Con un account su mikrotik.com si può chiedere una prova di 60 giorni dei livelli a pagamento (P1 a 1 Gbit/s, P10 a 10 Gbit/s, P-Unlimited senza limite); in produzione si acquista una licenza perpetua. Per imparare la configurazione basta la licenza free; il test di banda nella verifica mostra che cosa significa per il traffico instradato.
 
 ### OPNsense come alternativa
 
@@ -81,14 +80,28 @@ Lo stesso schema (router-on-a-stick, DHCP, NAT, firewall) si realizza con **OPNs
 | Aspetto | MikroTik CHR | OPNsense |
 |---|---|---|
 | Installazione | immagine disco pronta da importare (128 MiB) | ISO con installer |
-| Risorse | nel lab: 1 vCPU, 512 MiB di RAM | qualche GiB di RAM e più vCPU (vedi i requisiti ufficiali) |
+| Risorse | nel lab: 1 vCPU, 512 MiB di RAM | almeno 3 GB di RAM e una CPU dual-core, secondo la documentazione di OPNsense |
 | Gestione | CLI, WinBox, interfaccia web | interfaccia web completa |
 | Licenza | free limitata a 1 Mbit/s per interfaccia; trial di 60 giorni; licenze a pagamento | open source, nessun limite |
 | Funzioni di sicurezza | firewall, VPN, routing dinamico | firewall, VPN, IDS/IPS (Suricata), proxy, plugin |
-| Schede VirtIO | supportate | supportate (`vtnet`); la documentazione consiglia di disattivare gli offload hardware delle schede virtuali |
+| Schede VirtIO | supportate | supportate (`vtnet`); sulle macchine virtuali la documentazione consiglia di disattivare tutti gli offload hardware in **Interfaces → Settings** |
 | Guest agent | integrato | plugin `os-qemu-guest-agent` |
 
 Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per un firewall perimetrale con interfaccia grafica e funzioni di sicurezza avanzate OPNsense è la scelta più comune.
+
+### Ambiente e versioni della prova
+
+Gli output e le misure di questo lab vengono da prove eseguite a novembre 2026 in questa configurazione:
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)) |
+| Router | RouterOS CHR 7.25.1, livello di licenza `free`; VM 261 su `desopve01` con 1 vCPU, 512 MiB di RAM, due schede VirtIO e disco su `rbd-vm` (Ceph 20.2, [Lab 17](/it/17-ceph-installation/)) |
+| Rete | `vmbr1` VLAN-aware su `bond0`, active-backup su porte 10 GbE, MTU 1500 ([Lab 21](/it/21-bonding/)); scheda in trunk con `trunks=10;20` |
+| Guest di prova | CT 121 (`desopve01`) e CT 122 (`desopve02`) nella VLAN 10, CT 123 (`desopve03`) nella VLAN 20, dal template Debian 13, con `iperf3` ([Lab 20](/it/20-bridges-stable-names-vlans/)) |
+| Test di banda | `iperf3` con un solo flusso TCP e opzioni predefinite: 8 s attraverso il router (CT 121 → CT 123), 5 s dentro la VLAN 10 (CT 121 → CT 122) |
+
+**Cosa misurano le prove e cosa no.** Gli output mostrano una sola esecuzione di ogni prova. Il router è stato fermato con uno spegnimento ordinato (`qm shutdown`), non da un crash o dal guasto di un nodo. Durante il test di banda non sono stati registrati né il carico della CPU del router né i contatori delle sue interfacce.
 
 ## Procedura
 
@@ -116,7 +129,7 @@ Per imparare il routing e le VLAN CHR è più leggero e veloce da preparare; per
      inflating: chr-7.25.1.img
    ```
 
-2. Proxmox VE riconosce nello storage di import solo le estensioni dei formati che conosce (`.raw`, `.qcow2`, `.vmdk`, `.ova`). Un file `.img` non compare: va rinominato in `.raw`, che è lo stesso formato:
+2. Nello storage di import Proxmox VE elenca solo i file con un'estensione che riconosce, come `.raw`, `.qcow2`, `.vmdk` o `.ova`. Un file `.img` non compare: va rinominato in `.raw`, che è lo stesso formato:
 
    ```bash title="root@desopve01:/var/lib/vz/import"
    pvesm list local --content import
@@ -425,6 +438,8 @@ vlan20 ['10.20.20.1']
 
 ## Verifica e test
 
+Il lab è riuscito se il routing tra le VLAN funziona, se il firewall blocca VLAN 20 → VLAN 10 mentre la VLAN 20 raggiunge ancora la rete del laboratorio, e se la rete del laboratorio vede l'indirizzo del router (NAT). La banda e il tempo di ripartenza descrivono questo laboratorio: si registrano, non sono criteri di riuscita.
+
 1. **Routing tra VLAN:** CT 121 (VLAN 10) raggiunge CT 123 (VLAN 20). Con TTL 1 il primo salto risponde: è il router.
 
    ```bash title="root@desopve01"
@@ -506,7 +521,9 @@ vlan20 ['10.20.20.1']
    Reading package lists...
    ```
 
-5. **La licenza free si vede:** `iperf3` dalla VLAN 10 alla VLAN 20, attraverso il router, contro lo stesso test dentro la VLAN 10, senza router:
+   La velocità stampata da `apt` si riferisce a un trasferimento di 43,4 kB e non dice nulla sulla banda.
+
+5. **La banda attraverso il router.** `iperf3` dalla VLAN 10 alla VLAN 20, attraverso il router, contro lo stesso test dentro la VLAN 10, senza router. Prima il livello della licenza:
 
    ```text title="RouterOS — router01" frame="terminal"
    /system license print
@@ -539,7 +556,9 @@ vlan20 ['10.20.20.1']
    [  5]   0.00-5.00   sec  3.13 GBytes  5367 Mbits/sec                  receiver
    ```
 
-   Attraverso il router si ottiene circa **1 Mbit/s**, il limite della licenza free; dentro la stessa VLAN, dove il router non c'entra, oltre 5 Gbit/s.
+   - **Misura:** attraverso il router, con un solo flusso TCP dal CT 121 al CT 123, il ricevente ha avuto 2,00 MByte in 15,61 s, cioè **1,07 Mbit/s**. La riga del mittente (4,50 MByte in 8 s, 4,72 Mbit/s) conta i dati che il client ha consegnato a TCP, non quelli recapitati: il ricevente ne ha avuti meno della metà, in quasi il doppio del tempo. Dentro la VLAN 10, senza router, dal CT 121 al CT 122: 5.367 Mbit/s al ricevente, in 5 s.
+   - **Interpretazione:** la banda instradata è compatibile con il limite di 1 Mbit/s per interfaccia che MikroTik documenta per la licenza free, e il livello di licenza risulta `free`. La prova però non separa la licenza dagli altri limiti di questo router (1 vCPU, 512 MiB di RAM), né mostra su quale interfaccia il limite venga applicato.
+   - **Verifica:** durante il test, sul router `/interface monitor-traffic ether2` mostra la velocità in trasmissione dell'interfaccia in trunk e `/system resource print` il carico della CPU; ripetere il test con una licenza di prova (P1 o superiore) mostra quanto del limite dipenda dalla licenza.
 
 6. **Router spento:** con il router fermo, la stessa VLAN funziona ancora (è un bridge), il routing no:
 
@@ -571,17 +590,22 @@ vlan20 ['10.20.20.1']
    qm start 261
    ```
 
-   Dal comando di avvio al primo ping riuscito tra le VLAN passano circa 28 secondi: il tempo di avvio di RouterOS. Un router virtuale è un *single point of failure*: in produzione si raddoppia (VRRP) o lo si protegge con l'alta disponibilità di Proxmox VE (lab 49).
+   - **Misura:** circa 28 secondi tra il comando di avvio e il primo ping riuscito tra le VLAN. La prova registra solo questo totale: non dice ogni quanto venisse ripetuto il ping, né come il tempo si divida tra l'avvio della VM, il boot di RouterOS e l'attivazione delle sue interfacce.
+   - **Interpretazione:** il valore è compatibile con il tempo di avvio del router; con un altro hardware, un'altra versione di RouterOS o una configurazione diversa può cambiare.
+   - **Verifica:** un ping con l'orario dal CT 121 verso il CT 123 (`ping -D -O`), lanciato insieme a `qm start`, e il log del router (`/log print`), che mostra quando il sistema è partito.
 
-| Prova | Risultato |
-|---|---|
-| VLAN 10 → VLAN 20 attraverso il router | 0% di perdita, primo salto 10.10.10.1 |
-| VLAN 20 → VLAN 10 | 100% di perdita: bloccato dal firewall |
-| VLAN 20 → DC e proxy | 0% di perdita, con l'indirizzo del router (NAT) |
-| Lease DHCP dinamico e poi statico | .199 dinamico, poi .121 fisso |
-| Banda attraverso il router (licenza free) | 1,07 Mbit/s |
-| Banda nella stessa VLAN, senza router | 5,4 Gbit/s |
-| Router spento | stessa VLAN ok, routing assente; ripresa in circa 28 s |
+   Per tutto quel tempo il routing tra le VLAN manca: un router virtuale è un *single point of failure*. I due rimedi abituali non sono stati provati in questo laboratorio. Con due router e VRRP il secondo è già acceso e prende l'indirizzo del gateway. Con l'alta disponibilità di Proxmox VE ([Lab 49](/it/49-high-availability/)) la stessa VM viene riavviata su un altro nodo: dopo il guasto di un nodo, all'avvio misurato qui si somma il tempo del fencing, circa due minuti nel lab 49.
+
+| Controllo | Risultato atteso | Osservato nella prova |
+|---|---|---|
+| VLAN 10 → VLAN 20 attraverso il router | risponde, primo salto il router | 0% di perdita, primo salto 10.10.10.1 |
+| VLAN 20 → VLAN 10 | nessuna risposta: bloccato dal firewall | 100% di perdita, 3 pacchetti contati dall'ultima regola `forward` |
+| VLAN 20 → DC e proxy | risponde, con l'indirizzo del router (NAT) | 0% di perdita, origine 172.27.199.26 |
+| Lease DHCP dinamico e poi statico | un indirizzo del pool, poi quello fisso | .199 dinamico, poi .121 fisso |
+| `iperf3` attraverso il router (licenza free), un flusso TCP, lato ricevente | circa 1 Mbit/s | 1,07 Mbit/s |
+| `iperf3` dentro la VLAN 10, senza router, un flusso TCP, lato ricevente | non limitato dal router | 5.367 Mbit/s (5,4 Gbit/s) |
+| Router fermato con uno spegnimento ordinato | la stessa VLAN funziona, nessun routing tra le VLAN | come atteso |
+| Da `qm start` al primo ping tra le VLAN | misurato, senza soglia | circa 28 s |
 
 ## Stato finale del lab
 
@@ -601,18 +625,20 @@ vlan20 ['10.20.20.1']
 
 ## Cosa hai imparato
 
-- Un'immagine disco pronta si importa dallo storage di tipo *Import*; i file `.img` vanno rinominati in `.raw`.
-- Con `trunks` una sola scheda di VM porta più VLAN con il tag, e il bridge lascia passare solo quelle.
-- Un router-on-a-stick unisce le VLAN: interfacce VLAN sul trunk, un DHCP per rete, NAT verso l'esterno.
-- Il firewall stateful permette le risposte alle connessioni autorizzate: basta decidere chi può aprire la connessione.
-- Un lease DHCP statico dà agli host un indirizzo fisso mantenendo la configurazione centralizzata.
-- Il router virtuale è un punto singolo di guasto; la licenza free di CHR limita la banda a 1 Mbit/s per interfaccia.
+- **Come portare in Proxmox VE l'appliance di un produttore:** si copia l'immagine nella cartella `import` di uno storage con il contenuto *Import*, con un'estensione che Proxmox VE riconosce (un `.img` diventa `.raw`), e la si importa su uno storage condiviso se la VM deve potersi spostare tra i nodi.
+- **Quante VLAN dare a un'appliance:** una sola scheda in trunk con `trunks=` porta esattamente le VLAN che servono, invece di tutte quelle di `bridge-vids`; `bridge vlan show` lo conferma.
+- **Dove sta la politica tra le VLAN:** con un firewall stateful si decide solo chi può aprire una connessione, le risposte passano con `established,related` e i contatori delle regole mostrano quale regola ha gestito il traffico. Per i server, un lease DHCP statico tiene gli indirizzi in un solo posto.
+- **Se basta un solo router virtuale:** quando si ferma, con lui si ferma il routing tra le VLAN, mentre il traffico dentro una VLAN continua; qui dal comando di avvio al ritorno del routing sono passati circa 28 s. Se è troppo, si sceglie tra due router con VRRP e il riavvio con l'HA, che dopo il guasto di un nodo aggiunge il tempo del fencing.
+- **Come leggere un test di banda attraverso un router:** prima si controlla il livello della licenza, poi si usa la riga del ricevente di `iperf3` e si conferma la velocità sulle interfacce del router. Con la licenza free di CHR il traffico instradato resta intorno a 1 Mbit/s. Per un firewall perimetrale con interfaccia web e IDS/IPS la scelta più comune è OPNsense, con almeno 3 GB di RAM.
 
 ## Riferimenti
 
-- [Proxmox VE – Import of disk images (storage *Import*)](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_import_of_disk_images)
+- [Proxmox VE – Tipi di contenuto degli storage, compreso `import`](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_common_storage_properties)
+- [Proxmox VE – Storage di tipo directory e la sua cartella `import/`](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#storage_directory)
 - [Proxmox VE – qm, opzioni di rete (`trunks`)](https://pve.proxmox.com/pve-docs/qm.1.html)
-- [MikroTik – Cloud Hosted Router (CHR)](https://help.mikrotik.com/docs/spaces/ROS/pages/18350234/Cloud+Hosted+Router+CHR)
+- [MikroTik – Cloud Hosted Router (CHR) e i livelli di licenza](https://help.mikrotik.com/docs/spaces/ROS/pages/18350234/Cloud+Hosted+Router+CHR)
 - [MikroTik – DHCP server](https://help.mikrotik.com/docs/spaces/ROS/pages/24805500/DHCP)
 - [MikroTik – Filter rules](https://help.mikrotik.com/docs/spaces/ROS/pages/48660574/Filter)
-- [OPNsense – Virtual & Cloud based Installation](https://docs.opnsense.org/manual/virtuals.html)
+- [iperf3(1) – righe del mittente e del ricevente nel riepilogo](https://manpages.debian.org/trixie/iperf3/iperf3.1.en.html)
+- [OPNsense – Virtual & Cloud-Based Installation: RAM, offload, guest agent](https://docs.opnsense.org/manual/virtuals.html)
+- [OPNsense – Hardware sizing & setup](https://docs.opnsense.org/manual/hardware.html)
