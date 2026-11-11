@@ -10,9 +10,9 @@ L'obiettivo è semplice: imparare Proxmox VE **facendo**, con procedure che funz
 
 Il progetto è pensato per crescere: oltre al percorso dei lab, chiunque può proporre nuove guide, correzioni e traduzioni. Vedi [Contribuisci](/it/contributing/).
 
-## Autore
+## Chi lo cura
 
-Il progetto è curato da **Nicola Marco Decandia** ([@ndecandia](https://github.com/ndecandia) su GitHub).
+Il progetto è curato da [NextGuard](https://www.nextguard.it) insieme ai suoi [contributori](https://github.com/Next-Guard/Proxmox/graphs/contributors), ed è pubblicato dall'organizzazione [Next-Guard](https://github.com/Next-Guard) su GitHub.
 
 Segnalazioni, domande e proposte sono benvenute come *issue* o *pull request* nel [repository del progetto](https://github.com/Next-Guard/Proxmox).
 

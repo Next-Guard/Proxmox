@@ -78,7 +78,7 @@ export default defineConfig({
 				Footer: './src/components/Footer.astro',
 			},
 			head: [
-				{ tag: 'meta', attrs: { name: 'author', content: 'Nicola Marco Decandia' } },
+				{ tag: 'meta', attrs: { name: 'author', content: 'NextGuard' } },
 				{ tag: 'meta', attrs: { name: 'theme-color', content: '#0b1222' } },
 			],
 			plugins: [starlightLinksValidator()],

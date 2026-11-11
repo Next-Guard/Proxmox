@@ -34,4 +34,4 @@ tools/build.sh            # genera e verifica il sito in ../nextguard-starlight-
 
 Proxmox® è un marchio registrato di Proxmox Server Solutions GmbH. Questo progetto è indipendente e non è affiliato, sponsorizzato o approvato da Proxmox Server Solutions GmbH.
 
-© 2026 Nicola Marco Decandia
+© 2026 NextGuard e contributori

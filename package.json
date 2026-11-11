@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Proxmox Community: hands-on Proxmox VE 9 labs (Astro Starlight site)",
-  "author": "Nicola Marco Decandia (https://github.com/ndecandia)",
+  "author": "NextGuard (https://www.nextguard.it)",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",

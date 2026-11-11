@@ -10,9 +10,9 @@ The goal is simple: learn Proxmox VE **by doing**, with procedures that actually
 
 The project is designed to grow: besides the lab path, anyone can propose new guides, fixes and translations. See [Contribute](/contributing/).
 
-## Author
+## Who maintains it
 
-The project is maintained by **Nicola Marco Decandia** ([@ndecandia](https://github.com/ndecandia) on GitHub).
+The project is maintained by [NextGuard](https://www.nextguard.it) together with its [contributors](https://github.com/Next-Guard/Proxmox/graphs/contributors), and published by the [Next-Guard](https://github.com/Next-Guard) organization on GitHub.
 
 Reports, questions and proposals are welcome as *issues* or *pull requests* in the [project repository](https://github.com/Next-Guard/Proxmox).
 
