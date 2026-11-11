@@ -59,7 +59,7 @@ When you face a problem, it pays to always proceed the same way:
 | With the VNet firewall enabled, the guests no longer get an IP address from DHCP or resolve names | The VNet firewall also filters the traffic to the gateway on the node | Explicitly allow DHCP and DNS to the VNet gateway | [33](/33-firewall-2/) |
 | The VNet firewall does not block outbound traffic | It filters the traffic between guests and to the node, not the traffic routed out of the VNet | Filter outbound traffic on the guest firewall or on a router | [33](/33-firewall-2/) |
 | With nftables, SNAT traffic from a Simple zone to a CT with its firewall enabled on the **same** node is dropped | Conntrack drops the connection (`insert_failed`) | Open issue: avoid the combination, or disable the firewall of the destination CT | [33](/33-firewall-2/) |
-| Gotify/webhook notifications to an internal address rejected with 403 | The targets go through the datacenter proxy even for internal IPs | Allow the internal destinations on the proxy | [51](/51-notifications-metrics-logs/) |
+| Gotify notifications to an internal address rejected with `CONNECT proxy failed: 403` | The Gotify target uses the Datacenter proxy even for internal IPs (documented; in the source code the Webhook target uses the same setting, not tested) | Allow the internal destinations on the proxy; the proxy log shows the refused request | [51](/51-notifications-metrics-logs/) |
 
 ### Storage
 
@@ -127,7 +127,7 @@ When you face a problem, it pays to always proceed the same way:
 | Live-restore not available | It requires Proxmox Backup Server | Use a PBS storage | [46](/46-vzdump-backup/) |
 | Encrypted restore: `missing key` | The encryption key is not available | Without the key the backup cannot be recovered: keep the key outside the cluster | [47](/47-proxmox-backup-server/) |
 | PBS GC does not free space immediately | Chunks are removed only after 24 hours | Expected | [47](/47-proxmox-backup-server/) |
-| Backup and fencing notifications do not arrive | Without an MX record, Postfix cannot deliver them and leaves them in the queue | Configure an SMTP relay or a notification target | [51](/51-notifications-metrics-logs/) |
+| Backup and fencing notifications do not arrive | In the lab: messages deferred in the Postfix queue, the connection to port 25 of the domain's own address timed out; consistent with a domain without an MX record | Check `postqueue -p` and the reason for the deferral; set a `relayhost` or an SMTP target | [51](/51-notifications-metrics-logs/) |
 
 ### Importing from VMware ESXi
 

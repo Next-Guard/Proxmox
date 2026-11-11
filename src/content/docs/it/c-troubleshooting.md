@@ -59,7 +59,7 @@ Davanti a un problema conviene procedere sempre allo stesso modo:
 | Con il firewall della VNet attivo i guest non prendono più l'IP dal DHCP né risolvono i nomi | Il firewall della VNet filtra anche il traffico verso il gateway del nodo | Consenti esplicitamente DHCP e DNS verso il gateway della VNet | [33](/it/33-firewall-2/) |
 | Il firewall della VNet non blocca il traffico verso l'esterno | Filtra il traffico tra i guest e verso il nodo, non quello instradato fuori dalla VNet | Filtra l'uscita sul firewall dei guest o su un router | [33](/it/33-firewall-2/) |
 | Con nftables il traffico in SNAT da una zona Simple verso un CT con firewall sullo **stesso** nodo viene scartato | Conntrack scarta la connessione (`insert_failed`) | Problema aperto: evita la combinazione, o disattiva il firewall del CT di destinazione | [33](/it/33-firewall-2/) |
-| Notifiche Gotify/webhook verso un indirizzo interno rifiutate con 403 | I target passano dal proxy del datacenter anche verso gli IP interni | Consenti le destinazioni interne sul proxy | [51](/it/51-notifications-metrics-logs/) |
+| Notifiche Gotify verso un indirizzo interno rifiutate con `CONNECT proxy failed: 403` | Il target Gotify usa il proxy del Datacenter anche verso gli IP interni (documentato; nel codice sorgente il target Webhook usa la stessa impostazione, non provato) | Consenti le destinazioni interne sul proxy; il log del proxy mostra la richiesta rifiutata | [51](/it/51-notifications-metrics-logs/) |
 
 ### Storage
 
@@ -127,7 +127,7 @@ Davanti a un problema conviene procedere sempre allo stesso modo:
 | Live-restore non disponibile | Richiede Proxmox Backup Server | Usa uno storage PBS | [46](/it/46-vzdump-backup/) |
 | Restore cifrato: `missing key` | La chiave di cifratura non è disponibile | Senza chiave il backup è irrecuperabile: conserva la chiave fuori dal cluster | [47](/it/47-proxmox-backup-server/) |
 | La GC di PBS non libera spazio subito | I chunk vengono rimossi solo dopo 24 ore | Atteso | [47](/it/47-proxmox-backup-server/) |
-| Le notifiche di backup e fencing non arrivano | Senza record MX Postfix non riesce a consegnarle e le lascia in coda | Configura un relay SMTP o un target di notifica | [51](/it/51-notifications-metrics-logs/) |
+| Le notifiche di backup e fencing non arrivano | Nel laboratorio: messaggi rinviati nella coda di Postfix, connessione alla porta 25 dell'indirizzo del dominio scaduta per timeout; compatibile con un dominio senza record MX | Controlla `postqueue -p` e il motivo del rinvio; imposta un `relayhost` o un target SMTP | [51](/it/51-notifications-metrics-logs/) |
 
 ### Importazione da VMware ESXi
 
