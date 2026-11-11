@@ -6,13 +6,16 @@
 import Default from '@astrojs/starlight/components/Footer.astro';
 import PcIcon from './PcIcon.astro';
 import DiagramZoom from './DiagramZoom.astro';
+import Consent from './Consent.astro';
 
 const t = Astro.locals.t;
 const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
+const privacyHref = Astro.locals.starlightRoute.locale === 'it' ? '/it/privacy/' : '/privacy/';
 ---
 
 <Default><slot /></Default>
 <DiagramZoom />
+<Consent />
 
 <div class:list={['pc-footer', 'not-content', { 'pc-footer--wide': isSplash }]}>
 	<div class="pc-footer__row">
@@ -32,6 +35,7 @@ const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
 		{t('pc.footer.content.code')}{' '}<a href="https://opensource.org/license/mit">MIT</a>.
 	</p>
 	<p class="pc-footer__tm">{t('pc.footer.trademark')}</p>
+	<p class="pc-footer__legal"><a href={privacyHref}>{t('pc.footer.privacy')}</a> · <a href={privacyHref} data-pc-consent-open>{t('pc.footer.cookies')}</a></p>
 </div>
 
 <style>

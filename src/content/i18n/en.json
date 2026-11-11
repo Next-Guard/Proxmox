@@ -13,5 +13,12 @@
 	"pc.footer.content.code": "code under",
 	"pc.footer.createdBy": "Content created by",
 	"pc.footer.trademark": "Proxmox® is a registered trademark of Proxmox Server Solutions GmbH. This project is independent and is not affiliated with, sponsored or endorsed by Proxmox Server Solutions GmbH.",
-	"pc.footer.repo": "Source on GitHub"
+	"pc.footer.repo": "Source on GitHub",
+	"pc.consent.title": "Statistics cookies.",
+	"pc.consent.text": "With your consent we use Google Analytics to understand which pages are read and improve the manual. Nothing is loaded until you accept, and you can change your mind at any time.",
+	"pc.consent.more": "Privacy & cookies",
+	"pc.consent.accept": "Accept",
+	"pc.consent.reject": "Reject",
+	"pc.footer.privacy": "Privacy & cookies",
+	"pc.footer.cookies": "Cookie preferences"
 }

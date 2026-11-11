@@ -1,0 +1,140 @@
+---
+/**
+ * Banner di consenso per le statistiche (Google Tag Manager con Google Analytics 4).
+ * Nessun tag Google viene caricato finché il visitatore non accetta; la scelta resta nel browser
+ * e si può cambiare dal footer ("Preferenze cookie").
+ */
+const t = Astro.locals.t;
+const isIt = Astro.locals.starlightRoute.locale === 'it';
+const privacy = isIt ? '/it/privacy/' : '/privacy/';
+---
+
+<div id="pc-consent" class="pc-consent not-content" role="dialog" aria-live="polite" aria-label={t('pc.consent.title')} hidden>
+	<p class="pc-consent__text">
+		<strong>{t('pc.consent.title')}</strong>{' '}{t('pc.consent.text')}{' '}
+		<a href={privacy}>{t('pc.consent.more')}</a>
+	</p>
+	<div class="pc-consent__actions">
+		<button type="button" class="pc-consent__btn" data-pc-consent="denied">{t('pc.consent.reject')}</button>
+		<button type="button" class="pc-consent__btn pc-consent__btn--primary" data-pc-consent="granted">{t('pc.consent.accept')}</button>
+	</div>
+</div>
+
+<script>
+	const GTM_ID = 'GTM-WV3M2T5N';
+	const KEY = 'pc-consent';
+	const read = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
+	const write = (v: string) => { try { localStorage.setItem(KEY, v); } catch {} };
+	const w = window as any;
+
+	function loadTagManager() {
+		if (w.__pcGtm) return;
+		w.__pcGtm = true;
+		w.dataLayer = w.dataLayer || [];
+		w.gtag = function () { w.dataLayer.push(arguments); };
+		w.gtag('consent', 'default', {
+			ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied',
+			analytics_storage: 'granted',
+		});
+		w.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
+		const s = document.createElement('script');
+		s.async = true;
+		s.src = 'https://www.googletagmanager.com/gtm.js?id=' + GTM_ID;
+		document.head.appendChild(s);
+	}
+
+	function dropAnalyticsCookies() {
+		const host = location.hostname.replace(/^www\./, '');
+		for (const c of document.cookie.split(';')) {
+			const name = c.split('=')[0].trim();
+			if (/^_ga|^_gid|^_gat/.test(name)) {
+				for (const d of ['', '; domain=' + host, '; domain=.' + host]) {
+					document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + d;
+				}
+			}
+		}
+	}
+
+	const banner = document.getElementById('pc-consent');
+	const choice = read();
+	if (choice === 'granted') loadTagManager();
+	else if (choice !== 'denied' && banner) banner.hidden = false;
+
+	banner?.querySelectorAll<HTMLButtonElement>('[data-pc-consent]').forEach((b) =>
+		b.addEventListener('click', () => {
+			const v = b.dataset.pcConsent!;
+			const before = read();
+			write(v);
+			banner.hidden = true;
+			if (v === 'granted') loadTagManager();
+			else if (before === 'granted') { dropAnalyticsCookies(); location.reload(); }
+		})
+	);
+	document.querySelectorAll('[data-pc-consent-open]').forEach((a) =>
+		a.addEventListener('click', (e) => { e.preventDefault(); if (banner) banner.hidden = false; })
+	);
+</script>
+
+<style>
+	.pc-consent {
+		position: fixed;
+		z-index: 1000;
+		left: 50%;
+		bottom: 1rem;
+		transform: translateX(-50%);
+		width: min(46rem, calc(100% - 2rem));
+		display: flex;
+		gap: 1rem;
+		align-items: center;
+		justify-content: space-between;
+		padding: 1rem 1.25rem;
+		border: 1px solid var(--sl-color-gray-5);
+		border-radius: 1rem;
+		background: var(--sl-color-bg-nav);
+		box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+		font-size: var(--sl-text-sm);
+		line-height: 1.5;
+	}
+	.pc-consent[hidden] {
+		display: none;
+	}
+	.pc-consent__text {
+		margin: 0;
+		color: var(--sl-color-gray-2);
+	}
+	.pc-consent__text strong {
+		color: var(--sl-color-white);
+	}
+	.pc-consent__text a {
+		color: var(--sl-color-text-accent);
+	}
+	.pc-consent__actions {
+		display: flex;
+		gap: 0.5rem;
+		flex: none;
+	}
+	.pc-consent__btn {
+		cursor: pointer;
+		border-radius: 999px;
+		padding: 0.45rem 1rem;
+		font: inherit;
+		font-weight: 600;
+		border: 1px solid var(--sl-color-gray-4);
+		background: transparent;
+		color: var(--sl-color-white);
+	}
+	.pc-consent__btn--primary {
+		border-color: var(--sl-color-accent);
+		background: var(--sl-color-accent);
+		color: var(--sl-color-black);
+	}
+	@media (max-width: 40rem) {
+		.pc-consent {
+			flex-direction: column;
+			align-items: stretch;
+		}
+		.pc-consent__actions {
+			justify-content: flex-end;
+		}
+	}
+</style>
