@@ -17,11 +17,11 @@ duration: 1 hour 30 minutes
 
 ## Objectives
 
-- Compare **VirtIO SCSI**, **VirtIO Block** and **SATA** on the same storage.
-- Understand the five **cache** modes and what each one risks if the node crashes.
-- Know what changes between the **Async IO** modes (`io_uring`, `native`, `threads`).
-- Return space to the thin pool with **discard** and **fstrim**, and expose the disk as an SSD.
-- Limit the bandwidth and IOPS of a disk, even while the VM is running.
+- A test VM with three disks on the same storage, one per controller (VirtIO SCSI, VirtIO Block, SATA), measured with the same script, and the ability to tell which differences exceed the run-to-run variability and which do not.
+- For each of the five **cache** modes, knowing where the data is when the guest gets a write acknowledged, and checking it with the QEMU monitor and the node's dirty memory.
+- An **Async IO** and cache combination that keeps the VM from starting, recognized from its error message and fixed.
+- Space returned to the thin pool with **discard** and **fstrim**, confirmed with `lvs` on the node, and the disk exposed to the guest as an SSD.
+- Bandwidth and IOPS limits applied to a running VM and confirmed with a measurement.
 
 ## How it works
 
@@ -35,29 +35,47 @@ node:  volume on the storage (here an LVM thin LV)
 
 **Controllers.**
 
-- **VirtIO SCSI:** paravirtualized controller; with **VirtIO SCSI single** each disk has its own controller and can have a dedicated **IO thread**. It supports discard, many disks and hotplug. It is the recommended default.
-- **VirtIO Block:** also paravirtualized, and simpler: one PCI device per disk (`/dev/vdX`), without the SCSI layer.
-- **SATA (and IDE):** emulated controllers, recognized by every operating system without drivers. Each operation costs the QEMU process more. They are used to install systems without VirtIO drivers or for compatibility.
+- **VirtIO SCSI:** a paravirtualized controller. With **VirtIO SCSI single** each disk gets its own controller and can have a dedicated **IO thread**. It supports discard, many disks and hotplug, and it is the recommended default.
+- **VirtIO Block:** also paravirtualized, and simpler: one PCI device per disk (`/dev/vdX`), with no SCSI layer.
+- **SATA (and IDE):** emulated controllers that every operating system recognizes without extra drivers. Each operation usually costs the QEMU process more, and they cannot have an IO thread: Proxmox VE offers that option only for VirtIO SCSI single and VirtIO Block. Use them to install systems that lack VirtIO drivers, or for compatibility.
 
-**IO thread.** With `iothread=1` the disk I/O runs in a dedicated thread instead of QEMU's main thread. With multiple disks the threads work in parallel, and I/O does not slow down the management of the VM.
+**IO thread.** With `iothread=1` the disk's I/O runs in a dedicated thread instead of QEMU's main thread. Several disks then work in parallel, and I/O does not slow down the management of the VM.
 
-**Cache.** It decides whether QEMU uses the node's page cache and whether it honors the *flushes* the guest sends to make its data safe:
+**Cache.** The cache mode decides whether QEMU uses the node's page cache and how it handles *flushes*, the requests with which the guest asks for the data it has written to become stable:
 
-| Mode | Node page cache | Guest flushes | Risk if the node crashes |
+| Mode | Node page cache | Guest flushes | What can be lost if the node crashes |
 |---|---|---|---|
-| `none` (default) | no (O_DIRECT) | honored | none beyond the guest itself |
-| `writethrough` | yes, reads only | every write is synchronous | none, but slow writes |
-| `writeback` | yes | honored | only what the guest has not yet confirmed with a flush is lost |
-| `directsync` | no | every write is synchronous | none, even slower writes |
-| `unsafe` | yes | **ignored** | data that the guest believes already written can be lost |
+| `none` (default) | no (O_DIRECT) | honored | whatever the guest has not yet made durable with a flush, as with a physical disk that has a write cache |
+| `writethrough` | yes, for reads only | not needed: a write is acknowledged only once it is on the storage | none of the acknowledged writes |
+| `writeback` | yes | honored | the same as with `none`, but the data not yet flushed sits in the node's RAM and can be much larger |
+| `directsync` | no (O_DIRECT) | not needed: a write is acknowledged only once it is on the storage | none of the acknowledged writes |
+| `unsafe` | yes | **ignored** | even data the guest believes is already safe |
 
 **Async IO.**
 
-- **`io_uring`:** the default, the modern asynchronous Linux interface.
-- **`native`:** the classic kernel AIO; it works only with O_DIRECT, that is, with `cache=none` or `directsync`.
-- **`threads`:** a thread pool that performs synchronous I/O, the most compatible option.
+- **`io_uring`:** the default for most storage types, the modern asynchronous Linux interface.
+- **`native`:** classic kernel AIO; it works only with O_DIRECT, that is with `cache=none` or `directsync`.
+- **`threads`:** a pool of threads doing synchronous I/O, the most compatible option.
 
-**Discard.** When the guest deletes data, it can tell the disk "these blocks are free" (TRIM/UNMAP). With `discard=on` QEMU passes the request on to the storage, and a thin pool releases the space. With the default `discard=ignore` the guest believes it has freed the space, but the node does not notice.
+**Discard.** When the guest deletes data, it can tell the disk which blocks are now free (TRIM/UNMAP). With `discard=on` QEMU passes the request on to the storage, and a thin pool releases the space. With the default `discard=ignore` the guest believes it has freed the space, but the node never finds out.
+
+### Test environment and versions
+
+The results below come from a run carried out in November 2026 with the configuration described here. You need it to read them correctly: with other versions, options or hardware, the same commands give different numbers.
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/04-first-access-repositories-updates/)); QEMU 11.1.3 ([Lab 35](/35-kvm-qemu/)) |
+| Node | `desopve04`, a standalone node with 4 cores and 16 GB of RAM ([Lab 01](/01-lab-architecture/)) |
+| Storage | `local-lvm`: 14 GiB thin pool `pve/data` on the system disk of `desopve04` ([Lab 03](/03-install-proxmox-ve/), [Lab 09](/09-lvm-and-lvm-thin/)), 23.7% full before the lab |
+| Test VM | Debian 13 from the cloud image, 2 vCPUs of type `host`, 2 GiB of RAM; 4 GiB test disks: `scsi1` (VirtIO SCSI single, `iothread=1`), `virtio1` (VirtIO Block, `iothread=1`), `sata1` (SATA, no IO thread) |
+| Disk options | defaults (`cache=none`, `aio=io_uring`, `discard=ignore`) unless a section says otherwise |
+| Tool | `fio` from the Debian 13 repositories (version not recorded in this lab; [Lab 19](/19-fio-benchmark/), with the same image, has 3.39), with `--direct=1 --ioengine=libaio`, run through [`fiorun.sh`](/files/37/fiorun.sh) |
+| Test area | 2 GiB per disk, written before the measurements; runs of 12-20 seconds plus a 2-second ramp-up; one or two rounds per configuration |
+
+The models of the node's disks and controllers are redacted, as explained in the [manual's conventions](/the-lab/#conventions): read the numbers as properties of this configuration.
+
+**What the test measures, and what it does not.** It measures the full path as the guest sees it: driver, virtual controller, QEMU (cache and aio), the LVM thin pool and the node's disk. It does not isolate the individual layers, so a high or low value does not tell you on its own which layer produced it. It measures a single VM and one disk at a time, and the activity of the node's other guests during the run was not recorded. With one or two short rounds, a difference between two configurations only counts if it is larger than the spread between rounds of the same configuration. For `scsi1` with the default options, sections 2-4 of this lab measured between 26,063 and 29,085 IOPS for random reads and between 8,247 and 14,864 IOPS for random writes.
 
 ## Procedure
 
@@ -84,7 +102,7 @@ virtio1: local-lvm:vm-370-disk-3,iothread=1,size=4G
 sata1: local-lvm:vm-370-disk-2,size=4G
 ```
 
-The warning is the overprovisioning seen in [Lab 09](/09-lvm-and-lvm-thin/): the volumes add up to 36 GiB on a 14 GiB pool. During the lab, at most a part of each disk is written, and the pool is checked with `lvs`.
+The warning is the overprovisioning seen in [Lab 09](/09-lvm-and-lvm-thin/): the volumes add up to 36 GiB on a 14 GiB pool. During the lab only part of each disk is ever written, and the pool is checked with `lvs`.
 
 In the guest:
 
@@ -96,10 +114,10 @@ sdc    4G    1        QEMU HARDDISK       1G
 vda    4G    1 virtio                     2G
 ```
 
-`ROTA 1`: all the disks present themselves as rotational disks.
+`ROTA 1`: every disk presents itself as a rotational disk.
 
 :::caution[Watch out for disk names in the guest]
-After a VM restart, in the lab `sdb` and `sdc` swapped places: the SCSI disk and the SATA disk are detected in a different order at each boot. A test run on `/dev/sdX` can thus end up on the wrong disk without any error. In tests and in `/etc/fstab`, use the stable names in `/dev/disk/by-id`: Proxmox VE gives each SCSI disk the identifier `drive-scsiN`.
+After a VM restart, `sdb` and `sdc` swapped places in the lab: the SCSI and SATA disks can be detected in a different order from one boot to the next. A test run against `/dev/sdX` can then hit the wrong disk without any error. In tests and in `/etc/fstab`, use the stable names in `/dev/disk/by-id`: Proxmox VE gives each SCSI disk the identifier `drive-scsiN`.
 
 ```text
 ata-QEMU_HARDDISK_QM00007 -> ../../sdc
@@ -107,7 +125,14 @@ scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 -> ../../sdb
 ```
 :::
 
-The measurements use `fio` with O_DIRECT in the guest, on a 2 GiB area of each disk filled before the test. Each test lasts 12-20 seconds. The tests are run by the script [`fiorun.sh`](/files/37/fiorun.sh), to be copied into the guest (for example with `scp` from the DC, which logs in with `ssh labuser@172.27.199.170`). It runs `fio` with `--direct=1 --ioengine=libaio --size=2G --time_based --ramp_time=2` and prints one line with IOPS, MB/s, average latency (`lat media`) and 99th percentile latency. Install `fio` in the guest through the lab proxy, configured as in [Lab 36](/36-memory/):
+The measurements run `fio` with O_DIRECT in the guest, on a 2 GiB area of each disk that is filled before the test. Each run lasts 12-20 seconds. They are driven by the script [`fiorun.sh`](/files/37/fiorun.sh), which you copy into the guest (for example with `scp` from the DC, which logs in with `ssh labuser@172.27.199.170`). It runs `fio` with `--direct=1 --ioengine=libaio --size=2G --time_based --ramp_time=2` and prints one line per run:
+
+- `IOPS`: operations completed per second;
+- `MB/s`: fio's bandwidth (`bw`, in KiB/s) divided by 1024, so the value is in **MiB/s**, the unit used in this lab's tables;
+- `lat media` and `p99`: the mean and the 99th percentile of the **completion latency** (*clat*, from submitting an operation to its completion), in microseconds. They do not include the submission time; fio's three latencies are explained in [Lab 19](/19-fio-benchmark/);
+- with `--fsync=1` the latency printed covers the write only: fio reports the time spent in `fsync` separately, and the script does not print it.
+
+Install `fio` in the guest through the lab proxy, configured as in [Lab 36](/36-memory/):
 
 ```bash
 sudo apt-get install -y fio
@@ -116,7 +141,7 @@ sudo apt-get install -y fio
 
 ### 2. Controllers: VirtIO SCSI, VirtIO Block and SATA
 
-Two consecutive rounds:
+Two consecutive rounds, with the default options:
 
 ```text
 == giro 1
@@ -141,15 +166,28 @@ SATA randwrite4k             IOPS=    2646  MB/s=   10.3  lat media=  11972 us  
 SATA write1M                 IOPS=     344  MB/s=  344.2  lat media=  22930 us  p99= 214958 us
 ```
 
-| Controller | 4k random reads | 4k random writes | 1M sequential write |
+| Controller (both rounds) | 4k random reads | 4k random writes | 1M sequential write |
 |---|---|---|---|
-| VirtIO SCSI + iothread | 26,900-29,100 IOPS | 8,200-10,500 IOPS | 285-652 MB/s |
-| VirtIO Block + iothread | 29,500-30,800 IOPS | 7,100-7,500 IOPS | 563-629 MB/s |
-| SATA | 7,700-8,200 IOPS | 2,600-5,800 IOPS | 344-469 MB/s |
+| VirtIO SCSI + iothread | 26,900-29,100 IOPS | 8,200-10,500 IOPS | 285-652 MiB/s |
+| VirtIO Block + iothread | 29,500-30,800 IOPS | 7,100-7,500 IOPS | 563-629 MiB/s |
+| SATA | 7,700-8,200 IOPS | 2,600-5,800 IOPS | 344-469 MiB/s |
 
-- **VirtIO SCSI and VirtIO Block** are equivalent: the differences are within the variability between one round and the next.
-- **SATA** delivers about **a quarter** of the random reads, with three times the latency: it is the cost of emulating a physical controller.
-- **Sequential writes** vary a lot between the two rounds on the same disk: the speed of the node's disk changes over time (disk and controller cache, background writes). In a lab, only compare tests run close together, and repeat them.
+Each point below separates what the test measured from how we interpret it, and names the check that would confirm the interpretation.
+
+1. **4k random reads.**
+   - **Measured:** VirtIO SCSI 26,867 and 29,085 IOPS, VirtIO Block 30,766 and 29,454, SATA 8,155 and 7,748. The mean completion latency is 1.0-1.2 ms for the two VirtIO controllers and 3.8-4.0 ms for SATA.
+   - **Interpretation:** the two VirtIO controllers overlap. SATA reaches 25-30% of their reads, at 3-4 times the latency. That is consistent with the cost of an emulated controller, but the SATA disk is also the only one without an IO thread, and the test cannot separate the two factors.
+   - **How to check:** repeat the run on `scsi1` with `iothread=0` to see what the IO thread alone is worth; during the run, `top -H -p $(cat /var/run/qemu-server/370.pid)` on the node shows which QEMU threads are busy (vCPUs, IO thread, main thread).
+2. **4k random writes.**
+   - **Measured:** VirtIO SCSI 8,247 and 10,540 IOPS, VirtIO Block 7,546 and 7,146, SATA 5,767 and 2,646.
+   - **Interpretation:** VirtIO SCSI is ahead of VirtIO Block in both rounds, but the same disk with the same options produced anywhere between 8,247 and 14,864 IOPS across sections 2-4, so the difference is not established. In the second round SATA drops by half (from 5,767 to 2,646 IOPS, with a p99 of 304 ms), and the test does not say why.
+   - **How to check:** more and longer rounds, changing the order of the disks; on the node, `iostat -x 1` (from the `sysstat` package) during the run shows whether the physical disk is saturated (`%util`, `w_await`).
+3. **1M sequential writes.**
+   - **Measured:** VirtIO SCSI 285 and 652 MiB/s, VirtIO Block 563 and 629, SATA 469 and 344.
+   - **Interpretation:** the gap between the two rounds on the same disk (more than double for VirtIO SCSI) is larger than the differences between controllers, so this test cannot rank them. Write caches in the node's disk or controller and background writes are possible causes; the test does not isolate them.
+   - **How to check:** as in point 2, with a write long enough to exceed the caches.
+
+**In short:** the only thing this test shows with confidence is that SATA falls far behind both VirtIO controllers for random reads. Between VirtIO SCSI and VirtIO Block, the differences seen in this lab are within the variability of the test.
 
 ### 3. Cache modes
 
@@ -157,14 +195,14 @@ SATA write1M                 IOPS=     344  MB/s=  344.2  lat media=  22930 us  
 
 ![Edit Hard Disk window (scsi1) with Cache, Discard, IO thread, SSD emulation and Async IO](../../assets/images/37/01-disco-opzioni-avanzate.png)
 
-On `scsi1`, test the five modes. Each change requires stopping and starting the VM:
+Test the five modes on `scsi1`. Every change requires stopping and starting the VM:
 
 ```bash
 qm set 370 --scsi1 local-lvm:vm-370-disk-1,iothread=1,cache=writeback
 qm stop 370 && qm start 370
 ```
 
-Four tests per mode on the disk `/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1`. The first one is one write at a time, each followed by an `fsync`: this is how a database committing transactions behaves.
+Each mode gets four runs on `/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1`. The first one writes one block at a time and follows every write with an `fsync`, the way a database commits transactions. In that line, `IOPS` counts write + `fsync` cycles per second.
 
 ```text
 == cache=none
@@ -194,19 +232,28 @@ randread 4k QD32             IOPS=   30653  MB/s=  119.7  lat media=   1015 us  
 write 1M QD8                 IOPS=    2386  MB/s= 2386.9  lat media=   3172 us  p99=   9241 us
 ```
 
-| Cache | Write + fsync (QD1) | 4k random writes QD32 | 1M sequential write |
+| Cache | Write + fsync, QD1 (cycles per second) | 4k random writes QD32 | 1M sequential write QD8 |
 |---|---|---|---|
-| `none` | 545 IOPS | 8,700 IOPS | 318 MB/s |
-| `writethrough` | 501 IOPS | 9,700 IOPS | 537 MB/s |
-| `directsync` | 717 IOPS | 5,600 IOPS | 431 MB/s |
-| `writeback` | 575 IOPS | 30,300 IOPS | 2,509 MB/s |
-| `unsafe` | **4,399 IOPS** | 30,300 IOPS | 2,387 MB/s |
+| `none` | 545 | 8,700 IOPS | 318 MiB/s |
+| `writethrough` | 501 | 9,700 IOPS | 537 MiB/s |
+| `directsync` | 717 | 5,600 IOPS | 431 MiB/s |
+| `writeback` | 575 | 30,300 IOPS | 2,509 MiB/s |
+| `unsafe` | **4,399** | 30,300 IOPS | 2,387 MiB/s |
 
-- **`writeback` and `unsafe`:** the writes end up in the node's RAM, hence the "impossible" speeds (2.5 GB/s on this storage).
-- **With an `fsync` after every write**, `writeback` becomes as slow as `none`, because every guest flush forces the node to actually write. Only `unsafe` stays fast: the flush is **ignored**.
-- **`none`, `writethrough` and `directsync`** stay at the speed of the storage. Reads are equivalent because the test area is small and the underlying storage has its own cache.
+1. **`writeback` and `unsafe` without `fsync`.**
+   - **Measured:** 1M sequential writes reach 2,509 MiB/s with `writeback` and 2,387 with `unsafe`, against 318-537 MiB/s for the other three modes; 4k random writes at QD32 reach about 30,300 IOPS, against 5,583-9,728.
+   - **Interpretation:** consistent with the writes being absorbed by the node's page cache, which these two modes use for writes as well: the guest gets its acknowledgment before the data reaches the disk. The dirty-memory test further down points the same way.
+   - **How to check:** during the run, on the node, read `grep -E '^(Dirty|Writeback):' /proc/meminfo` every second and watch the physical disk with `iostat -x 1`. If the guest writes at 2.5 GiB/s while the disk keeps writing at its usual pace, the difference is sitting in RAM.
+2. **One write at a time, each followed by `fsync`.**
+   - **Measured:** `none` completes 545 cycles per second, `writethrough` 501, `directsync` 717, `writeback` 575 and `unsafe` 4,399. The latency printed covers the write alone: 182 µs with `writeback`, 101 µs with `unsafe`, 1,315-1,901 µs with the other three.
+   - **Interpretation:** with `writeback` the write completes in RAM (182 µs), yet each cycle takes about 1.7 ms (1/575 of a second), close to the 1.8 ms of `none`. The extra time is spent outside the write, which is consistent with an `fsync` that waits for the node to put the data on disk. With `unsafe` the node completes almost eight times as many cycles, consistent with flushes being ignored, as the monitor confirms below. With `writethrough` and `directsync` the write takes up nearly the whole cycle, because it is already synchronous.
+   - **How to check:** fio measures the time spent in `fsync` separately (`jobs[0].sync.lat_ns` in the JSON output, which the script does not print); on the node, `iostat -x 1` shows the flush requests per second that reach the disk (the `f/s` column).
+3. **The other measurements.**
+   - **Measured:** `none`, `writethrough` and `directsync` give 5,583-9,728 IOPS for random writes and 318-537 MiB/s for sequential writes. Random reads land between 26,063 and 32,097 IOPS in all five modes.
+   - **Interpretation:** these differences are of the same order as the spread measured for an unchanged configuration (see [Test environment and versions](#test-environment-and-versions)), so the test neither ranks these three modes nor shows any effect of the cache on reads. Nor does it tell what limits the reads: the disk, the thin pool, QEMU or the guest's two vCPUs.
+   - **How to check:** run `iostat -x 1` on the node during the read test. If the physical disk serves reads at the same rate, they reach the disk; if it is nearly idle, they come from a cache.
 
-The monitor confirms that with `unsafe` the flushes are discarded:
+The monitor shows the configuration actually in use: with `unsafe` on `scsi1`, that disk's nodes report `writeback, ignore flushes` (only the `Cache mode` lines are shown here):
 
 ```text title="qm monitor" frame="terminal"
 info block -n
@@ -218,7 +265,7 @@ info block -n
     Cache mode:       writeback, ignore flushes
 ```
 
-**Where the data is when the guest believes it has written it.** In the guest, write 1 GiB directly to the disk, with a final `fsync` (`conv=fsync`), and right afterwards look at the "dirty" memory on the node, that is, the data still to be written to disk:
+**Where the data is when the guest believes it has been written.** In the guest, write 1 GiB straight to the disk, ending with an `fsync` (`conv=fsync`). Right afterwards, look at the node's dirty memory, that is the data still waiting to be written to disk:
 
 ```bash
 dd if=/dev/urandom of=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1 bs=1M count=1024 oflag=direct conv=fsync   # in the guest
@@ -234,10 +281,12 @@ grep ^Dirty: /proc/meminfo                                                      
   nodo subito dopo: Dirty: 1050036 kB
 ```
 
-- **`writeback`:** when the guest's `fsync` returns, the data is on the node's disk.
-- **`unsafe`:** the guest has finished and believes its GiB is safe, but it is all still in the node's RAM. A power failure at that moment would wipe it out, and the guest would never know.
+- **Measured:** right after the `dd`, which ends with an `fsync`, the node's `Dirty` counter reads 1,456 kB with `writeback` and 1,050,036 kB with `unsafe`, roughly the GiB that was just written.
+- **Interpretation:** with `writeback`, the guest's `fsync` forced the node to write the data out of its page cache, which is consistent with the data already being on the node's disk when `fsync` returns. With `unsafe`, the GiB the guest considers safe was still in the node's RAM: a power failure at that moment would wipe it out, and the guest would never know.
+- **Limits of the test:** `Dirty` counts all the dirty memory of the node, and it was read only once. The `dd` throughput (176 and 233 MB/s) is not a storage measurement here: it includes generating random data with `/dev/urandom` in the guest, and it issues one 1 MiB write at a time.
+- **How to check:** read `Dirty` and `Writeback` every second for a minute after the `dd`. With `unsafe` they should fall as the node's kernel writes the data out, within the interval set by `vm.dirty_expire_centisecs`.
 
-`unsafe` is fine only for throwaway data, for example while installing a template VM. `writeback` is acceptable with a node protected by a UPS and operating systems that use flushes correctly. The default `none` is the safe choice.
+**Which mode to choose.** `unsafe` is only for throwaway data, for example while installing a system that will become a template. `writeback` makes sense when the guest uses flushes correctly and the node's RAM is protected against power loss (a UPS), because the amount of data the guest has not yet flushed can be large. The default, `none`, is the safe choice.
 
 ### 4. Async IO
 
@@ -261,9 +310,20 @@ randread 4k QD32             IOPS=   30716  MB/s=  120.0  lat media=   1021 us  
 randwrite 4k QD32            IOPS=    7674  MB/s=   30.0  lat media=   4142 us  p99=  57410 us
 ```
 
-Reads stay between 27,000 and 33,000 IOPS with all three modes. Writes vary more from one round to the next (from 6,000 to 12,200 with `native`) than from one mode to another: in this lab there is no measurable winner. `io_uring` remains the sensible default. `threads` is for storage types with which the other modes cause problems.
+1. **Reads.**
+   - **Measured:** `io_uring` 27,460 and 27,121 IOPS, `native` 32,438 and 33,112, `threads` 31,479 and 30,716.
+   - **Interpretation:** `native` and `threads` beat `io_uring` in both rounds, by 13-22%, and they also beat every read measured on `scsi1` with the default options (26,063-29,085 IOPS). That hints at an advantage for random reads in this configuration, but it is not proof: the modes were measured one after another, with only two rounds each.
+   - **How to check:** more rounds that alternate the modes (`io_uring`, `native`, `threads`, then `io_uring` again), each after restarting the VM, and longer runs.
+2. **Writes.**
+   - **Measured:** `io_uring` 13,340 and 14,864 IOPS, `native` 6,043 and 12,222, `threads` 6,368 and 7,674.
+   - **Interpretation:** the same `io_uring` configuration produced 8,247-10,540 IOPS in section 2 and 8,693 in section 3, and `native` doubles from one round to the next. The spread of an unchanged configuration covers the differences between modes, so this test names no winner for writes.
+   - **How to check:** as in point 1.
 
-`native` has a constraint, and Proxmox VE does not check it before startup:
+**Which mode to choose.** `io_uring` remains the sensible default for this storage until a repeated measurement on your own storage shows a consistent advantage for another mode. `threads` is meant for storage types with which the other modes cause problems: for some of them, such as thick LVM and CIFS, Proxmox VE does not use `io_uring` even as the default. `qm showcmd 370 --pretty` shows the mode a disk actually uses.
+
+#### A combination that prevents startup
+
+**Configuration tried.** `aio=native` with `cache=writeback` on `scsi1`:
 
 ```bash
 qm stop 370
@@ -271,16 +331,27 @@ qm set 370 --scsi1 local-lvm:vm-370-disk-1,iothread=1,aio=native,cache=writeback
 qm start 370
 ```
 
+**Error observed.** `qm set` accepts the configuration, but the start fails:
+
 ```text output
 kvm: -blockdev {...,"file":{"aio":"native","cache":{"direct":false,"no-flush":false},...,"driver":"host_device","filename":"/dev/pve/vm-370-disk-1",...}: aio=native was specified, but it requires cache.direct=on, which was not specified.
 start failed: QEMU exited with code 1
 ```
 
-The configuration is accepted, but the VM does not start: `native` requires `cache=none` or `directsync`.
+The message states the constraint: `native` needs `cache.direct=on`, that is O_DIRECT, which among the Proxmox VE cache modes only `none` and `directsync` provide. In this version (Proxmox VE 9.2.26 with QEMU 11.1.3) the combination is not rejected when the configuration is saved, only when the VM starts.
+
+**Decision.** Go back to a valid combination before moving on; here, the defaults, by removing `aio` and `cache` from the disk line.
+
+```bash
+qm set 370 --scsi1 local-lvm:vm-370-disk-1,iothread=1
+qm start 370
+```
+
+**Result.** The VM starts again with `cache=none` and `aio=io_uring`, and the next section starts from this configuration.
 
 ### 5. Discard, fstrim and SSD emulation
 
-Create an ext4 filesystem on `scsi1`. Write a 1 GiB file, delete it and ask the guest to report the free blocks with `fstrim`. On the node, look at the usage of the thin volume:
+Create an ext4 filesystem on `scsi1`, write a 1 GiB file, delete it and ask the guest to report the free blocks with `fstrim`. On the node, watch how much of the thin volume is in use:
 
 ```bash
 # in the guest
@@ -302,7 +373,7 @@ file-1GiB-scritto
  vm-370-disk-1 50.79          ← after fstrim: no change
 ```
 
-The guest reports having freed 2.9 GiB, but the node receives nothing: QEMU discards the requests.
+The guest reports 2.9 GiB freed, but the volume stays at 50.79%: with `discard=ignore`, QEMU does not pass the requests on to the storage.
 
 **With `discard=on` and `ssd=1`** (stopping and starting the VM):
 
@@ -323,15 +394,15 @@ file-1GiB-scritto
  data 65.69                   ← thin pool of the node: it was at 79%
 ```
 
-- **`ssd=1`:** the guest sees a non-rotational disk (`rotational=0`) and adapts the I/O scheduler and the filesystem behavior.
-- **`discard=on`:** the space freed in the guest actually goes back to the thin pool.
-- The `fstrim` run right after `rm` frees only 6 MiB: ext4 releases the blocks of the deleted file only at the journal commit, after a few seconds. Debian runs `fstrim` every week with `fstrim.timer` (`enabled`), so the space comes back on its own.
+- **`ssd=1`:** the guest sees a non-rotational disk (`rotational=0`). What changes as a result depends on the guest's operating system and applications, and this test does not measure it. According to the Proxmox VE documentation, some operating systems also need SSD emulation before they send TRIM. SSD emulation is not available on VirtIO Block disks.
+- **`discard=on`:** the space freed in the guest goes back to the thin pool. The volume drops from 50.79% to 3.46% (1.9 GiB returned), and the node's thin pool from 79% to 65.69%.
+- **Trimming right after `rm`:** it frees only 6 MiB, while after `sync` and a few seconds it frees 1.1 GiB. That is consistent with ext4 making the blocks of a deleted file available only when the journal commits, every 5 seconds by default. To check it, repeat the test with `sync` immediately before `fstrim` and no wait. Either way, Debian runs `fstrim` every week through `fstrim.timer`, which is `enabled` in the guest, so the space comes back without any intervention.
 
-With thin storage (LVM-thin, ZFS, Ceph, qcow2), without `discard=on` the VM disks grow and never shrink again. It is the leading cause of the thin pools that fill up "for no reason" seen in [Lab 09](/09-lvm-and-lvm-thin/).
+On thin storage (LVM-thin, ZFS, Ceph, qcow2), without `discard=on` the space freed inside the guest stays allocated on the node, as you saw here with `discard=ignore`. [Lab 09](/09-lvm-and-lvm-thin/) shows the same mechanism for containers (`pct fstrim`). When a thin pool fills up faster than the guests' data would justify, this is one of the first things to check: compare the space used inside the guest (`df`) with the usage of the volume on the node (`lvs`).
 
 ### 6. Bandwidth and IOPS limits
 
-In the **Bandwidth** tab of the same window you limit reads and writes, in MB/s and in operations per second, with an optional temporary *burst*:
+The **Bandwidth** tab of the same window limits reads and writes, in MB/s and in operations per second, with an optional temporary *burst*:
 
 ![Bandwidth tab of disk scsi1 with Write limit 20 MB/s and Read limit 500 ops/s](../../assets/images/37/02-disco-limiti-banda.png)
 
@@ -352,15 +423,24 @@ write 1M QD8                 IOPS=      19  MB/s=   20.0  lat media= 403898 us  
 randread 4k QD32             IOPS=     497  MB/s=    2.0  lat media=  64070 us  p99=  66322 us
 ```
 
-The limit is accurate: 20.0 MB/s and 497 IOPS. The guest gets no errors: its requests wait in the queue, and in fact latency rises to 400 ms for writes and 64 ms for reads. This prevents a noisy VM from saturating a storage shared with the others; CPU limits and the rest are covered in Lab 42.
+- **Measured:** with the limits in place, 1M writes at QD8 run at 20.0 MiB/s with a mean completion latency of 404 ms (p99 600 ms), and 4k reads at QD32 reach 497 IOPS with a 64 ms mean. Without limits they were 724 MiB/s and 27,229 IOPS. `fio` reported no errors.
+- **Interpretation:** the limits hold. Proxmox VE converts `mbps_wr=20` into 20 × 1024 × 1024 bytes per second, that is 20 MiB/s, the same unit the script prints; the read limit was 500 operations per second. The latencies are what a queue predicts: at a fixed throughput, latency is roughly the queue depth divided by the rate, so 8 / 20 per second = 0.40 s and 32 / 497 per second ≈ 64 ms. The guest therefore gets no errors: its requests wait in the queue.
+- **How to check:** `qm showcmd 370 --pretty` shows the limit in bytes per second (`bps-write` 20971520).
+
+This keeps a noisy VM from saturating storage it shares with others; CPU limits and the rest are covered in Lab 42.
 
 ## Verification and tests
 
-- VirtIO SCSI and VirtIO Block give equivalent results; SATA has about a quarter of the random reads.
-- `unsafe` ignores flushes (`ignore flushes` in the monitor) and leaves 1 GiB in the node's RAM after a guest `fsync`; `writeback` does not.
-- `aio=native` with a cache mode other than `none`/`directsync` prevents the VM from starting.
-- With `discard=on`, the guest's `fstrim` returns the space to the thin pool; with the default it does not.
-- The bandwidth and IOPS limits are applied live and are respected.
+The lab has succeeded when every section has produced the `fiorun.sh` lines for all disks and modes, and the checks below give the expected result. The observed values are those of the run described in [Test environment and versions](#test-environment-and-versions).
+
+| Check | Expected result | Observed in this run |
+|---|---|---|
+| Disk names in the guest | tests use `/dev/disk/by-id`, never `sdX` | `sdb` and `sdc` swapped after a restart; tests run on `drive-scsi1` |
+| Controllers | every difference compared with the spread between the two rounds | SATA at 25-30% of VirtIO for random reads; VirtIO SCSI and Block indistinguishable |
+| `unsafe` cache | `ignore flushes` in the monitor; data still in `Dirty` on the node after a guest `fsync` | `writeback, ignore flushes`; `Dirty` 1,050,036 kB (1,456 kB with `writeback`) |
+| `aio=native` with `cache=writeback` | the VM does not start; with a valid combination it starts again | error `requires cache.direct=on`; VM restarted with the default options |
+| Discard | with `discard=on`, the guest's `fstrim` lowers the volume usage; with `ignore`, it does not | from 50.79% to 3.46% with `on`; unchanged with `ignore` |
+| I/O limits | applied to the running VM, measurement close to the limit, no errors in the guest | 20.0 MiB/s and 497 IOPS; mean latencies 404 ms and 64 ms |
 
 ## Final lab state
 
@@ -370,16 +450,18 @@ The limit is accurate: 20.0 MB/s and 497 IOPS. The guest gets no errors: its req
 
 ## What you learned
 
-- Paravirtualized disks (VirtIO SCSI single or VirtIO Block) with an IO thread give the best performance; use SATA only when the guest lacks the drivers.
-- The `writeback` cache speeds up writes using the node's RAM but honors flushes; `unsafe` ignores them and can lose data that the guest considers written.
-- `aio=native` works only with O_DIRECT; `io_uring` is the right default.
-- Without `discard=on`, the space freed in the guests never goes back to thin storage.
-- I/O limits can be changed live and protect shared storage from the noisiest VMs.
-- In the guests, identify disks by `/dev/disk/by-id`, not by `sdX`.
+- **Choosing a disk controller:** VirtIO SCSI single with an IO thread as the default, or VirtIO Block, which this test could not tell apart from it; SATA only until the guest has VirtIO drivers, since it delivered 25-30% of the VirtIO random reads.
+- **Choosing a cache mode by where acknowledged data may sit:** `none` by default; `writeback` only if the guest uses flushes and the node's RAM is protected against power loss; `unsafe` only for throwaway data. The monitor (`info block`) and the node's `Dirty` counter show what actually happens.
+- **Leaving `aio` at its default** until a repeated measurement on your own storage shows a consistent advantage, and using `native` only with `cache=none` or `directsync`, or the VM will not start.
+- **Enabling `discard=on` on thin storage**, and making sure something in the guest sends the trims (`fstrim.timer`), by comparing the space used in the guest with `lvs` on the node.
+- **Using I/O limits to protect shared storage**, knowing that the guest experiences them as latency (queue depth divided by the limit), not as errors.
+- **Reading a performance comparison:** before attributing a difference to the option you changed, compare it with the spread between repeated runs of the same configuration.
+- **Identifying disks in the guests** by `/dev/disk/by-id`, not by `sdX`.
 
 ## References
 
-- [Proxmox VE – Virtual Machines: Hard Disk](https://pve.proxmox.com/pve-docs/chapter-qm.html#qm_hard_disk)
-- [Proxmox VE wiki – Performance Tweaks (cache modes)](https://pve.proxmox.com/wiki/Performance_Tweaks)
-- [QEMU – Block device options (cache, aio, discard)](https://www.qemu.org/docs/master/system/qemu-block-drivers.html)
-- [fio – Flexible I/O Tester](https://fio.readthedocs.io/)
+- [Proxmox VE – VM hard disks: cache, discard, IO thread, SSD emulation](https://pve.proxmox.com/pve-docs/chapter-qm.html#qm_hard_disk)
+- [Proxmox VE wiki – Performance Tweaks: disk cache modes](https://pve.proxmox.com/wiki/Performance_Tweaks#Disk_Cache)
+- [QEMU 11.1 – Block device options (`-drive`: cache, aio, discard, detect-zeroes)](https://qemu.readthedocs.io/en/stable-11.1/system/invocation.html#hxtool-1)
+- [fio – interpreting the output: slat, clat and lat](https://fio.readthedocs.io/en/latest/fio_doc.html#interpreting-the-output)
+- [`proc_meminfo(5)` – the `Dirty` and `Writeback` counters](https://man7.org/linux/man-pages/man5/proc_meminfo.5.html)
