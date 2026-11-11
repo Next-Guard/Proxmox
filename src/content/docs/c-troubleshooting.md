@@ -92,7 +92,7 @@ When you face a problem, it pays to always proceed the same way:
 | Symptom | Cause | Solution | Lab |
 |---|---|---|---|
 | `/etc/pve` read-only on a node | The node has lost quorum | Restore Corosync communication; do not force `pvecm expected` unless you know what you are doing | [06](/06-cluster-corosync/) |
-| After a failure the replicated VM must be recovered manually | ZFS replication is not HA | Move the VM configuration to the node holding the replica; the data written since the last replication is lost | [11](/11-zfs-replication/) |
+| After a failure the replicated VM must be recovered manually | ZFS replication is not HA | Move the VM configuration to the node holding the replica; the data written after the snapshot of the last successful run is lost. If you need the writes left on the failed node, disable the job before powering it back on | [11](/11-zfs-replication/) |
 | Creating an HA group is rejected | In PVE 9, groups have been replaced by HA rules | Use **node affinity rules** | [49](/49-high-availability/) |
 | A resource affinity rule is rejected | The resource is already in a node affinity rule with multiple priorities | Simplify the node affinity or do without the resource affinity | [49](/49-high-availability/) |
 | Maintenance mode cannot evacuate a node | A *Keep Separate* rule on 3 VMs with 3 nodes leaves no room | Reduce the rule or add nodes | [49](/49-high-availability/) |

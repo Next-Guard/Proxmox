@@ -14,12 +14,10 @@ duration: 1 hour 30 minutes
 
 ## Objectives
 
-- Understand how Proxmox VE asynchronous replication works and when it is worth using.
-- Create replication jobs to multiple nodes, with a schedule and a rate limit.
-- Read the status and logs of the jobs, and recognize the replication snapshots.
-- Measure how much a replica shortens the migration of a VM with local disks.
-- Manually recover a VM from a failed node and measure the data lost.
-- Put the cluster back in order when the failed node returns to service.
+- Two replication jobs for VM 100, to two different nodes, one of them every 5 minutes with a 50 MB/s limit, whose state, logs and snapshots you can read in the GUI and with `pvesr`.
+- The same VM live-migrated to a node without a replica and to a node with one, with the task duration, the downtime reported by QEMU and the data copied read separately in the logs.
+- VM 100 restarted by hand on another node after its own node was abruptly powered off, with the data lost checked against the time of the last replicated snapshot.
+- The cluster and the replication back in order when the failed node returns, knowing which copy is kept and which writes are discarded.
 
 ## How it works
 
@@ -34,22 +32,44 @@ With a local storage like `local-zfs`, the disk of a VM exists on **one node onl
          (every 15 minutes it sends only the blocks changed since the last snapshot)
 ```
 
-- Replication is **asynchronous** and based on ZFS snapshots: on every run the job creates a snapshot, sends the difference from the previous run over SSH (incremental `zfs send`) and deletes the old snapshot. The first run sends the whole disk.
+- Replication is **asynchronous** and based on ZFS snapshots: on every run the job creates a snapshot, sends the difference from the previous run over SSH (incremental `zfs send`) and deletes the old snapshot. The first run sends all the data on the disk.
 - It works **only with ZFS storage** (`zfspool`) and requires the storage to have the same name on the source and on the target.
 - It is configured **per guest and per target node**: a job has an ID in the form `<VMID>-<number>` and one target; to have copies on two nodes you need two jobs.
 - The jobs are run by the **`pvescheduler`** service, according to a schedule in *calendar event* format (`*/15`, i.e. every 15 minutes, is the default; forms like `mon..fri 22:30` can be used too).
-- The copy is **not real-time**: if the source node fails, everything written after the last replication is lost. This window, the *Recovery Point Objective* (RPO), is at most the schedule interval plus the duration of the job.
+- The copy is **not real-time**. What reaches the target is the state of the disk at the moment of the snapshot that opens each run: if the source node fails, everything written after the snapshot of the last successful run is lost. As long as the runs succeed, that window lasts at most the schedule interval plus the duration of a run; every failed run widens it. This is the figure to compare with the *Recovery Point Objective* (RPO), the largest data loss a service can accept.
 
 ### What you gain
 
-- **Fast migrations:** if the target already has a replica, the migration sends only the difference. Live migration benefits too: QEMU keeps a *dirty bitmap* of the blocks written after the last replication and copies only those.
+- **Shorter migrations:** if the target already holds a replica, a migration sends only the changes since the last run instead of the whole disk. This also works for live migration: Proxmox VE runs the job one last time, has QEMU track the blocks written from that moment on (a *dirty bitmap*), and then mirrors only those.
 - **Restart after a failure:** the VM can be restarted on the node that holds the replica, manually (this lab) or automatically with high availability (lab 49), accepting the loss of the most recent data.
 
 Replication **does not replace backups** (labs 46-47): a deleted file or ransomware gets replicated like any other change.
 
 ### Who owns the VM
 
-The configuration of a VM lives in the cluster file system, in `/etc/pve/nodes/<node>/qemu-server/<VMID>.conf`: the **directory** that contains the file decides which node the VM runs on. To restart a VM on another node after a failure you move that file, but only if the failed node is **definitely powered off**: if it were still running and cut off from the network, the VM would run twice on the same data.
+The configuration of a VM lives in the cluster file system, in `/etc/pve/nodes/<node>/qemu-server/<VMID>.conf`: the **directory** that holds the file decides which node the VM belongs to. To restart a VM on another node after a failure you move that file, but only if the failed node is **certainly powered off**. If it were still running, merely cut off from the others, the VM would end up running twice, on two copies of the disk that drift apart and with the same addresses on the network.
+
+### Test environment and versions
+
+The times and sizes in this lab come from a single run on 9 November 2026, in the configuration below. They describe this configuration: with other versions, disks, networks or VMs they change.
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` on `desopve01-03` ([Lab 04](/04-first-access-repositories-updates/)); QEMU 11.1.3 (the `creation-qemu` of VM 100, [Lab 07](/07-first-vm-and-container/)) |
+| `local-zfs` | `rpool/data` on the ZFS mirror (RAID1) of the two system disks of each node ([Lab 03](/03-install-proxmox-ve/)), `sparse 1`; ZFS in the version shipped with Proxmox VE 9.2.26, which the lab does not record (`zfs version` shows it) |
+| VM 100 `debian01` | Debian 13.7, 2 vCPUs, 2 GiB of RAM, no guest agent, 16 GiB `scsi0` disk holding about 1.9 GiB of data; idle apart from the test writes ([Lab 07](/07-first-vm-and-container/)) |
+| Network | replication (over SSH) and migrations use the management network `172.27.199.0/24`, because no migration network is set yet ([Lab 22](/22-dedicated-networks/)); migration type `secure`, the default; the link speed is not recorded (`ethtool` shows it) |
+| Jobs | `100-0`: `*/5`, limit 50 MB/s (50,000,000 bytes/s); `100-1`: `*/15`, no limit |
+
+**What the logs measure.** The lab compares figures that measure different things:
+
+- **task duration** (`migration finished successfully (duration …)`): the whole migration task, from the start to the final steps;
+- **downtime** (`downtime … ms`): the pause that QEMU measures in the last phase of the memory transfer. Proxmox VE resumes the VM on the target only afterwards, in the final steps of the task, so this figure is not the interruption a client sees;
+- **average migration speed**: the VM's memory divided by the duration of the memory transfer in whole seconds; it is neither the network throughput nor the speed of the disk copy;
+- **run duration** (`Duration` in `pvesr status`): a whole run of a replication job, of which the send is only one part;
+- **data to send** (`estimated size`): the estimate ZFS makes before sending, in binary units (`154K`, `511M` and `1.91G` are KiB, MiB and GiB); it is not a network counter.
+
+**What the lab does not measure.** It does not measure the pause a client sees during the migrations, nor the time from the power-off of the node until the VM is reachable again. Each migration and each test was run once: the figures are single observations, not statistics.
 
 ## Procedure
 
@@ -70,7 +90,7 @@ zfspool: local-zfs
 
 ### 2. A baseline migration, without replication
 
-To have a point of comparison, live-migrate VM 100 to `desopve03`, which does not have any copy of the disk yet. With `--with-local-disks` Proxmox VE copies the whole 16 GiB disk while the VM keeps running:
+To have a point of comparison, live-migrate VM 100 to `desopve03`, which has no copy of its disk yet. With `--with-local-disks`, Proxmox VE mirrors the 16 GiB disk to the target while the VM keeps running:
 
 ```bash title="root@desopve01"
 qm migrate 100 desopve03 --online --with-local-disks
@@ -84,7 +104,11 @@ mirror-scsi0: transferred 16.0 GiB of 16.0 GiB (100.00%) in 57s, ready
 2026-11-09 14:19:43 migration finished successfully (duration 00:01:13)
 ```
 
-Well over a minute for an almost empty disk: the time grows with the size of the disk and with the network bandwidth. The VM now runs on `desopve03`.
+- **Measured:** the disk mirror (`mirror-scsi0`) reports 16.0 GiB of 16.0 GiB in 57 seconds; the whole task takes 1 minute 13 seconds; QEMU reports 10 ms of downtime and 333.6 MiB of VM state (the memory) transferred.
+- **Interpretation:** the mirror went through the whole 16 GiB virtual size of the disk, although the volume holds only about 1.9 GiB of data (the estimate of the full send in step 4). The duration is consistent with a copy that depends on the size of the disk more than on its contents, which is what the documentation describes for a target without a replica. The log does not show how many bytes actually crossed the network, nor what limited the speed of the copy: the network, the source pool or the target pool.
+- **How to check:** compare the bytes the source node transmits on the management network before and after the migration (`ip -s link show vmbr0`), and watch `zpool iostat 1` on both nodes during the copy.
+
+The VM now runs on `desopve03`.
 
 ### 3. Create the replication jobs
 
@@ -123,7 +147,7 @@ The second job has no `schedule` line because it uses the default value.
 
 ### 4. The first run: a full copy
 
-A few seconds after creation the first runs start. **Log** shows what happens: snapshot, full send (`full sync`) and import on the target. With the 50 MB/s limit, 1.9 GB take about 40 seconds:
+The first runs start a few seconds after the jobs are created. **Log** shows the steps of a run: snapshot, full send (`full sync`), import on the target. This is the first run of the job to `desopve01`, with the 50 MB/s limit:
 
 ```text
 2026-11-09 14:22:02 100-0: create snapshot '__replicate_100-0_1794230521__' on local-zfs:vm-100-disk-0
@@ -136,21 +160,21 @@ A few seconds after creation the first runs start. **Log** shows what happens: s
 2026-11-09 14:23:01 100-0: end replication job
 ```
 
-The 16 GiB volume contains only 1.9 GB of written data: `zfs send` sends the used blocks, not the empty space. The job to `desopve02`, with no limit, sends the same amount in 7 seconds.
+ZFS estimates `1.91G` to send (in binary units, 1.91 GiB). The 16 GiB volume holds only the blocks written so far, and `zfs send` sends those, not the empty space. The send takes about 40 seconds, in line with the limit (1.91 GiB at 50 MB/s takes about 41 seconds). The job to `desopve02`, without a limit, sends the same data in 7 seconds. Step 5 compares these times with the duration of the whole runs.
 
 ### 5. Subsequent runs: only the differences
 
-1. In the VM, write 500 MB of new data:
+1. In the VM, write 500 MiB of new data:
 
    ```bash title="labuser@debian01"
    dd if=/dev/urandom of=$HOME/dati-1.bin bs=1M count=500 status=none; sync
    ```
 
-2. Select the job to `desopve01` and click **Schedule now**, then open **Log**. This time the run is **incremental** (`incremental sync`) and sends only the 511 MB that changed:
+2. Select the job to `desopve01`, click **Schedule now**, then open **Log**. This time the run is **incremental** (`incremental sync`): ZFS estimates `511M` to send, close to the 500 MiB just written, instead of the whole volume:
 
    ![Log of an incremental run](../../assets/images/11/03-replication-log.png)
 
-3. The job list shows, for each job, the last sync, the duration, the next run and the state:
+3. The job list shows, for each job, the last sync, the duration of the last run, the next run and the state:
 
    ![The two jobs of VM 100](../../assets/images/11/02-replication-list.png)
 
@@ -194,6 +218,18 @@ The 16 GiB volume contains only 1.9 GB of written data: `zfs send` sends the use
 
    Do not delete the `__replicate_…` snapshots by hand: without the common base, the next run would have to start over with a full copy.
 
+**Send and run: two different durations.** The `Duration` column is the length of a whole run. The send is only one part of it, as the logs show:
+
+| Run | Data to send (ZFS estimate) | Send (progress lines in the log) | Whole run |
+|---|---|---|---|
+| First run to `desopve01`, 50 MB/s limit (step 4) | `1.91G` | about 40 s (14:22:03 → 14:22:43) | about 1 minute (14:22:02 → 14:23:01) |
+| First run to `desopve02`, no limit (step 4) | the same | 7 s | 33.2 s (`Duration`) |
+| Incremental run to `desopve01`, 50 MB/s limit (this step) | `511M` | about 10 s (14:25:03 → 14:25:12) | 30.4 s (`Duration`) |
+
+- **Measured:** with the limit, the send proceeds at about 50 MB/s, the configured value (the log states it as `50000000 bytes per second`). In both runs to `desopve01`, 17-18 seconds pass between the last progress line and `successfully imported`; the run to `desopve02` lasts 33.2 seconds for a 7-second send.
+- **Interpretation:** the length of the send follows from the data to send and the limit. The log does not break down the rest of the run: it may go into completing the receive on the target or into the other steps of the job, and this test does not tell them apart.
+- **How to check:** during a run, `zpool iostat 1` on the target shows whether the pool is still writing after the last progress line, and the full log of the job gives the time of every step.
+
 ### 6. Migrate a replicated VM
 
 Migrate VM 100 from `desopve03` to `desopve01`, which already has a replica:
@@ -213,12 +249,14 @@ drive mirror re-using dirty bitmap 'repl_scsi0'
 2026-11-09 14:27:14 migration finished successfully (duration 00:00:20)
 ```
 
-| Live migration of VM 100 | Disk data copied | Duration |
-|---|---|---|
-| To a node without a replica (step 2) | the whole 16 GiB disk | 1 minute 13 seconds |
-| To a node with the replica | 154 KB plus the blocks written during the migration | 20 seconds |
+| Live migration of VM 100 | Disk copy, from the task log | Downtime reported by QEMU | Task duration |
+|---|---|---|---|
+| To `desopve03`, without a replica (step 2) | mirror of the whole disk: 16.0 GiB of 16.0 GiB in 57 s | 10 ms | 1 minute 13 seconds |
+| To `desopve01`, with the replica | one last replication run (estimate `154K`), then a mirror of only the blocks recorded in the `repl_scsi0` bitmap | 20 ms | 20 seconds |
 
-Before moving the VM, the migration performs one last replication run; then QEMU reuses the `repl_scsi0` *dirty bitmap* and copies only the blocks written after that run. The rest of the time is spent copying the memory.
+- **Measured:** with the replica, the task lasts 20 seconds instead of 1 minute 13 seconds. The replication run it starts lasts 3.2 seconds: it is the run of job `100-0` with `LastSync` 14:26:54 in the `pvesr status` at the start of the failure test.
+- **Interpretation:** the shorter task is consistent with the smaller disk copy. The excerpts do not show how the rest of the time is split, but two figures narrow it down. From the `average migration speed` (see [Test environment and versions](#test-environment-and-versions)), the memory transfer took about 3 seconds here and about 2 in step 2. And in both migrations 7 seconds pass between the end of the memory transfer and the end of the task (14:27:07 → 14:27:14 here, 14:19:36 → 14:19:43 in step 2). The downtimes, 10 and 20 ms, are QEMU's figures from a single run each: they do not say how long a client lost contact with the VM.
+- **How to check:** the full task log (double-click the task in **Tasks**) gives the time of every phase. To measure what a client sees, ping the VM from another host during the migration, with an interval shorter than the pause you want to resolve, for example every 10 ms (`ping -D -i 0.01 172.27.199.100`). With a ping every 0.2 seconds, as in [Lab 48](/48-migrations/), a pause shorter than the interval can go unnoticed.
 
 After the migration Proxmox VE **reverses** the jobs on its own: the one that pointed to `desopve01` now replicates to the old node, `desopve03`. The comment, however, stays as it was written by hand:
 
@@ -242,11 +280,22 @@ local: 100-1
 
 ## Verification and tests
 
+The lab has succeeded when every check below gives the expected result. The last column shows what this run observed, on 9 November 2026.
+
+| Check | Expected result | Observed in the lab |
+|---|---|---|
+| Replication jobs (`pvesr status`, **Datacenter** → **Replication**) | both jobs `OK`, `FailCount` 0 | `100-0` every 5 minutes and `100-1` every 15, both `OK` |
+| Run logs | `full sync` on the first run, `incremental sync` afterwards | `1.91G` on the first run; `511M` after writing 500 MiB |
+| Migration to a node with the replica (step 6) | `incremental sync` and `drive mirror re-using dirty bitmap` in the log; a shorter task than without a replica | 20 s instead of 1 minute 13 s |
+| VM restarted from the replica (first test) | the VM starts on `desopve02`; the files written before the last snapshot are there, the later ones are missing | `A` and `dati-1.bin` present; `B` and `dati-2.bin`, written after 14:28:01, lost |
+| Return of the failed node (second test) | the node rejoins with quorum, does not start VM 100, and the next run realigns it with an `incremental sync` | `Quorate`, 3 votes; `12.5M` sent at 14:36:02 |
+| Cleanup | no jobs left, no volumes of VM 100 on `desopve02` and `desopve03` | as expected |
+
 ### Test – The node suddenly powers off
 
-VM 100 runs on `desopve01` and is replicated to `desopve02` and `desopve03`. You simulate a power failure on `desopve01` and restart the VM from the replica on `desopve02`.
+**Configuration tried.** VM 100 runs on `desopve01` and is replicated to `desopve03` (job `100-0`, every 5 minutes) and to `desopve02` (job `100-1`). You cut the power to `desopve01` and restart the VM from the replica on `desopve02`.
 
-1. In the VM, write a file, start a replication run to `desopve02` and wait for it to finish. Then write more data, **after** the replication:
+1. In the VM, write a file, start a replication run to `desopve02` and wait for it to finish. Then write more data, **after** the snapshot of that run (`LastSync`):
 
    ```bash title="labuser@debian01"
    date "+%F %T" > $HOME/A-prima-della-replica.txt; sync
@@ -276,7 +325,7 @@ VM 100 runs on `desopve01` and is replicated to `desopve02` and `desopve03`. You
    -rw-rw-r-- 1 labuser labuser 209715200 14:28:12 dati-2.bin
    ```
 
-2. At 14:28:28, before the next run, power off `desopve01` abruptly, without shutting anything down. The *SysRq* `o` command tells the kernel to cut the power immediately:
+2. At 14:28:28, before the next run, power `desopve01` off abruptly. The *SysRq* `o` command makes the kernel switch the machine off at once, without a clean shutdown: services are not stopped and file systems are not unmounted:
 
    ```bash title="root@desopve01"
    echo o > /proc/sysrq-trigger
@@ -294,11 +343,11 @@ VM 100 runs on `desopve01` and is replicated to `desopve02` and `desopve03`. You
    Flags:            Quorate
    ```
 
-   The web interface marks `desopve01` as offline. VM 100 still appears under `desopve01`, with its last known state: nothing restarts it automatically, because there is no high availability.
+   **Behaviour observed.** The web interface marks `desopve01` as offline. VM 100 still appears under `desopve01`, with its last known state, and nothing restarts it: there is no high availability.
 
    ![desopve01 offline, with VM 100 stopped along with it](../../assets/images/11/05-nodo-spento.png)
 
-4. On `desopve02`, check the last replication snapshot received: it is the one from 14:28.
+4. On `desopve02`, check the last replication snapshot received: it is the one taken at 14:28:01 (`__replicate_100-1_1794230881__`; the number in the name is the time of the snapshot in seconds since 1970).
 
    ```bash title="root@desopve02"
    zfs list -t snapshot -o name,creation -r rpool/data/vm-100-disk-0
@@ -310,7 +359,7 @@ VM 100 runs on `desopve01` and is replicated to `desopve02` and `desopve03`. You
    rpool/data/vm-100-disk-0@__replicate_100-1_1794230881__  Mon Nov  9 14:28 2026
    ```
 
-5. You know for certain that `desopve01` is off: move the VM configuration into the `desopve02` directory and start the VM.
+5. **Decision.** Restart the VM from the replica on `desopve02`. This is safe only because you know for certain that `desopve01` is off: you switched it off yourself. Move the VM configuration into the directory of `desopve02` and start the VM, as the documentation describes for a failed node:
 
    ```bash title="root@desopve02"
    mv /etc/pve/nodes/desopve01/qemu-server/100.conf /etc/pve/nodes/desopve02/qemu-server/100.conf
@@ -338,9 +387,15 @@ VM 100 runs on `desopve01` and is replicated to `desopve02` and `desopve03`. You
    cat: /home/labuser/B-dopo-la-replica.txt: No such file or directory
    ```
 
-   The VM restarted with the disk as it was at **14:28:01**, the time of the last replication. File `B` and the 200 MB of `dati-2.bin`, written between 14:28:01 and the power-off at 14:28:28, are **lost**: 27 seconds of writes. With the `*/15` schedule the loss could have reached a quarter of an hour. The VM file system, on the other hand, is intact: the snapshot is consistent, as after a power failure, and the ext4 journal puts it back in order at boot.
+   **Result.** The VM restarted with its disk as it was at **14:28:01**, the moment of the last replicated snapshot.
 
-7. Meanwhile the jobs have adjusted by themselves. The one to `desopve02` (the node the VM now runs on) now points to the failed node, `desopve01`, and keeps failing as long as that node is off. The one to `desopve03` continues from the new node:
+   - **Measured:** the file written before the snapshot (`A`, 14:27:34) and `dati-1.bin` are there; file `B` (14:28:11) and the 200 MiB of `dati-2.bin` (14:28:12), written after it, are **lost**. Between the snapshot and the power-off (14:28:28) 27 seconds passed: that is the data-loss window of this test. The VM boots and its files can be read.
+   - **Interpretation:** what is lost is whatever was written inside the window, and the window depends on where the failure falls between two runs. With job `100-1` on its default `*/15` schedule and no forced run, it could have reached 15 minutes plus the duration of a run, and more after failed runs. VM 100 has no guest agent, so the snapshot is taken without freezing the guest file systems: the copy is like a disk after a power cut (*crash-consistent*), and ext4 makes it consistent again by replaying its journal when it mounts.
+   - **How to check:** in the VM, as root, the kernel log of the boot shows whether ext4 recovered its journal (`journalctl -k -b | grep EXT4-fs`); in the job log, the line `freeze guest filesystem` appears only when the guest file systems are frozen before the snapshot. Applications need their own checks: a database, for example, has to recover its own log.
+
+   The test did not measure how long the service was down, from the power-off until the VM answered again: here that time includes making sure that the node is off and the manual steps. To measure it, keep a ping running from another host for the whole test (`ping -D 172.27.199.100`): the timestamps of the last reply before the power-off and of the first one after the restart give the interruption.
+
+7. Meanwhile the jobs have followed the VM. Job `100-1`, whose target was `desopve02`, now replicates from `desopve02` to the failed node, `desopve01`: it fails (`FailCount` 1, `ssh` exit code 255) and has no `NextSync` while that node is off. Job `100-0` carries on from the new node to `desopve03`:
 
    ```bash title="root@desopve02"
    pvesr status
@@ -376,9 +431,9 @@ VM 100 runs on `desopve01` and is replicated to `desopve02` and `desopve03`. You
    rpool/data/vm-100-disk-0@__replicate_100-1_1794230881__  Mon Nov  9 14:28 2026
    ```
 
-   The disk left on `desopve01` is **stale**: it contains the 27 seconds of writes that were never replicated, but the VM now lives on `desopve02`.
+   The disk left on `desopve01` is **stale**: the VM now lives on `desopve02`, and this copy stopped at the power-off. It may also hold the writes made after 14:28:01 that never reached the replica; the lab does not check this. To see it, before the job runs again, run `zfs get written rpool/data/vm-100-disk-0` on `desopve01`: it shows how much was written after the last snapshot, and a value close to the 200 MiB of `dati-2.bin` would confirm it.
 
-2. On the next run the job resumes by itself. It finds the common snapshot from 14:28 (`__replicate_100-1_1794230881__`), rolls the disk on `desopve01` back to that point and sends only the differences accumulated on `desopve02`: 12.5 MB.
+2. The job resumes by itself, at 14:36:02 in this run. It starts from the snapshot the two nodes have in common, the one taken at 14:28:01 (`__replicate_100-1_1794230881__`), and sends only what the VM wrote on `desopve02` after it: an estimated `12.5M`. On import, Proxmox VE uses `zfs receive -F`, which first rolls the volume on `desopve01` back to that snapshot:
 
    ```text
    2026-11-09 14:36:02 100-1: incremental sync 'local-zfs:vm-100-disk-0' (__replicate_100-1_1794230881__ => __replicate_100-1_1794231361__)
@@ -387,9 +442,9 @@ VM 100 runs on `desopve01` and is replicated to `desopve02` and `desopve03`. You
    2026-11-09 14:36:11 100-1: end replication job
    ```
 
-   The writes left only on `desopve01` are discarded: the good copy is the one the VM kept working on. If you needed them, you would have to recover them **before** replication resumes, for example by disabling the job.
+   The writes left only on `desopve01` are discarded: the good copy is the one the VM kept working on. The time of the retry is not fixed: the documentation speaks of retries every 30 minutes, while here the job ran again within a few minutes. **Decision:** if you need the writes left on the failed node, disable the job (`pvesr disable 100-1`) **before** powering the node back on, and recover them first.
 
-3. Move the VM back to its node. Thanks to replication, the migration again takes only a few seconds:
+3. Move the VM back to its node. The log shows the same steps as in step 6 of the procedure, an incremental run and the reuse of the `repl_scsi0` bitmap, and the task again lasts 20 seconds:
 
    ```bash title="root@desopve02"
    qm migrate 100 desopve01 --online --with-local-disks
@@ -464,12 +519,6 @@ ssh desopve03 'zfs list -t all -o name -r rpool/data | grep vm-100 || echo "ness
 nessun volume della VM 100
 ```
 
-- [ ] You created two replication jobs, one with a `*/5` schedule and a rate limit, and you read their state and logs.
-- [ ] The first run sent all the written data of the disk, the following ones only the differences.
-- [ ] The migration to a node with the replica took 20 seconds instead of 1 minute 13 seconds.
-- [ ] With the source node powered off you restarted the VM on another node, losing only the writes made after the last replication.
-- [ ] When the node came back, replication realigned itself on the good copy.
-
 ## Final lab state
 
 - Cluster `deso-cluster` with the three nodes online; `desopve04` unchanged.
@@ -479,16 +528,23 @@ nessun volume della VM 100
 
 ## What you learned
 
-- Proxmox VE replication copies ZFS disks to other nodes with incremental `zfs send`, on a schedule: it is asynchronous and leaves a window of unprotected data.
-- A job covers one VM and one target; more copies require more jobs. The rate limit protects the network during the first full send.
-- With a replica on the target node, the migration of a VM with local disks sends only the differences and is much faster.
-- If the source node fails, the VM is restarted by moving its configuration file into the directory of a node that holds the replica, but only after making sure that the failed node is powered off.
-- The writes made after the last replication are lost; when the node returns, replication realigns on the copy in use and discards the writes left on the failed node.
-- Replication is not a backup and does not restart VMs by itself: automatic restart requires high availability (lab 49).
+- **Choosing the schedule from the data you can afford to lose.** After a failure you lose everything written after the snapshot of the last successful run: up to the schedule interval plus the duration of a run, and more if runs fail. You compare that window with the RPO of the service, and you watch `LastSync` and `FailCount` in `pvesr status` or in **Datacenter** → **Replication**.
+- **Planning copies and bandwidth.** A job covers one guest and one target, so two copies need two jobs; a rate limit keeps the first full send from saturating the network, at the cost of a longer run.
+- **Using a replica to shorten migrations.** With a replica on the target, the migration of a VM with local disks sends only the changes since the last run. Here it took 20 seconds instead of 1 minute 13 seconds, measured once on one VM: on your own VMs, measure before relying on a figure.
+- **Reading a migration log.** The task duration, the downtime reported by QEMU and the pause a client sees are different measurements, and `average migration speed` is not the network throughput. To know what clients see, you measure it from outside, with a ping at an interval suited to the pause you expect.
+- **Restarting a VM by hand after a failure.** Only when the failed node is certainly off: you move the configuration file into the directory of a node that holds the replica, then start the VM.
+- **Handling the return of the failed node.** Replication resumes by itself and rolls the stale copy back to the common snapshot, discarding the writes left there: if you need them, you disable the job before powering the node back on.
+- **Knowing what replication does not do.** It is not a backup and it does not restart VMs: automatic restart needs high availability (lab 49), with the same data-loss window.
 
 ## References
 
 - [Proxmox VE – Storage Replication](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#chapter_pvesr)
+- [Proxmox VE – Storage Replication: error handling and retries](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_error_handling)
+- [Proxmox VE – Migrating a guest in case of error (moving the configuration file)](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#_migrating_a_guest_in_case_of_error)
 - [Proxmox VE – Schedule Format (calendar events)](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#chapter_calendar_events)
 - [Proxmox VE – `pvesr` man page](https://pve.proxmox.com/pve-docs/pvesr.1.html)
 - [Proxmox VE – Migration](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#qm_migration)
+- [Proxmox VE – qemu-server source, `QemuMigrate.pm` (`average migration speed`, resuming the VM on the target)](https://git.proxmox.com/?p=qemu-server.git;a=blob;f=src/PVE/QemuMigrate.pm;hb=HEAD)
+- [OpenZFS 2.4 – `zfs receive -F` (rollback before receiving)](https://openzfs.github.io/openzfs-docs/man/v2.4/8/zfs-receive.8.html#F)
+- [OpenZFS 2.4 – the `written` property](https://openzfs.github.io/openzfs-docs/man/v2.4/7/zfsprops.7.html#written)
+- [Linux kernel – Magic SysRq key (`o`: power off)](https://docs.kernel.org/admin-guide/sysrq.html)

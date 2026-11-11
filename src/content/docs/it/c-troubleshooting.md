@@ -92,7 +92,7 @@ Davanti a un problema conviene procedere sempre allo stesso modo:
 | Sintomo | Causa | Soluzione | Lab |
 |---|---|---|---|
 | `/etc/pve` in sola lettura su un nodo | Il nodo ha perso il quorum | Ripristina la comunicazione Corosync; non forzare `pvecm expected` se non sai cosa stai facendo | [06](/it/06-cluster-corosync/) |
-| Dopo un guasto la VM replicata va recuperata a mano | La replica ZFS non è HA | Sposta la configurazione della VM sul nodo con la replica; si perdono i dati dall'ultima replica | [11](/it/11-zfs-replication/) |
+| Dopo un guasto la VM replicata va recuperata a mano | La replica ZFS non è HA | Sposta la configurazione della VM sul nodo con la replica; si perdono i dati scritti dopo lo snapshot dell'ultimo giro riuscito. Se servono le scritture rimaste sul nodo guasto, disattiva il job prima di riaccenderlo | [11](/it/11-zfs-replication/) |
 | La creazione di un gruppo HA viene rifiutata | In PVE 9 i gruppi sono stati sostituiti dalle HA rules | Usa le **node affinity rules** | [49](/it/49-high-availability/) |
 | Una resource affinity rule viene rifiutata | La risorsa ha già una node affinity con più priorità | Semplifica la node affinity o rinuncia alla resource affinity | [49](/it/49-high-availability/) |
 | La manutenzione di un nodo non riesce a evacuarlo | Una regola *Keep Separate* su 3 VM con 3 nodi non lascia posto | Riduci la regola o aggiungi nodi | [49](/it/49-high-availability/) |
