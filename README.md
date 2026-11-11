@@ -11,7 +11,7 @@ Practical, connected labs on **Proxmox VE 9**, **Proxmox Backup Server 4** and *
 ### Build locally
 
 ```bash
-tools/build.sh            # builds the site into ../nextguard-site
+tools/build.sh            # builds and checks the site in ../nextguard-starlight-site
 ```
 
 Proxmox® is a registered trademark of Proxmox Server Solutions GmbH. This project is independent and is not affiliated with, sponsored or endorsed by Proxmox Server Solutions GmbH.
@@ -29,7 +29,7 @@ Laboratori pratici e concatenati su **Proxmox VE 9**, **Proxmox Backup Server 4*
 ### Build in locale
 
 ```bash
-tools/build.sh            # genera il sito in ../nextguard-site
+tools/build.sh            # genera e verifica il sito in ../nextguard-starlight-site
 ```
 
 Proxmox® è un marchio registrato di Proxmox Server Solutions GmbH. Questo progetto è indipendente e non è affiliato, sponsorizzato o approvato da Proxmox Server Solutions GmbH.

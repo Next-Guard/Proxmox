@@ -1,0 +1,17 @@
+{
+	"pc.level": "Level",
+	"pc.duration": "Duration",
+	"pc.hero.eyebrow": "Proxmox VE 9.2 · Backup Server 4 · Datacenter Manager",
+	"pc.hero.terminal": "Real commands and output from the lab",
+	"pc.hero.stats.labs": "hands-on labs",
+	"pc.hero.stats.screenshots": "real screenshots",
+	"pc.hero.stats.outputs": "command outputs",
+	"pc.hero.stats.languages": "languages",
+	"pc.footer.copyright": "© 2026 Nicola Marco Decandia",
+	"pc.footer.content": "Content licensed under",
+	"pc.footer.content.cc": "CC BY-SA 4.0",
+	"pc.footer.content.code": "code under",
+	"pc.footer.createdBy": "Content created by",
+	"pc.footer.trademark": "Proxmox® is a registered trademark of Proxmox Server Solutions GmbH. This project is independent and is not affiliated with, sponsored or endorsed by Proxmox Server Solutions GmbH.",
+	"pc.footer.repo": "Source on GitHub"
+}

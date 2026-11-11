@@ -1,0 +1,15 @@
+---
+import PcIcon from '../PcIcon.astro';
+
+interface Props {
+	icon: 'dependencies' | 'objectives' | 'procedure' | 'verify' | 'state' | 'learned';
+	title: string;
+}
+const { icon, title } = Astro.props;
+---
+
+<div class="pc-feature">
+	<span class="pc-feature__icon"><PcIcon name={icon} size="1.25rem" /></span>
+	<p class="pc-feature__title">{title}</p>
+	<div class="pc-feature__body"><slot /></div>
+</div>

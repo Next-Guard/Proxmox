@@ -1,0 +1,327 @@
+---
+/**
+ * Hero della home (sostituisce il componente Hero di Starlight).
+ * Titolo, sottotitolo e pulsanti arrivano dal frontmatter `hero` della pagina (EN/IT);
+ * i numeri sono calcolati dai contenuti della lingua corrente.
+ */
+import { getCollection } from 'astro:content';
+import config from 'virtual:starlight/user-config';
+import PcIcon from './PcIcon.astro';
+
+const { entry, locale } = Astro.locals.starlightRoute;
+const { data } = entry;
+const { title = data.title, tagline, actions = [] } = data.hero || {};
+const t = Astro.locals.t;
+// La pagina 404 di Starlight usa lo stesso hero: lì solo titolo e sottotitolo.
+const full = actions.length > 0;
+
+// Pagine della lingua corrente: radice per l'inglese, `it/` per l'italiano.
+const prefix = locale ? `${locale}/` : '';
+const pages = (await getCollection('docs')).filter((p) =>
+	prefix ? p.id.startsWith(prefix) : !Object.keys(config.locales ?? {}).some((l) => l !== 'root' && p.id.startsWith(`${l}/`))
+);
+const isLab = (id: string) => /^\d{2}-/.test(id.slice(prefix.length));
+const labs = pages.filter((p) => isLab(p.id)).length;
+const screenshots = new Set(pages.flatMap((p) => [...(p.body ?? '').matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map((m) => m[1].split('/').slice(-2).join('/')))).size;
+// Esclude gli esempi di sintassi racchiusi in blocchi ```` (pagina Contribuisci).
+const withoutExamples = (body: string) => body.replace(/^(\s*)````[\s\S]*?^\1````/gm, '');
+const outputs = pages.reduce((n, p) => n + [...withoutExamples(p.body ?? '').matchAll(/^\s*```\w*[^\n]*\boutput\b/gm)].length, 0);
+const languages = Object.keys(config.locales ?? { root: {} }).length;
+const nf = new Intl.NumberFormat(Astro.locals.starlightRoute.lang);
+
+const stats = [
+	{ value: nf.format(labs), label: t('pc.hero.stats.labs') },
+	{ value: nf.format(screenshots), label: t('pc.hero.stats.screenshots') },
+	{ value: nf.format(outputs), label: t('pc.hero.stats.outputs') },
+	{ value: nf.format(languages), label: t('pc.hero.stats.languages') },
+];
+
+// Sessione reale: comandi e output presi dai lab 04, 06, 28 e 49.
+const session: Array<[string, string?]> = [
+	['$', 'pveversion'],
+	['pve-manager/9.2.26/41a0e2e09b9e6f9d (running kernel: 7.0.14-28-pve)'],
+	['$', 'pvecm status | grep -E "^Quorate|Total votes"'],
+	['Quorate:          <b>Yes</b>'],
+	['Total votes:      3'],
+	['$', 'ceph health'],
+	['<b>HEALTH_OK</b>'],
+	['$', 'ha-manager status | head -3'],
+	['<b>quorum OK</b>'],
+	['master desopve01 (active, Tue Nov 10 06:18:26 2026)'],
+	['fencing armed (CRM watchdog active)'],
+];
+---
+
+<section class:list={['pc-hero', 'not-content', { 'pc-hero--simple': !full }]}>
+	<div class="pc-hero__bg" aria-hidden="true"></div>
+	<div class="pc-hero__copy">
+		{full && <p class="pc-hero__eyebrow"><span class="pc-hero__pulse" aria-hidden="true"></span>{t('pc.hero.eyebrow')}</p>}
+		<h1 id="_top" data-page-title set:html={title} />
+		{tagline && <p class="pc-hero__tagline" set:html={tagline} />}
+		{
+			actions.length > 0 && (
+				<div class="pc-hero__actions">
+					{actions.map(({ text, link, variant, attrs }) => (
+						<a class:list={['pc-btn', `pc-btn--${variant}`]} href={link} {...attrs}>
+							<span>{text}</span>
+							{variant === 'primary' && <PcIcon name="arrow" size="1.05rem" />}
+						</a>
+					))}
+				</div>
+			)
+		}
+		{
+			full && (
+				<dl class="pc-hero__stats">
+					{stats.map(({ value, label }) => (
+						<div>
+							<dt>{value}</dt>
+							<dd>{label}</dd>
+						</div>
+					))}
+				</dl>
+			)
+		}
+	</div>
+	{full && (<figure class="pc-term">
+		<div class="pc-term__bar" aria-hidden="true">
+			<span></span><span></span><span></span>
+			<p>root@desopve01: ~</p>
+		</div>
+		<pre aria-label={t('pc.hero.terminal')}><code>{
+			session.map(([a, b]) =>
+				b === undefined ? (
+					<span class="pc-term__out" set:html={a} />
+				) : (
+					<span class="pc-term__cmd"><span class="pc-term__prompt">root@desopve01:~#</span> {b}</span>
+				)
+			)
+		}</code></pre>
+		<figcaption>{t('pc.hero.terminal')}</figcaption>
+	</figure>)}
+</section>
+
+<style>
+	.pc-hero {
+		position: relative;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		gap: 2.5rem;
+		align-items: center;
+		padding-block: 2.5rem 3.5rem;
+		isolation: isolate;
+	}
+	.pc-hero__bg {
+		position: absolute;
+		z-index: -1;
+		inset-block: -1.5rem 0;
+		inset-inline-start: 50%;
+		width: 100vw;
+		transform: translateX(-50%);
+		background:
+			radial-gradient(48rem 26rem at 12% 8%, var(--pc-glow-teal), transparent 70%),
+			radial-gradient(42rem 28rem at 92% 30%, var(--pc-glow-indigo), transparent 70%),
+			var(--pc-hero-bg);
+		border-bottom: 1px solid var(--sl-color-hairline);
+	}
+	.pc-hero__bg::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background-image:
+			linear-gradient(var(--pc-grid-line) 1px, transparent 1px),
+			linear-gradient(90deg, var(--pc-grid-line) 1px, transparent 1px);
+		background-size: 44px 44px;
+		mask-image: radial-gradient(ellipse 70% 80% at 50% 30%, #000 30%, transparent 75%);
+	}
+	.pc-hero__copy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 1.25rem;
+	}
+	.pc-hero__eyebrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.3rem 0.85rem 0.3rem 0.6rem;
+		border: 1px solid var(--pc-border-strong);
+		border-radius: 999px;
+		background: var(--pc-surface-glass);
+		color: var(--sl-color-gray-2);
+		font-size: var(--sl-text-xs);
+		font-weight: 500;
+		letter-spacing: 0.01em;
+	}
+	.pc-hero__pulse {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		background: var(--pc-ok);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc-ok) 25%, transparent);
+	}
+	h1 {
+		margin: 0;
+		font-size: clamp(2.25rem, 1.4rem + 3.4vw, 3.75rem);
+		line-height: 1.06;
+		letter-spacing: -0.035em;
+		font-weight: 750;
+		color: var(--sl-color-white);
+		text-wrap: balance;
+	}
+	h1 :global(.pc-gradient) {
+		background: linear-gradient(100deg, var(--pc-teal) 10%, var(--pc-indigo) 90%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+	}
+	.pc-hero__tagline {
+		margin: 0;
+		max-width: 36rem;
+		font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.25rem);
+		line-height: 1.6;
+		color: var(--sl-color-gray-2);
+		text-wrap: pretty;
+	}
+	.pc-hero__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin-top: 0.5rem;
+	}
+	.pc-hero__stats {
+		display: grid;
+		grid-template-columns: repeat(2, auto);
+		gap: 1rem 2.25rem;
+		margin: 1rem 0 0;
+		padding-top: 1.25rem;
+		border-top: 1px solid var(--sl-color-hairline-light);
+	}
+	.pc-hero__stats div {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+	.pc-hero__stats dt {
+		font-size: 1.5rem;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: var(--sl-color-white);
+		font-variant-numeric: tabular-nums;
+	}
+	.pc-hero__stats dd {
+		margin: 0;
+		font-size: var(--sl-text-xs);
+		color: var(--sl-color-gray-3);
+	}
+
+	/* Terminale */
+	.pc-term {
+		margin: 0;
+		min-width: 0;
+		border-radius: 0.9rem;
+		background: #0a1020;
+		border: 1px solid rgb(255 255 255 / 0.08);
+		box-shadow:
+			0 1px 0 rgb(255 255 255 / 0.06) inset,
+			0 30px 60px -20px rgb(4 10 26 / 0.55),
+			0 18px 36px -18px rgb(13 148 136 / 0.35);
+		overflow: hidden;
+	}
+	.pc-term__bar {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.7rem 0.95rem;
+		background: #111a2e;
+		border-bottom: 1px solid rgb(255 255 255 / 0.06);
+	}
+	.pc-term__bar span {
+		width: 0.7rem;
+		height: 0.7rem;
+		border-radius: 50%;
+		background: #2b3550;
+	}
+	.pc-term__bar span:nth-child(1) {
+		background: #f87171;
+	}
+	.pc-term__bar span:nth-child(2) {
+		background: #fbbf24;
+	}
+	.pc-term__bar span:nth-child(3) {
+		background: #34d399;
+	}
+	.pc-term__bar p {
+		flex: 1;
+		margin: 0 3.1rem 0 0;
+		text-align: center;
+		font-family: var(--__sl-font-mono);
+		font-size: 0.75rem;
+		color: #8792ad;
+	}
+	.pc-term pre {
+		margin: 0;
+		padding: 1.1rem 1.2rem 1.2rem;
+		overflow-x: auto;
+		font-family: var(--__sl-font-mono);
+		font-size: 0.78rem;
+		line-height: 1.75;
+		color: #aab4cb;
+		background: transparent;
+		border: 0;
+	}
+	.pc-term code {
+		display: flex;
+		flex-direction: column;
+		background: none;
+		padding: 0;
+		font-size: inherit;
+		color: inherit;
+	}
+	.pc-term__cmd {
+		color: #f1f5fb;
+		margin-top: 0.45rem;
+	}
+	.pc-term__cmd:first-child {
+		margin-top: 0;
+	}
+	.pc-term__prompt {
+		color: #2dd4bf;
+	}
+	.pc-term__out :global(b) {
+		font-weight: 600;
+		color: #4ade80;
+	}
+	.pc-term figcaption {
+		padding: 0.6rem 1.2rem 0.75rem;
+		border-top: 1px solid rgb(255 255 255 / 0.06);
+		font-size: 0.72rem;
+		color: #8792ad;
+	}
+
+	.pc-hero--simple {
+		text-align: center;
+		justify-items: center;
+	}
+	.pc-hero--simple .pc-hero__copy {
+		align-items: center;
+	}
+	@media (min-width: 64rem) {
+		.pc-hero.pc-hero--simple {
+			grid-template-columns: minmax(0, 1fr);
+			padding-block: 6rem;
+		}
+	}
+	@media (min-width: 40rem) {
+		.pc-hero__stats {
+			grid-template-columns: repeat(4, auto);
+		}
+	}
+	@media (min-width: 64rem) {
+		.pc-hero {
+			grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+			gap: 3.5rem;
+			padding-block: 4.5rem 5rem;
+		}
+	}
+</style>

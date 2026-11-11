@@ -1,0 +1,25 @@
+---
+/** Riquadro finale "Come contribuire" con due pulsanti. */
+import PcIcon from '../PcIcon.astro';
+
+interface Props {
+	id?: string;
+	eyebrow: string;
+	title: string;
+	primary: { text: string; href: string };
+	secondary: { text: string; href: string };
+}
+const { id, eyebrow, title, primary, secondary } = Astro.props;
+---
+
+<section id={id} class="pc-cta not-content">
+	<div class="pc-cta__text">
+		<p class="pc-eyebrow">{eyebrow}</p>
+		<h2>{title}</h2>
+		<div class="pc-cta__body"><slot /></div>
+	</div>
+	<div class="pc-cta__actions">
+		<a class="pc-btn pc-btn--primary" href={primary.href}><PcIcon name="edit" size="1.05rem" /><span>{primary.text}</span></a>
+		<a class="pc-btn pc-btn--secondary" href={secondary.href}><PcIcon name="github" size="1.05rem" /><span>{secondary.text}</span></a>
+	</div>
+</section>

@@ -1,0 +1,14 @@
+---
+/** Sezione della home: occhiello, titolo (## nel contenuto MDX) e contenuto. */
+interface Props {
+	id?: string;
+	eyebrow?: string;
+	class?: string;
+}
+const { id, eyebrow, class: className } = Astro.props;
+---
+
+<section id={id} class:list={['pc-section', className]}>
+	{eyebrow && <p class="pc-eyebrow">{eyebrow}</p>}
+	<slot />
+</section>

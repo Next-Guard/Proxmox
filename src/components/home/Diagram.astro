@@ -1,0 +1,12 @@
+---
+/** Cornice per un diagramma Mermaid con didascalia. */
+interface Props {
+	caption?: string;
+}
+const { caption } = Astro.props;
+---
+
+<figure class="pc-diagram">
+	<div class="pc-diagram__canvas"><slot /></div>
+	{caption && <figcaption>{caption}</figcaption>}
+</figure>

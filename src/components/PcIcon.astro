@@ -1,0 +1,59 @@
+---
+/**
+ * Icone del sito (SVG 24×24 a tratto), disegnate per Proxmox Community.
+ * Uso: <PcIcon name="server" />
+ */
+interface Props {
+	name: keyof typeof ICONS;
+	size?: string;
+	class?: string;
+}
+
+const ICONS = {
+	// Parti del percorso
+	server:
+		'<rect x="3.5" y="4" width="17" height="6.5" rx="1.75"/><rect x="3.5" y="13.5" width="17" height="6.5" rx="1.75"/><path d="M7.5 7.25h.01M7.5 16.75h.01M11 7.25h5.5M11 16.75h5.5"/>',
+	storage:
+		'<ellipse cx="12" cy="5.75" rx="7.5" ry="2.75"/><path d="M4.5 5.75v12.5c0 1.52 3.36 2.75 7.5 2.75s7.5-1.23 7.5-2.75V5.75"/><path d="M4.5 12c0 1.52 3.36 2.75 7.5 2.75s7.5-1.23 7.5-2.75"/>',
+	network:
+		'<rect x="9" y="3" width="6" height="5" rx="1.25"/><rect x="2.75" y="16" width="6" height="5" rx="1.25"/><rect x="15.25" y="16" width="6" height="5" rx="1.25"/><path d="M12 8v4M5.75 16v-2a2 2 0 0 1 2-2h8.5a2 2 0 0 1 2 2v2"/>',
+	cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx=".75"/><path d="M9.5 2.75V6M14.5 2.75V6M9.5 18v3.25M14.5 18v3.25M2.75 9.5H6M2.75 14.5H6M18 9.5h3.25M18 14.5h3.25"/>',
+	shield:
+		'<path d="M12 3 4.75 5.75v5.5c0 4.6 3.05 8.3 7.25 9.75 4.2-1.45 7.25-5.15 7.25-9.75v-5.5z"/><path d="m8.75 12 2.25 2.25 4.25-4.5"/>',
+	book: '<path d="M12 6.5C10.4 5.2 8.2 4.5 4 4.5v13c4.2 0 6.4.7 8 2 1.6-1.3 3.8-2 8-2v-13c-4.2 0-6.4.7-8 2z"/><path d="M12 6.5v13"/>',
+	// Struttura dei lab
+	dependencies:
+		'<circle cx="6" cy="6" r="2.25"/><circle cx="18" cy="6" r="2.25"/><circle cx="12" cy="18" r="2.25"/><path d="M7.5 7.75 10.75 16M16.5 7.75 13.25 16"/>',
+	objectives:
+		'<circle cx="12" cy="12" r="8.25"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".9" fill="currentColor"/>',
+	procedure:
+		'<path d="M10 6.5h10M10 12h10M10 17.5h10"/><path d="M4 5.5h1.5v3M4 8.5h3M4 11.25c.4-.6 2.6-.7 2.6.5 0 1-2.6 1.6-2.6 3h2.75"/>',
+	verify: '<circle cx="12" cy="12" r="8.25"/><path d="m8.25 12.25 2.5 2.5 5-5.25"/>',
+	state: '<path d="M5.5 21V4M5.5 4.5h11.25l-2.25 3.75 2.25 3.75H5.5"/>',
+	learned:
+		'<path d="m12 4.5 9.25 4.5L12 13.5 2.75 9z"/><path d="M6.5 11v4.25c0 1.25 2.45 2.75 5.5 2.75s5.5-1.5 5.5-2.75V11M21.25 9v5"/>',
+	// Varie
+	arrow: '<path d="M5 12h14M13.5 6.5 19 12l-5.5 5.5"/>',
+	clock: '<circle cx="12" cy="12" r="8.25"/><path d="M12 7.5V12l3 2"/>',
+	github:
+		'<path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/>',
+	edit: '<path d="M4 20h4L18.5 9.5a2.83 2.83 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+	globe: '<circle cx="12" cy="12" r="8.25"/><path d="M3.75 12h16.5M12 3.75c2.25 2.3 3.4 5.05 3.4 8.25S14.25 17.95 12 20.25C9.75 17.95 8.6 15.2 8.6 12S9.75 6.05 12 3.75z"/>',
+} as const;
+
+const { name, size = '1.25rem', class: className } = Astro.props;
+---
+
+<svg
+	class:list={['pc-icon', className]}
+	width={size}
+	height={size}
+	viewBox="0 0 24 24"
+	fill="none"
+	stroke="currentColor"
+	stroke-width="1.75"
+	stroke-linecap="round"
+	stroke-linejoin="round"
+	aria-hidden="true"
+	set:html={ICONS[name]}
+/>

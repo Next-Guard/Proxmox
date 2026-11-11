@@ -1,0 +1,83 @@
+---
+/**
+ * Diagrammi Mermaid larghi: quando un diagramma è rimpicciolito per stare nella colonna, compare il
+ * pulsante "Ingrandisci", che lo apre a grandezza naturale in una finestra scorrevole.
+ * Incluso in ogni pagina dal piè di pagina (src/components/Footer.astro).
+ */
+---
+
+<script>
+	const TEXTS: Record<string, { open: string; close: string }> = {
+		en: { open: 'Enlarge diagram', close: 'Close' },
+		it: { open: 'Ingrandisci lo schema', close: 'Chiudi' },
+	};
+	const lang = document.documentElement.lang.split('-')[0];
+	const t = TEXTS[lang] ?? TEXTS.en;
+	const ICON =
+		'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>';
+
+	let dialog: HTMLDialogElement | undefined;
+	function getDialog() {
+		if (dialog) return dialog;
+		dialog = document.createElement('dialog');
+		dialog.className = 'pc-zoom';
+		dialog.innerHTML = `<div class="pc-zoom__bar"><button type="button" class="pc-zoom__close">${t.close}</button></div><div class="pc-zoom__canvas"></div>`;
+		dialog.querySelector('.pc-zoom__close')!.addEventListener('click', () => dialog!.close());
+		dialog.addEventListener('click', (e) => {
+			if (e.target === dialog) dialog!.close();
+		});
+		document.body.append(dialog);
+		return dialog;
+	}
+
+	function open(pre: HTMLElement) {
+		const svg = pre.querySelector('svg');
+		if (!svg) return;
+		const d = getDialog();
+		const clone = svg.cloneNode(true) as SVGSVGElement;
+		// Id e stile del diagramma clonato devono restare unici nella pagina.
+		const id = `${svg.id}-zoom`;
+		const style = clone.querySelector('style');
+		if (style && svg.id) style.textContent = style.textContent!.split(`#${svg.id}`).join(`#${id}`);
+		clone.id = id;
+		clone.removeAttribute('width');
+		clone.style.maxWidth = 'none';
+		clone.style.width = svg.style.maxWidth;
+		d.querySelector('.pc-zoom__canvas')!.replaceChildren(clone);
+		d.showModal();
+	}
+
+	function enhance(pre: HTMLElement) {
+		const svg = pre.querySelector('svg');
+		if (!svg) return;
+		let wrap = pre.parentElement;
+		if (!wrap?.classList.contains('pc-mermaid')) {
+			wrap = document.createElement('div');
+			wrap.className = 'pc-mermaid';
+			pre.before(wrap);
+			wrap.append(pre);
+		}
+		const natural = parseFloat(svg.style.maxWidth) || 0;
+		const shown = svg.getBoundingClientRect().width;
+		let button = wrap.querySelector<HTMLButtonElement>(':scope > .pc-zoom-btn');
+		if (natural > shown * 1.1) {
+			if (!button) {
+				button = document.createElement('button');
+				button.type = 'button';
+				button.className = 'pc-zoom-btn';
+				button.innerHTML = `${ICON}<span>${t.open}</span>`;
+				button.addEventListener('click', () => open(pre));
+				wrap.append(button);
+			}
+		} else button?.remove();
+	}
+
+	const scan = () => document.querySelectorAll<HTMLElement>('pre.mermaid[data-processed]').forEach(enhance);
+	new MutationObserver(scan).observe(document.body, {
+		subtree: true,
+		attributes: true,
+		attributeFilter: ['data-processed'],
+	});
+	addEventListener('resize', scan);
+	scan();
+</script>

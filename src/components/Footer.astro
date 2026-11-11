@@ -1,0 +1,100 @@
+---
+/**
+ * Piè di pagina: quello di Starlight (modifica pagina, pagina precedente/successiva) più
+ * licenze, credito NextGuard e nota sul marchio Proxmox, nella lingua della pagina.
+ */
+import Default from '@astrojs/starlight/components/Footer.astro';
+import PcIcon from './PcIcon.astro';
+import DiagramZoom from './DiagramZoom.astro';
+
+const t = Astro.locals.t;
+const isSplash = Astro.locals.starlightRoute.entry.data.template === 'splash';
+---
+
+<Default><slot /></Default>
+<DiagramZoom />
+
+<div class:list={['pc-footer', 'not-content', { 'pc-footer--wide': isSplash }]}>
+	<div class="pc-footer__row">
+		<p class="pc-footer__brand">
+			<span>Proxmox Community</span>
+			<a href="https://github.com/Next-Guard/Proxmox" class="pc-footer__repo">
+				<PcIcon name="github" size="1rem" />
+				{t('pc.footer.repo')}
+			</a>
+		</p>
+		<p class="pc-footer__credit">
+			{t('pc.footer.createdBy')}{' '}<a href="https://www.nextguard.it">NextGuard</a>
+		</p>
+	</div>
+	<p>
+		{t('pc.footer.copyright')} · {t('pc.footer.content')}{' '}<a href="https://creativecommons.org/licenses/by-sa/4.0/">{t('pc.footer.content.cc')}</a>,{' '}
+		{t('pc.footer.content.code')}{' '}<a href="https://opensource.org/license/mit">MIT</a>.
+	</p>
+	<p class="pc-footer__tm">{t('pc.footer.trademark')}</p>
+</div>
+
+<style>
+	.pc-footer {
+		margin-top: 2.5rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid var(--sl-color-hairline-light);
+		font-size: var(--sl-text-xs);
+		line-height: 1.6;
+		color: var(--sl-color-gray-3);
+	}
+	.pc-footer p {
+		margin: 0;
+	}
+	.pc-footer > * + * {
+		margin-top: 0.6rem;
+	}
+	.pc-footer a {
+		color: var(--sl-color-gray-2);
+		text-decoration: underline;
+		text-decoration-color: var(--sl-color-gray-5);
+		text-underline-offset: 0.2em;
+	}
+	.pc-footer a:hover {
+		color: var(--sl-color-text-accent);
+		text-decoration-color: currentColor;
+	}
+	.pc-footer__row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem 1.5rem;
+		margin-bottom: 0.9rem;
+	}
+	.pc-footer__brand {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.4rem 1rem;
+	}
+	.pc-footer__brand > span {
+		font-size: var(--sl-text-sm);
+		font-weight: 650;
+		color: var(--sl-color-white);
+	}
+	a.pc-footer__repo {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		text-decoration: none;
+	}
+	.pc-footer__credit {
+		font-size: var(--sl-text-sm);
+	}
+	.pc-footer__credit a {
+		font-weight: 600;
+		color: var(--sl-color-text-accent);
+	}
+	.pc-footer__tm {
+		max-width: 60rem;
+	}
+	.pc-footer--wide {
+		margin-top: 4rem;
+	}
+</style>

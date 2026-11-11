@@ -1,0 +1,28 @@
+---
+/** Card di una parte del percorso: lettera, titolo, descrizione, lab e link al primo lab. */
+import PcIcon from '../PcIcon.astro';
+
+interface Props {
+	part: string;
+	title: string;
+	range: string;
+	count?: string;
+	href: string;
+	cta: string;
+	icon: 'server' | 'storage' | 'network' | 'cpu' | 'shield' | 'book';
+}
+const { part, title, range, count, href, cta, icon } = Astro.props;
+---
+
+<a class="pc-card" href={href} data-part={part}>
+	<div class="pc-card__head">
+		<span class="pc-card__badge" aria-hidden="true">{part}</span>
+		<span class="pc-card__icon"><PcIcon name={icon} size="1.35rem" /></span>
+	</div>
+	<div class="pc-card__title">{title}</div>
+	<div class="pc-card__body"><slot /></div>
+	<div class="pc-card__foot">
+		<span class="pc-card__range">{range}{count && <span class="pc-card__count">{count}</span>}</span>
+		<span class="pc-card__cta">{cta}<PcIcon name="arrow" size="1rem" /></span>
+	</div>
+</a>

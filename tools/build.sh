@@ -1,32 +1,36 @@
 #!/usr/bin/env bash
-# Build del sito Proxmox Community.
+# Build del sito Proxmox Community (Astro Starlight).
 #
 # Uso: tools/build.sh [cartella-di-uscita]
-#   - crea (se manca) un ambiente Python FUORI dal repository: ../venv-proxmox-community
-#   - genera il sito in una cartella FUORI dal repository (predefinita: ../nextguard-site)
-#   - esegue il build in modalità strict: si ferma su link, immagini o ancore mancanti
+#   - installa le dipendenze se mancano (npm ci);
+#   - copia i sorgenti in una cartella di lavoro FUORI dal repository (predefinita:
+#     ../nextguard-starlight-work): Astro scrive la sua cartella .astro/ nella radice del progetto
+#     e nel repository non devono nascere file o cartelle che iniziano con ".";
+#   - genera il sito in una cartella FUORI dal repository (predefinita: ../nextguard-starlight-site);
+#     starlight-links-validator ferma il build su link o ancore interne non valide;
+#   - verifica il risultato con tools/check-site.mjs (percorsi "_"/".", CNAME, lingue, link interni,
+#     indice di ricerca, sintassi MkDocs residua).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-VENV="${VENV:-$REPO/../venv-proxmox-community}"
-OUT="${1:-$REPO/../nextguard-site}"
+OUT="$(realpath -m "${1:-$REPO/../nextguard-starlight-site}")"
+WORK="$(realpath -m "${WORK:-$REPO/../nextguard-starlight-work}")"
 
-if [ ! -x "$VENV/bin/mkdocs" ]; then
-  python3 -m venv "$VENV"
-  "$VENV/bin/pip" install --quiet --upgrade pip
-  "$VENV/bin/pip" install --quiet -r "$REPO/requirements.txt"
+case "$OUT/" in "$REPO"/*) echo "La cartella di uscita deve stare fuori dal repository: $OUT" >&2; exit 1 ;; esac
+case "$WORK/" in "$REPO"/*) echo "La cartella di lavoro deve stare fuori dal repository: $WORK" >&2; exit 1 ;; esac
+
+export ASTRO_TELEMETRY_DISABLED=1
+
+if [ ! -x "$REPO/node_modules/.bin/astro" ]; then
+  (cd "$REPO" && npm ci --no-audit --no-fund)
 fi
 
-cd "$REPO"
-"$VENV/bin/mkdocs" build --strict --clean --site-dir "$OUT"
+mkdir -p "$WORK"
+rsync -a --delete --exclude /node_modules --exclude /.git --exclude /.astro "$REPO/" "$WORK/"
+ln -sfn "$REPO/node_modules" "$WORK/node_modules"
 
-# Verifiche minime sul risultato
-test -f "$OUT/index.html"
-test -f "$OUT/it/index.html"
-test -f "$OUT/CNAME"
-grep -q '<html lang="en"' "$OUT/404.html"   # la 404 nella radice è quella inglese
-test -f "$OUT/it/404.html"
-test -f "$OUT/search/search_index.json"
-test -f "$OUT/it/search/search_index.json"
+rm -rf "$OUT"
+(cd "$WORK" && ./node_modules/.bin/astro build --outDir "$OUT")
+
+node "$REPO/tools/check-site.mjs" "$OUT" "$REPO"
 echo "Sito generato in: $OUT"
-echo "Pagine HTML: $(find "$OUT" -name index.html | wc -l)"

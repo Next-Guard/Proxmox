@@ -1,0 +1,31 @@
+---
+/** Barra del percorso: una tacca per parte, larga in proporzione al numero di lab. */
+interface Part {
+	id: string;
+	name: string;
+	labs: number;
+	href: string;
+}
+interface Props {
+	label: string;
+	parts: Part[];
+}
+const { label, parts } = Astro.props;
+---
+
+<nav class="pc-rail not-content" aria-label={label}>
+	<ol>
+		{
+			parts.map((p) => (
+				<li style={`--labs: ${p.labs}`} data-part={p.id}>
+					<a href={p.href}>
+						<span class="pc-rail__bar" />
+						<span class="pc-rail__text">
+							<b>{p.id}</b> {p.name} <span class="pc-rail__count">{p.labs}</span>
+						</span>
+					</a>
+				</li>
+			))
+		}
+	</ol>
+</nav>
