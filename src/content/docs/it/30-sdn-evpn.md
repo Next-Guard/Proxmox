@@ -25,11 +25,10 @@ duration: 1 ora e 30 minuti
 
 ## Obiettivi
 
-- Capire cosa aggiunge EVPN alla VXLAN: un piano di controllo BGP al posto della replica dei broadcast.
-- Creare un controller EVPN, una zona con VRF e due VNet con gateway distribuito (*anycast gateway*).
-- Instradare tra VNet su nodi diversi e far uscire i guest dagli *exit node* con SNAT.
-- Leggere lo stato di BGP ed EVPN con `vtysh`.
-- Migrare a caldo una VM senza che cambi il suo gateway, e simulare la caduta dell'exit node principale.
+- Una zona EVPN, `evpnz`, con la sua VRF e due VNet, e le sessioni iBGP con BFD stabilite tra i tre nodi: `vtysh` mostra le sessioni, i VNI e le route MAC/IP dei guest.
+- Lo stesso gateway, con lo stesso IP e lo stesso MAC, su ogni nodo (*anycast gateway*): un container in `vnev2` raggiunge uno in `vnev1` su un altro nodo, ed esce dalla zona con l'indirizzo dell'*exit node* principale (SNAT).
+- Una VM migrata a caldo su un altro nodo senza toccare la sua configurazione di rete, con il suo MAC annunciato ora dietro il nuovo nodo.
+- Una caduta simulata dell'exit node principale, dopo la quale sai verificare se l'uscita è passata al nodo di riserva, e perché un flusso già aperto può restare bloccato.
 
 ## Come funziona
 
@@ -43,7 +42,7 @@ Nella zona VXLAN del lab 29 ogni nodo scopriva i MAC dal traffico e copiava i br
 | Tipo 3 (multicast) | quali VTEP partecipano a un VNI | i tre nodi per ogni VNet |
 | Tipo 5 (prefisso IP) | una rete instradabile, per esempio la route di default di un exit node | 0.0.0.0/0 da `desopve01` |
 
-I nodi formano tra loro sessioni **iBGP** con un ASN privato (65000) sugli indirizzi della rete underlay. Proxmox VE attiva anche **BFD**, che si accorge in meno di un secondo se un vicino sparisce.
+I nodi formano tra loro sessioni **iBGP** con un ASN privato (65000) sugli indirizzi della rete underlay. L'SDN attiva su queste sessioni anche **BFD** (`neighbor VTEP bfd` nella configurazione del passo 4). Con i tempi predefiniti di FRR, 300 ms tra un pacchetto di controllo e l'altro e un moltiplicatore 3, un vicino che smette di rispondere viene dichiarato caduto dopo circa 900 ms, senza aspettare i timer di BGP; `vtysh -c "show bfd peers"` mostra i tempi effettivamente in uso.
 
 ### VRF, anycast gateway e routing distribuito
 
@@ -53,7 +52,24 @@ I nodi formano tra loro sessioni **iBGP** con un ASN privato (65000) sugli indir
 
 ### Exit node
 
-Per uscire dalla zona servono uno o più **exit node**: nodi che annunciano nella zona una route di default e collegano la VRF alla rete dell'host. Con **SNAT** nella subnet i guest escono con l'IP dell'exit node. Con un **Primary Exit Node** tutto il traffico in uscita usa quel nodo e gli altri restano di riserva.
+Per uscire dalla zona servono uno o più **exit node**: nodi che annunciano nella zona una route di default e collegano la VRF alla rete dell'host. Con **SNAT** nella subnet i guest escono con l'indirizzo dell'exit node. Se gli exit node sono più d'uno, con un **Primary Exit Node** tutto il traffico in uscita passa da quel nodo e gli altri restano di riserva; la documentazione di Proxmox VE lo richiede se si usa SNAT.
+
+L'SNAT è *stateful*: l'exit node registra ogni flusso nella sua tabella di connection tracking (*conntrack*) e usa quella voce per tradurre le risposte. Come nel [Lab 24](/it/24-routing-nat/), una voce ha due metà: la richiesta come l'ha inviata il guest e la risposta come ci si aspetta che torni. Con SNAT la metà della risposta è indirizzata all'exit node, non al guest: il passo 8 usa questa lettura per capire cosa è successo durante il guasto.
+
+### Ambiente e versioni della prova
+
+Gli output e le misure che seguono vengono da prove eseguite a novembre 2026 in questa configurazione:
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)) |
+| FRR | 10.6.1-1+pve3, con la configurazione generata dall'SDN |
+| Underlay | VLAN 61 (`vmbr1.61`, 10.61.10.0/24) su `vmbr1` e `bond0`, active-backup su porte 10 GbE, MTU 1500 ([Lab 21](/it/21-bonding/), [Lab 29](/it/29-sdn-vxlan/)) |
+| Zona | exit node `desopve01` (principale) e `desopve02`, SNAT sulle due subnet, MTU dei guest 1450 |
+| Guest | CT 301 e CT 302 dal template `debian-13-standard_13.6-1`, VM 303 dall'immagine cloud di Debian 13, tutti su `rbd-vm` (Ceph 20.2, [Lab 17](/it/17-ceph-installation/)) |
+| Strumenti | `ping` dal CT 302 ogni 100 o 200 ms, log del task di migrazione, `vtysh`, `tcpdump`, `conntrack` |
+
+**Cosa misurano le prove e cosa no.** La caduta dell'exit node è simulata spegnendo la sua interfaccia underlay: `desopve01` resta acceso e raggiungibile sulla rete di gestione, quindi non è il crash o la mancanza di alimentazione di un nodo. Il traffico è solo ICMP: nessuna connessione TCP è stata provata. Il `ping` mostra quello che vede un client, con la risoluzione del suo intervallo: non misura i tempi di BFD o della convergenza di BGP, e l'istante in cui l'interfaccia è stata spenta, rispetto al ping, non è stato registrato. La documentazione di Proxmox VE consiglia di disattivare il controllo stretto del percorso inverso (`rp_filter`) quando una zona ha più exit node; il suo valore sui nodi non è stato registrato.
 
 ## Procedura
 
@@ -367,7 +383,15 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
    450 packets transmitted, 440 received, 2.22222% packet loss, time 45465ms
    ```
 
-   La VM è rimasta ferma 45 ms. Si perdono 10 ping, circa un secondo: il tempo perché la nuova posizione del MAC arrivi via BGP a tutti i nodi. La VM non ha dovuto cambiare nulla: il gateway 10.71.71.1, con lo stesso MAC, esiste anche su `desopve02`.
+   Sono tre osservazioni diverse, da tenere separate:
+
+   - **Task:** la migrazione dura 10 secondi in tutto e il task riporta un fermo di 45 ms, la pausa della VM misurata da QEMU nell'ultima fase.
+   - **Ping:** dal CT 302, con una richiesta ogni 100 ms, mancano 10 risposte su 450. Il riepilogo non dice se fossero consecutive; se lo erano, l'interruzione è durata circa un secondo.
+   - **EVPN:** dopo la migrazione `desopve03` vede il MAC della VM dietro il VTEP di `desopve02` (passo successivo).
+
+   **Interpretazione:** un'interruzione di circa un secondo, contro una pausa di 45 ms, è compatibile con il tempo che serve agli altri nodi per sapere dove si trova ora la VM: `desopve02` deve vedere un frame della VM e annunciarne il MAC con una route di tipo 2, e gli altri nodi devono installarla. La prova non misura queste fasi una per una. **Verifica:** `ping -D -O -i 0.1` stampa l'ora di ogni risposta e segnala quelle mancanti, così si vede se sono consecutive e quando iniziano rispetto al log del task; su `desopve02`, `tcpdump -eni vnev1 ether src bc:24:11:45:63:6d` mostra quando i primi frame della VM arrivano sul nodo di destinazione.
+
+   La configurazione di rete della VM non è cambiata: il gateway 10.71.71.1, con lo stesso MAC, esiste anche su `desopve02`.
 
 4. Dopo la migrazione il MAC è dietro il VTEP di `desopve02` e il numero di sequenza è salito: è il meccanismo di *MAC mobility* di EVPN.
 
@@ -385,7 +409,7 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
 
 ### 8. Caduta dell'exit node principale
 
-1. Dal CT 302 un ping continuo verso il domain controller. Su `desopve01` si spegne l'interfaccia underlay, come se il nodo sparisse dalla rete tra i nodi:
+1. Dal CT 302 un ping continuo verso il domain controller. Su `desopve01` si spegne l'interfaccia underlay, come se il nodo sparisse dalla rete tra i nodi (resta acceso sulla rete di gestione):
 
    ```bash title="root@desopve03"
    pct exec 302 -- ping -i 0.1 -c 300 -q 172.27.199.20
@@ -395,7 +419,7 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
    ip link set vmbr1.61 down
    ```
 
-2. In pochi istanti BFD chiude le sessioni: su `desopve03` la route di default passa all'exit node di riserva, e su `desopve02` il traffico esce con il suo indirizzo:
+2. Dopo il guasto, su `desopve03` la route di default della VRF punta all'exit node di riserva, e su `desopve02` il traffico esce con l'indirizzo di quel nodo:
 
    ```bash title="root@desopve03"
    vtysh -c "show ip route vrf vrf_evpnz 0.0.0.0/0"
@@ -416,16 +440,20 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
    21:44:53.644875 IP 172.27.199.20 > 172.27.199.22: ICMP echo reply, id 294, seq 37, length 64
    ```
 
-3. Il risultato **non** è stato uguale in tutte le prove. Su quattro tentativi:
+   Questi output sono fotografie scattate dopo il passaggio e non dicono quanto è durato. Il log di FRR su `desopve03` (`journalctl -u frr`) registra quando è caduta la sessione con 10.61.10.21, e per quale motivo.
 
-   | Prova | Ping persi | Interruzione del ping in corso |
+3. Il ping già in corso **non** si è comportato allo stesso modo in tutte le prove. Su quattro tentativi:
+
+   | Prova | Risposte perse | Il ping in corso |
    |---|---|---|
-   | 1 | 152 su 400 (ogni 100 ms) | per tutto il guasto, circa 15 s |
-   | 2 | 4 su 150 (ogni 200 ms) | circa 0,8 s |
-   | 3 | 132 su 300 (ogni 100 ms) | per tutto il guasto, circa 13 s |
-   | 4 | 9 su 200 (ogni 100 ms) | circa 0,9 s |
+   | 1 | 152 su 400, ogni 100 ms (circa 15 s) | nessuna risposta fino al ripristino del collegamento |
+   | 2 | 4 su 150, ogni 200 ms (circa 0,8 s) | ripreso attraverso `desopve02` |
+   | 3 | 132 su 300, ogni 100 ms (circa 13 s) | nessuna risposta fino al ripristino del collegamento |
+   | 4 | 9 su 200, ogni 100 ms (circa 0,9 s) | ripreso attraverso `desopve02` |
 
-   Nelle prove 1 e 3 il connection tracking di `desopve02` aveva registrato il flusso **senza NAT**: le risposte tornavano verso 10.72.72.12, un indirizzo che fuori dalla zona nessuno sa raggiungere.
+   Il tempo tra parentesi è calcolato, risposte perse × intervallo: presuppone che le perdite fossero consecutive, cosa che il riepilogo del ping non mostra. Nelle prove 2 e 4 l'interruzione è compatibile con il tempo di rilevamento di BFD (circa 900 ms) più il cambio di route, ma i due tempi non sono stati misurati separatamente.
+
+   **Osservato nelle prove 1 e 3.** Su `desopve02` la voce di conntrack del ping in corso era **senza traduzione degli indirizzi**: nella metà della risposta la destinazione è 10.72.72.12, il guest, invece di 172.27.199.22, il nodo, e la voce è `[UNREPLIED]`. Per esempio:
 
    ```bash title="root@desopve02"
    conntrack -L -p icmp | grep 10.72.72.12
@@ -435,7 +463,7 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
    icmp     1 29 src=10.72.72.12 dst=172.27.199.20 type=8 code=0 id=295 [UNREPLIED] src=172.27.199.20 dst=10.72.72.12 type=0 code=0 id=295 mark=0 use=1
    ```
 
-   I primi pacchetti erano arrivati a `desopve02` quando aveva ancora la route di default verso `desopve01`, quindi senza passare dalla regola SNAT su `vmbr0`. Quella voce è rimasta valida finché il ping la teneva viva. Un ping **nuovo**, lanciato durante il guasto, funzionava senza perdite:
+   Un ping **nuovo**, lanciato durante il guasto, ha un identificativo ICMP diverso e quindi una voce nuova. Ha funzionato senza perdite:
 
    ```bash title="root@desopve03"
    pct exec 302 -- ping -c5 -W1 172.27.199.20
@@ -444,6 +472,14 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
    ```text output
    5 packets transmitted, 5 received, 0% packet loss, time 4006ms
    ```
+
+   **Interpretazione.** Senza traduzione, le richieste escono da `desopve02` con l'indirizzo privato del guest, e il DC risponde a 10.72.72.12, un indirizzo che nessun router fuori dalla zona sa raggiungere: è coerente con `[UNREPLIED]`. Perché la voce sia nata senza NAT è un'ipotesi. I primi pacchetti del flusso potrebbero essere arrivati a `desopve02` quando la sua route di default nella VRF puntava ancora a `desopve01`: in quel caso non sarebbero usciti da `vmbr0` e non avrebbero incontrato la regola SNAT (`-o vmbr0`). Il NAT si decide sul primo pacchetto di un flusso, e una voce ICMP scade solo dopo 30 secondi senza traffico (`nf_conntrack_icmp_timeout`): un ping ogni 100 ms la tiene viva finché continua. Nelle prove 2 e 4 gli eventi sarebbero avvenuti nell'ordine opposto. La prova non ne ha registrato i tempi.
+
+   **Verifica:**
+
+   - durante una prova bloccata, `tcpdump -lnni vmbr0 icmp and host 172.27.199.20` su `desopve02`: richieste in uscita da 10.72.72.12, senza risposte, confermano la traduzione mancante;
+   - `conntrack -E -p icmp -o timestamp` su `desopve02`, insieme a `ip -ts monitor route`, mostra se la voce è nata prima o dopo che il nodo cambiasse la sua route di default;
+   - si cancella la voce mentre il ping è bloccato (`conntrack -D -p icmp -s 10.72.72.12`): se il ping riprende subito, attraverso l'SNAT, la causa era la voce rimasta.
 
 4. Si ripristina il collegamento e le sessioni BGP si ristabiliscono:
 
@@ -457,18 +493,24 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
    desopve03(10.61.10.23) 4      65000       231       247       40    0    0 00:00:46            8        8 FRRouting/10.6.1
    ```
 
-**La lezione:** l'SNAT è *stateful*. Quando l'uscita passa a un altro exit node, le connessioni già aperte cambiano indirizzo di origine e cadono comunque, e un flusso che continua può restare bloccato. In produzione, per un'uscita senza interruzioni si evita l'SNAT: gli exit node annunciano le subnet della zona via BGP ai router della rete, che così sanno instradare le risposte verso qualunque exit node. In questo laboratorio il router di upstream `rtr-core` resta fuori dal BGP, per non toccare l'infrastruttura.
+**Decisione e limiti.** La zona mantiene l'SNAT con un exit node principale, la configurazione che la documentazione di Proxmox VE richiede per l'SNAT con più exit node, e il router di upstream `rtr-core` resta fuori dal BGP, per non toccare l'infrastruttura del laboratorio. Un flusso già aperto può quindi restare bloccato quando l'uscita si sposta, e la prova mostra che non succede ogni volta. Due casi non sono stati provati:
+
+- **Connessioni TCP.** L'ICMP tollera il cambio dell'indirizzo di origine: il DC risponde semplicemente a `desopve02`. Una connessione TCP aperta attraverso `desopve01`, invece, dopo il passaggio arriverebbe al server da un indirizzo che non appartiene a nessuna connessione aperta, e ci si aspetta che cada.
+- **Un'uscita senza SNAT.** Gli exit node annunciano le subnet della zona via BGP ai router di upstream, che così possono mandare le risposte a qualunque exit node, senza uno stato NAT sui nodi. Quanto dura il passaggio in quella configurazione va misurato sulla propria rete.
 
 ## Verifica e test
 
-| Prova | Risultato |
-|---|---|
-| Sessioni iBGP EVPN tra i 3 nodi | stabilite, con BFD |
-| Gateway anycast | stesso IP e MAC (`bc:24:11:f3:ac:a9`) su ogni nodo |
-| CT 302 (`vnev2`, `desopve03`) → CT 301 (`vnev1`, `desopve01`) | 0% di perdita, instradato nella VRF |
-| Uscita verso il DC | SNAT con l'indirizzo dell'exit node principale |
-| Migrazione a caldo di una VM | 45 ms di fermo VM, circa 1 s di ping persi, MAC spostato via BGP |
-| Caduta dell'exit node principale | uscita su `desopve02` in circa 1 s; in 2 prove su 4 il flusso già aperto si è bloccato per lo stato SNAT |
+Il lab è riuscito se ogni controllo della tabella dà il risultato atteso. Il comportamento di un flusso già aperto durante il guasto si registra, non si giudica: in questa prova non era ripetibile.
+
+| Controllo | Risultato atteso | Osservato nella prova |
+|---|---|---|
+| Sessioni iBGP EVPN tra i 3 nodi | stabilite, con BFD | stabilite |
+| Gateway anycast | stesso IP e MAC su ogni nodo | 10.71.71.1 e `bc:24:11:f3:ac:a9` su `desopve01` e `desopve03` |
+| CT 302 (`vnev2`, `desopve03`) → CT 301 (`vnev1`, `desopve01`) | risponde, instradato nella VRF | 0% di perdita |
+| Uscita verso il DC | indirizzo di origine dell'exit node principale | 172.27.199.21 |
+| Migrazione a caldo della VM 303 | migrazione completata, MAC dietro il VTEP del nodo di destinazione | task: 10 s, fermo di 45 ms; ping ogni 100 ms: 10 risposte perse su 450; MAC dietro 10.61.10.22, sequenza 2/1 |
+| Underlay dell'exit node principale spento | route di default verso `desopve02`, flussi nuovi in uscita con il suo indirizzo | route via 10.61.10.22; ping nuovo: 0% di perdita; ping in corso: 4 e 9 risposte perse in due prove, nessuna risposta fino al ripristino nelle altre due |
+| Collegamento ripristinato | sessioni BGP di nuovo stabilite | entrambe le sessioni attive |
 
 ## Stato finale del lab
 
@@ -484,16 +526,22 @@ Anche qui **SDN Fabric** è l'alternativa alla lista dei peer (lab 31).
 
 ## Cosa hai imparato
 
-- EVPN usa BGP per distribuire MAC, IP e reti tra i nodi: niente più *flood and learn* sull'underlay.
-- Una zona EVPN è una VRF; il gateway anycast porta il routing su ogni nodo e rende la migrazione trasparente per i guest.
-- Gli exit node collegano la zona al resto della rete; con SNAT i guest escono con l'IP del nodo.
-- `vtysh` mostra sessioni BGP, VNI, route di tipo 2 e 5 e la posizione di ogni MAC.
-- La commutazione tra exit node è rapida, ma lo stato dell'SNAT può bloccare i flussi già aperti: per un'uscita robusta si instrada senza SNAT.
+- **Quando EVPN conviene rispetto alla semplice VXLAN:** quando le VNet devono instradare tra loro su ogni nodo, con una VRF per tenant e lo stesso gateway ovunque, e vuoi che MAC e IP siano distribuiti da BGP invece che imparati inondando l'underlay ([Lab 29](/it/29-sdn-vxlan/)).
+- **Come far uscire la zona:** gli exit node con SNAT non chiedono nulla ai router di upstream, ma con più exit node serve un principale, e una commutazione può bloccare i flussi già aperti. Se i flussi aperti devono sopravvivere alla perdita di un exit node, progetta l'alternativa instradata, con le subnet annunciate via BGP, e provala sulla tua rete.
+- **Come condurre una prova di guasto:** tieni separati il cambio di route, l'interruzione vista dal client e lo stato di conntrack; ripeti la prova più volte, perché qui l'esito è cambiato da un tentativo all'altro, e registra gli orari (`ping -D -O`, log di FRR, `conntrack -E`).
+- **Cosa controllare dopo la caduta di un exit node:** la route di default della VRF su un nodo che non è exit node, l'indirizzo di origine su `vmbr0` del nodo di riserva e le eventuali voci di conntrack senza traduzione. Un flusso nuovo ti dice se l'uscita funziona; quello vecchio, se c'è uno stato rimasto a bloccarlo.
+- **Quanto costa una migrazione a caldo in una zona EVPN:** il guest mantiene il gateway, ma l'interruzione vista da un client, qui circa un secondo, è molto più lunga della pausa riportata dal task, e si misura con un ping con l'orario.
 
 ## Riferimenti
 
-- [Proxmox VE – SDN: EVPN Zones](https://pve.proxmox.com/pve-docs/chapter-pvesdn.html#pvesdn_zone_plugin_evpn)
-- [Proxmox VE – SDN: EVPN Controller](https://pve.proxmox.com/pve-docs/chapter-pvesdn.html#pvesdn_controller_plugin_evpn)
+- [Proxmox VE – SDN: zone EVPN, exit node e primary exit node](https://pve.proxmox.com/pve-docs/chapter-pvesdn.html#pvesdn_zone_plugin_evpn)
+- [Proxmox VE – SDN: controller EVPN](https://pve.proxmox.com/pve-docs/chapter-pvesdn.html#pvesdn_controller_plugin_evpn)
+- [Proxmox VE – SDN: subnet e opzione SNAT](https://pve.proxmox.com/pve-docs/chapter-pvesdn.html#pvesdn_config_subnet)
+- [Proxmox VE – SDN: più exit node EVPN e `rp_filter`](https://pve.proxmox.com/pve-docs/chapter-pvesdn.html#_multiple_evpn_exit_nodes)
 - [RFC 7432 – BGP MPLS-Based Ethernet VPN](https://www.rfc-editor.org/rfc/rfc7432)
+- [RFC 7432, sezione 15 – MAC mobility e numeri di sequenza](https://www.rfc-editor.org/rfc/rfc7432#section-15)
 - [RFC 8365 – A Network Virtualization Overlay Solution Using EVPN](https://www.rfc-editor.org/rfc/rfc8365)
-- [FRRouting – EVPN](https://docs.frrouting.org/en/latest/evpn.html)
+- [FRRouting 10.6 – EVPN](https://docs.frrouting.org/en/stable-10.6/evpn.html)
+- [FRRouting 10.6 – BFD, tempi predefiniti](https://docs.frrouting.org/en/stable-10.6/bfd.html)
+- [Linux 7.0 – parametri di conntrack (`nf_conntrack_icmp_timeout`)](https://www.kernel.org/doc/html/v7.0/networking/nf_conntrack-sysctl.html)
+- [conntrack(8) – elenco, osservazione e cancellazione delle voci](https://manpages.debian.org/trixie/conntrack/conntrack.8.en.html)
