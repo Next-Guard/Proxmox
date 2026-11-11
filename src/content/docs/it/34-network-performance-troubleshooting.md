@@ -19,10 +19,11 @@ duration: 1 ora e 30 minuti
 
 ## Obiettivi
 
-- Misurare l'effetto di **multiqueue** e del **limite di banda** della scheda di rete di una VM.
-- Sapere quali offload sono attivi e come si legge l'MTU di un percorso.
-- Avere un kit di comandi per la diagnosi di rete di un nodo Proxmox VE.
-- Riprodurre sei guasti tipici e risolverli seguendo lo schema **sintomo → verifica → causa → correzione**.
+- Una misura prima e dopo dell'effetto di **multiqueue** tra due VM, con un flusso e con quattro, da cui decidere se attivarlo.
+- Il **limite di banda** `rate` di una scheda verificato nelle due direzioni, con il meccanismo che lo applica (`tc`) letto sul nodo.
+- Gli offload attivi e l'MTU di un percorso letti con `ethtool` e `ping -M do`, sapendo che cosa mostra ciascuna prova e che cosa no.
+- Un kit di comandi per la diagnosi di rete di un nodo Proxmox VE, provato sul laboratorio.
+- Sei guasti tipici riprodotti e risolti seguendo lo schema **sintomo → verifica → causa → correzione**, ciascuno con la prova del ripristino.
 
 ## Come funziona
 
@@ -41,16 +42,30 @@ Ogni freccia è un punto in cui si può guardare con `tcpdump`, e ogni oggetto h
 
 ### Multiqueue
 
-Una scheda VirtIO ha di default **una** coda di trasmissione e una di ricezione, servite da un solo thread `vhost` sull'host e da una sola CPU nel guest. Con `queues=N` la scheda ne espone N: il traffico di più connessioni si distribuisce su più CPU, sia nel guest sia sull'host. Serve quando una sola coda è il collo di bottiglia e ci sono CPU libere; non moltiplica la banda di una singola connessione. La documentazione di Proxmox VE consiglia un numero di code pari a quello delle vCPU del guest.
+Una scheda VirtIO ha di default **una** coda di trasmissione e una di ricezione, servite da un solo thread `vhost` sull'host e da una sola CPU nel guest. Con `queues=N` la scheda ne espone N: il traffico di più connessioni si distribuisce su più CPU, sia nel guest sia sull'host. Serve quando una sola coda è il collo di bottiglia e ci sono CPU libere; non moltiplica la banda di una singola connessione. La documentazione di Proxmox VE consiglia un numero di code pari a quello delle vCPU del guest; avverte anche che più code aumentano il carico di CPU di host e guest al crescere del traffico, e suggerisce l'opzione solo per VM che gestiscono molte connessioni in ingresso, come router, reverse proxy o server web molto carichi.
 
 ### Limite di banda
 
-`rate=` sulla scheda (in MB/s) viene applicato con il traffic control di Linux sull'interfaccia `tap` dell'host, in due modi diversi:
+`rate=` sulla scheda è espresso in MB/s: Proxmox VE lo moltiplica per 1024 × 1024, quindi `rate=10` vale 10 MiB/s, cioè 83,9 Mbit/s. Viene applicato con il traffic control di Linux sull'interfaccia `tap` dell'host, in due modi diversi:
 
 - **verso il guest:** con una coda `htb`, che rallenta i pacchetti (*shaping*);
 - **dal guest:** con un `police` sull'ingresso, che scarta quello che supera il limite (*policing*).
 
 Per TCP la differenza si sente, come si vedrà nelle misure.
+
+### Ambiente e versioni della prova
+
+Le misure dei passi 2-4 vengono da una prova eseguita a novembre 2026 nella configurazione descritta qui sotto. Con versioni, opzioni o hardware diversi, gli stessi comandi danno numeri diversi.
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)); QEMU 11.1.3 ([Lab 35](/it/35-kvm-qemu/)) |
+| Nodo | `desopve01`, 4 core e 32 GB di RAM ([Lab 01](/it/01-lab-architecture/)), con i guest e i servizi lasciati dai lab precedenti: per esempio il CT 121, la VM `router01` (passo 5) e gli OSD di Ceph ([Lab 17](/it/17-ceph-installation/)) |
+| VM di prova | due VM Debian 13 dall'immagine cloud, 4 vCPU di tipo `host` e 2 GiB di RAM ciascuna, scheda VirtIO su `vmbr0`, entrambe su `desopve01`: 8 vCPU su 4 core |
+| Strumento | iperf3 3.18 nei guest, TCP con le opzioni predefinite, prove da 8 secondi; i valori sono quelli della riga `receiver`, cioè i dati arrivati al ricevitore (con `-P 4`, la riga `SUM` è l'aggregato dei quattro flussi) |
+| Rete | MTU 1500 ([Lab 21](/it/21-bonding/)); il traffico tra le due VM resta dentro il nodo, senza passare da schede fisiche o switch |
+
+**Cosa misura e cosa non misura.** Le prove di multiqueue e del limite di banda misurano il traffico TCP tra due VM dello stesso nodo: le CPU del nodo e dei guest, il percorso virtio/vhost e il bridge. Non dicono nulla del traffico che attraversa la rete fisica, e non misurano l'uso delle CPU durante le prove. Ogni caso ha due giri da 8 secondi (multiqueue) o uno solo (limite di banda): danno un ordine di grandezza e il verso di un effetto, non una statistica.
 
 ## Procedura
 
@@ -153,14 +168,16 @@ Combined:	4
 [SUM]   0.00-8.02   sec  9.04 GBytes  9.68 Gbits/sec                  receiver
 ```
 
-| | 1 flusso | 4 flussi |
+| Riga `receiver` di iperf3, due giri | 1 flusso | 4 flussi (aggregato `SUM`) |
 |---|---|---|
 | 1 coda | 11,3-12,3 Gbit/s | 11,8-12,7 Gbit/s |
 | 4 code | 12,2-13,0 Gbit/s | 9,7-9,8 Gbit/s |
 
-In questo laboratorio multiqueue **non** ha migliorato le prestazioni: con 4 flussi è anzi sceso del 20% circa. Il motivo più probabile è la contesa per le CPU: le due VM, da 4 vCPU ciascuna, si mandano traffico sullo stesso nodo, e con 4 code per scheda i thread `vhost` competono con le vCPU per gli stessi core.
+- **Misura:** con quattro flussi l'aggregato passa da 11,8-12,7 Gbit/s con una coda a 9,7-9,8 Gbit/s con quattro, circa il 20% in meno, in entrambi i giri. Con un flusso si passa da 11,3-12,3 a 12,2-13,0 Gbit/s: gli intervalli si sovrappongono, quindi nessuna differenza dimostrata.
+- **Interpretazione:** il calo con quattro flussi è compatibile con una contesa per le CPU: le due VM hanno in tutto 8 vCPU su un nodo da 4 core, e con quattro code per scheda lavorano anche più thread `vhost`. La documentazione di Proxmox VE avverte proprio che più code aumentano il carico di CPU. La prova però non ha misurato l'uso delle CPU, quindi non lo dimostra.
+- **Verifica:** durante la prova, sul nodo, `top -H` (o `pidstat -t 1`, dal pacchetto `sysstat`) mostra quanta CPU usano i thread `vhost-<pid>` e quelli delle vCPU, e `mpstat -P ALL 1` se i quattro core sono saturi. Ripetere la prova con le due VM su nodi diversi, o con meno vCPU, dice se il calo dipende dalla contesa.
 
-Multiqueue rende quando:
+In questo laboratorio, quindi, multiqueue non va attivato. Può rendere quando:
 
 - la VM ha molte connessioni contemporanee (server web, proxy, router virtuali);
 - l'host ha core liberi;
@@ -189,7 +206,9 @@ qdisc ingress ffff: parent ffff:fff1 ----------------
  police 0x1 rate 83886Kbit burst 1Mb mtu 64Kb action drop overhead 0b
 ```
 
-Le misure nelle due direzioni:
+Il `police` mostra `rate 83886Kbit`, cioè 10 × 1024 × 1024 byte al secondo = 83,9 Mbit/s, con un *burst* di 1 MiB (`burst 1Mb`): il valore impostato in MB/s viene applicato in MiB/s.
+
+Le misure nelle due direzioni, un flusso TCP per volta:
 
 ```text
 == verso la VM 342 (ingresso della VM limitata)
@@ -200,10 +219,16 @@ Le misure nelle due direzioni:
 [  5]   0.00-8.00   sec  47.8 MBytes  50.1 Mbits/sec                  receiver
 ```
 
-- **Verso la VM:** 80 Mbit/s, praticamente i 10 MB/s nominali (83,9 Mbit/s), con 4 sole ritrasmissioni. La coda `htb` rallenta i pacchetti e TCP si adegua.
-- **Dalla VM:** 50 Mbit/s e **4639 ritrasmissioni**. Il `police` scarta i pacchetti oltre il limite, TCP li interpreta come congestione e rallenta più del necessario.
+- **Verso la VM.**
+  - **Misura:** 80,0 Mbit/s sulla riga `receiver`, con 4 ritrasmissioni.
+  - **Interpretazione:** è il 95% del limite di 83,9 Mbit/s. iperf3 conta solo i dati dell'applicazione, mentre il limite conta i pacchetti interi: con frame da 1500 byte le intestazioni valgono circa il 4-5%, quindi il risultato è compatibile con un limite rispettato quasi esattamente. Le poche ritrasmissioni sono coerenti con la coda `htb`, che ritarda i pacchetti invece di scartarli, e con TCP che si adegua.
+  - **Verifica:** dopo la prova, `tc -s class show dev tap342i0` mostra i byte passati dalla classe `htb`, intestazioni comprese, da confrontare con i 77,8 MBytes (MiB) che iperf3 riporta come ricevuti.
+- **Dalla VM.**
+  - **Misura:** 50,1 Mbit/s sulla riga `receiver`, con **4639 ritrasmissioni**.
+  - **Interpretazione:** è il 60% del limite. È compatibile con il `police`, che scarta i pacchetti oltre il limite: TCP interpreta le perdite come congestione e rallenta più del necessario.
+  - **Verifica:** dopo la prova, `tc -s filter show dev tap342i0 parent ffff:` mostra i contatori del `police`, da confrontare con le ritrasmissioni.
 
-Il limite è quindi più preciso sul traffico **verso** il guest. Su quello in uscita la banda effettiva è più bassa del valore impostato.
+In questa configurazione, con un solo flusso TCP tra due VM dello stesso nodo, il limite è risultato preciso sul traffico **verso** il guest, mentre in uscita ha reso il 60% del valore impostato. Con più flussi, con UDP o con un altro algoritmo di controllo della congestione il rapporto può cambiare: va misurato con il traffico reale.
 
 ### 4. Offload e MTU del percorso
 
@@ -231,7 +256,7 @@ generic-segmentation-offload: on
 generic-receive-offload: on
 ```
 
-Gli offload spiegano perché `iperf3` tra due VM dello stesso nodo supera di molto i 10 Gbit/s: i pacchetti viaggiano in blocchi da 64 KB e non vengono mai spezzati in frame da 1500 byte. Spegnerli serve solo per diagnosi; un `tcpdump` sulla `tap` mostra pacchetti più grandi dell'MTU proprio per questo.
+Le due VM dello stesso nodo si scambiano traffico senza passare da schede fisiche: la velocità delle porte del nodo (10 GbE, [Lab 01](/it/01-lab-architecture/)) non limita le prove dei passi 2 e 3. Con TSO, GSO e GRO attivi, il kernel può spostare blocchi fino a 64 KB invece di frame da 1500 byte: è compatibile con i 9,7-13,0 Gbit/s misurati, ma la prova non ha misurato quanto contino gli offload. Per verificarlo, ripeti `iperf3` dopo aver spento TSO e GSO nel guest (`ethtool -K eth0 tso off gso off`, solo per la prova). Gli offload sono anche il motivo per cui un `tcpdump` sulla `tap` mostra pacchetti più grandi dell'MTU; spegnerli serve per la diagnosi.
 
 L'MTU di un percorso si misura con pacchetti a dimensione crescente e il bit *Don't Fragment* (`-M do`). 1472 byte di dati + 28 di intestazioni ICMP e IP fanno 1500. Dalla VM 341:
 
@@ -246,7 +271,7 @@ PING 172.27.199.22 (172.27.199.22) 1473(1501) bytes of data.
 ping: sendmsg: Message too long
 ```
 
-La rete di gestione ha MTU 1500 da un capo all'altro: è l'MTU impostata sulle schede, non un limite degli switch. Nel [Lab 21](/it/21-bonding/) il percorso tra i nodi regge pacchetti fino a 8938 byte (8910 di dati ICMP), mentre i jumbo frame da 9000 byte non passano.
+La prova da 1472 byte passa: il percorso dalla VM 341 a `desopve02` (172.27.199.22), attraverso la rete fisica, porta pacchetti da 1500 byte. Quella da 1473 viene rifiutata dal guest stesso (`sendmsg: Message too long`) prima di partire, perché supera l'MTU della sua interfaccia: mostra l'MTU della VM, non il limite degli switch. Quello lo misura il [Lab 21](/it/21-bonding/): il percorso tra i nodi regge pacchetti fino a 8938 byte (8910 di dati ICMP), mentre i jumbo frame da 9000 byte non passano. La rete di gestione ha quindi MTU 1500 perché è l'MTU impostata sulle schede.
 
 ### 5. Il kit di diagnosi
 
@@ -448,7 +473,7 @@ default via 10.10.10.1 dev eth0
 ```
 
 :::note
-`Network is unreachable` vuol dire "non so dove mandarlo": un problema di rotte nel guest. Un timeout, invece, vuol dire che il pacchetto è partito ma qualcosa lungo la strada l'ha perso o non ha risposto.
+`connect: Network is unreachable` è un errore locale: il guest non ha una rotta per quella destinazione, e il pacchetto non parte nemmeno. Un timeout, invece, vuol dire che il pacchetto è partito ma qualcosa lungo la strada l'ha perso o non ha risposto.
 :::
 
 #### Guasto 5 – Bridge senza porta fisica
@@ -501,7 +526,7 @@ ip link del vmbr7
 pct exec 121 -- ip addr add 10.10.10.122/24 dev eth0
 ```
 
-**Sintomo** tipico: connessioni verso 10.10.10.122 che a volte funzionano e a volte no, sessioni che cadono, a seconda di quale MAC hanno in cache gli altri host.
+**Sintomo atteso**, non riprodotto in questa prova, che passa subito alla verifica: connessioni verso 10.10.10.122 che a volte funzionano e a volte no, sessioni che cadono, a seconda di quale MAC hanno in cache gli altri host.
 
 **Verifica:** il rilevamento dei duplicati di `arping` (`-D`) dal CT 122 sul proprio indirizzo. Il comando non c'è nel template: si installa nel CT 122, che esce attraverso `router01`, dopo aver impostato il proxy di `apt` come nelle VM del passo 1 (`pct exec 122 -- apt-get install -y iputils-arping`). Prima del guasto nessuno risponde (uscita 0), dopo risponde un altro MAC (uscita 1):
 
@@ -541,22 +566,24 @@ iptables -t nat -S POSTROUTING | sort | uniq -c | sort -rn | head -4
       1 -P POSTROUTING ACCEPT
 ```
 
-È lo stesso fenomeno del [Lab 24](/it/24-routing-nat/): ogni ricarica della rete (`ifreload`, anche quella fatta dall'**Apply** dell'SDN) riesegue i `post-up` che aggiungono la regola. Qui non fa danni, perché vale la prima regola che corrisponde e le copie sono identiche. Diventa però un problema quando una regola viene cambiata: la vecchia resta in tabella, prima della nuova. Il riavvio del nodo ricostruisce la tabella da zero.
+È compatibile con il meccanismo visto nel [Lab 24](/it/24-routing-nat/), qui con regole generate dall'SDN: ogni ricarica della rete (`ifreload`, anche quella fatta dall'**Apply** dell'SDN) riesegue i `post-up` che aggiungono la regola. Per verificarlo, cerca le righe che le aggiungono (`grep -rn SNAT /etc/network/interfaces.d/`) e conta le copie prima e dopo il prossimo `ifreload -a` o **Apply**: se la spiegazione è giusta, ogni regola cresce di una copia. Qui non fa danni, perché vale la prima regola che corrisponde e le copie sono identiche. Diventa però un problema quando una regola viene cambiata: la vecchia resta in tabella, prima della nuova. Il riavvio del nodo ricostruisce la tabella da zero.
 
 ## Verifica e test
 
-| Prova | Risultato |
-|---|---|
-| Multiqueue 1 → 4 code, 4 flussi tra due VM sullo stesso nodo | da 11,8-12,7 a 9,7-9,8 Gbit/s: nessun vantaggio in questo laboratorio |
-| `rate=10` verso la VM | 80 Mbit/s, shaping preciso |
-| `rate=10` dalla VM | 50 Mbit/s con 4639 ritrasmissioni (policing) |
-| MTU della rete di gestione | 1500, 1501 rifiutato |
-| Guasto 1 VLAN | trovato con `bridge vlan` e `tcpdump -e`, risolto |
-| Guasto 2 MTU VXLAN | trovato con `ping -M do`, risolto |
-| Guasto 3 regola firewall | trovato con le regole compilate (nessun log), risolto |
-| Guasto 4 gateway | trovato con `ip route`, risolto |
-| Guasto 5 bridge senza porta | trovato con `bridge link`, risolto |
-| Guasto 6 IP duplicato | trovato con `arping -D`, risolto |
+La prova è riuscita se ogni misura ha il suo prima e dopo nelle stesse condizioni, e se ogni guasto, dopo la correzione, torna al comportamento iniziale. I valori osservati sono quelli della prova descritta in [Ambiente e versioni della prova](#ambiente-e-versioni-della-prova).
+
+| Prova | Criterio di successo | Osservato in questa prova |
+|---|---|---|
+| Multiqueue 1 → 4 code, 4 flussi tra due VM dello stesso nodo | misura prima e dopo, due giri, nelle stesse condizioni | da 11,8-12,7 a 9,7-9,8 Gbit/s: nessun vantaggio in questo laboratorio |
+| `rate=10` verso la VM | vicino a 83,9 Mbit/s, poche ritrasmissioni | 80,0 Mbit/s (`receiver`), 4 ritrasmissioni |
+| `rate=10` dalla VM | sotto il limite, con ritrasmissioni (policing) | 50,1 Mbit/s (`receiver`), 4639 ritrasmissioni |
+| MTU della rete di gestione | 1472 byte di dati passano, 1473 rifiutati dal guest | come atteso |
+| Guasto 1 VLAN | trovato con `bridge vlan` e `tcpdump -e`; ping di nuovo riuscito | trovato e risolto |
+| Guasto 2 MTU VXLAN | trovato con `ping -M do`; ping di nuovo riuscito con MTU 1450 | trovato e risolto |
+| Guasto 3 regola firewall | trovato con le regole compilate (nessun log); HTTP di nuovo `ok` | trovato e risolto |
+| Guasto 4 gateway | trovato con `ip route`; rotta `default` di nuovo presente | trovato e risolto |
+| Guasto 5 bridge senza porta | trovato con `bridge link`; ping di nuovo riuscito | trovato e risolto |
+| Guasto 6 IP duplicato | trovato con `arping -D` (uscita 1, MAC del CT 121) | trovato e risolto |
 
 ## Stato finale del lab
 
@@ -567,16 +594,19 @@ iptables -t nat -S POSTROUTING | sort | uniq -c | sort -rn | head -4
 
 ## Cosa hai imparato
 
-- Multiqueue e limiti di banda vanno misurati: in un ambiente con poche CPU più code possono peggiorare le prestazioni, e il limite in uscita da una VM, applicato con *policing*, rende meno del valore impostato.
-- Gli offload spiegano velocità "impossibili" tra VM dello stesso nodo e pacchetti giganti in `tcpdump`.
-- La diagnosi segue il percorso del pacchetto: guest, porta del bridge, VLAN, bond, firewall, conntrack, routing. Per ogni tratto c'è un comando che ne mostra lo stato.
-- Timeout e errore immediato raccontano cose diverse: il secondo indica quasi sempre un problema di configurazione nel guest.
-- Le regole di blocco senza log sono invisibili: per trovarle servono le regole compilate (`nft list ruleset`).
+- **Quando attivare multiqueue:** solo dopo una misura prima e dopo con un traffico simile a quello reale (molte connessioni) e con CPU libere sul nodo; qui, con 8 vCPU su 4 core, l'aggregato di quattro flussi è sceso del 20%.
+- **Come usare `rate` e cosa aspettarsi:** il valore è in MiB/s; verso il guest il limite è preciso (shaping), in uscita dal guest il policing scarta pacchetti e con TCP rende meno del valore impostato. Prima di contare su un limite in uscita, lo misuri con il tuo traffico.
+- **Come leggere una misura di banda tra VM dello stesso nodo:** non attraversa la rete fisica, quindi non dice nulla delle porte e degli switch; contano le CPU, vhost e gli offload.
+- **Da dove partire in una diagnosi:** dal percorso del pacchetto (guest, porta del bridge, VLAN, bond, firewall, conntrack, routing), con il comando che mostra lo stato di ogni tratto; un errore locale immediato (`Network is unreachable`) e un timeout indicano tratti diversi.
+- **Come rendere visibili i blocchi del firewall:** `log` sulle regole `DROP` e `REJECT` scritte a mano; senza log, la causa si trova solo nelle regole compilate (`nft list ruleset`).
 
 ## Riferimenti
 
 - [Proxmox VE – Network Device: Multiqueue](https://pve.proxmox.com/pve-docs/chapter-qm.html#qm_network_device)
+- [Proxmox VE – `qm`: opzione `rate` delle schede di rete (`net[n]`)](https://pve.proxmox.com/pve-docs/qm.1.html)
 - [Proxmox VE – Network Configuration](https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#sysadmin_network_configuration)
-- [Linux kernel – bonding driver](https://www.kernel.org/doc/html/latest/networking/bonding.html)
+- [Linux 7.0 – bonding driver](https://www.kernel.org/doc/html/v7.0/networking/bonding.html)
 - [iproute2 – bridge(8)](https://man7.org/linux/man-pages/man8/bridge.8.html)
-- [iperf3](https://software.es.net/iperf/)
+- [`tc-htb(8)`: lo shaping in uscita dalla `tap`](https://man7.org/linux/man-pages/man8/tc-htb.8.html)
+- [`tc-police(8)`: il policing in ingresso](https://man7.org/linux/man-pages/man8/tc-police.8.html)
+- [iperf3 – opzioni `-P` e `-R`, righe sender e receiver](https://software.es.net/iperf/invoking.html)

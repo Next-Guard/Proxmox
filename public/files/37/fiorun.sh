@@ -1,6 +1,14 @@
 #!/bin/bash
 # fiorun.sh - esegue un job fio su un disco e stampa una riga di riepilogo:
-# IOPS, MB/s, latenza media e 99° percentile.
+# IOPS, banda e latenza di completamento (clat), media e 99° percentile.
+#
+# Che cosa stampa, esattamente (dal JSON di fio, lettura o scrittura a seconda del job):
+#   IOPS=       jobs[0].<read|write>.iops, operazioni completate al secondo
+#   MB/s=       jobs[0].<read|write>.bw / 1024: fio riporta bw in KiB/s, quindi il valore e' in MiB/s
+#   lat media=  clat_ns.mean in microsecondi: latenza di completamento, senza la sottomissione (slat)
+#   p99=        99° percentile di clat_ns in microsecondi
+# Con --fsync=1 la latenza stampata e' quella della sola scrittura: il tempo degli fsync
+# fio lo riporta a parte (jobs[0].sync) e questo script non lo stampa.
 #
 # Si esegue DENTRO la VM di prova (Lab 37), come utente con sudo, dopo aver installato
 # fio (sudo apt-get install -y fio). ATTENZIONE: scrive direttamente sul disco indicato,

@@ -13,12 +13,11 @@ duration: 1 ora
 
 ## Obiettivi
 
-- Creare una condivisione SMB su TrueNAS e dare i permessi a un utente di servizio.
-- Aggiungere lo storage SMB/CIFS al cluster e capire dove Proxmox VE salva la password.
-- Fissare la versione del protocollo SMB.
-- Usare la condivisione per ISO e backup, visibili da tutti i nodi.
-- Riconoscere i problemi tipici: credenziali, permessi, mount `soft`.
-- Confrontare SMB e NFS, anche sulla sicurezza delle scritture.
+- Una condivisione SMB `pve` sul dataset `dati/smb`, con l'utente di servizio `svc-pve` in controllo completo, che il nodo vede con `pvesm scan cifs`.
+- Lo storage `nas-smb` montato su tutti i nodi, con la versione del protocollo fissata a 3.11, la password in `/etc/pve/priv/storage/` e le opzioni effettive del mount lette da `mount`.
+- La ISO di Debian e un backup del container 101 sulla condivisione, visibili da ogni nodo.
+- I tre problemi tipici riprodotti e riconosciuti dal loro messaggio: password errata, permessi Unix ignorati, NAS fermo con il mount `soft`.
+- Un confronto con NFS in cui, per ogni numero, è chiaro se le scritture venivano rese stabili con un `fsync` oppure no.
 
 ## Come funziona
 
@@ -35,18 +34,19 @@ SMB (*Server Message Block*), chiamato anche CIFS, è il protocollo di condivisi
 
 - La password dell'utente sta in `/etc/pve/priv/storage/<ID>.pw`. È nel file system del cluster, quindi tutti i nodi la conoscono, ma la cartella `priv` è leggibile solo da root.
 - Il server decide i permessi con le sue ACL: per TrueNAS, l'utente `svc-pve` deve avere il controllo completo del dataset.
-- Il client Linux monta la condivisione con opzioni diverse da NFS: i permessi Unix non esistono (`nounix`), e il mount è **`soft`**. Se il server non risponde, le operazioni falliscono con un errore invece di restare in attesa.
+- Il client Linux monta la condivisione con opzioni diverse da NFS: i permessi Unix non esistono (`nounix`), e il mount è **`soft`**, un'opzione che Proxmox VE imposta sempre per gli storage CIFS. Se il server non risponde, le operazioni falliscono con un errore invece di restare in attesa.
 
 ### Quando usare SMB
 
 | | NFS | SMB/CIFS |
 |---|---|---|
 | Autenticazione | per indirizzo IP del client | utente e password (o dominio AD) |
-| Permessi Unix (proprietario, `chmod`) | sì | no: li decide il server |
-| Comportamento se il server cade | `hard`: si aspetta | `soft`: errore dopo pochi secondi |
+| Permessi Unix (proprietario, `chmod`) | sì | no, con le opzioni usate qui (`nounix`): li decide il server |
+| Mount in Proxmox VE | `hard` per default | sempre `soft` |
+| Con il NAS fermo, nei lab 13 e 14 | processi in attesa, senza errori | errore dopo circa 10 secondi |
 | Uso tipico in Proxmox VE | dischi delle VM, ISO, backup | ISO, template e backup; NAS già in uso con Windows |
 
-Per i dischi delle VM conviene NFS (o iSCSI, nel lab 15): con SMB un NAS che non risponde per qualche secondo restituisce errori di I/O al disco virtuale. Nel lab userai SMB per **ISO e backup**.
+In questo manuale i dischi delle VM stanno su NFS, iSCSI (lab 15) o Ceph, e SMB serve per **ISO e backup**. Il lab non mette dischi di VM su SMB: quello che succederebbe si deduce dal Test 3, dove con il NAS fermo le scritture falliscono dopo circa dieci secondi; per un disco virtuale vorrebbe dire errori di I/O nel guest.
 
 ### Alternativa: autenticazione con Active Directory
 
@@ -57,6 +57,22 @@ Nel laboratorio il NAS usa un utente locale. In un'azienda con Active Directory 
 - le ACL della condivisione usano utenti e gruppi del dominio.
 
 Prima dell'unione al dominio servono DNS e orario corretti sul NAS (lab 12): Kerberos rifiuta differenze di orario superiori a 5 minuti.
+
+### Ambiente e versioni della prova
+
+I test di questo lab sono stati eseguiti a novembre 2026 (il 9 novembre, come mostrano i nomi dei file e i log), nella configurazione descritta qui sotto. Con versioni, opzioni o hardware diversi, gli stessi comandi danno numeri e tempi diversi.
+
+| Componente | Configurazione della prova |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/it/04-first-access-repositories-updates/)); le prove partono dal nodo `desopve01` |
+| NAS | TrueNAS Community Edition 25.10.8 ([Lab 12](/it/12-truenas-nas/)), dataset `dati/smb` (preset SMB) e `dati/nfs` sullo stesso pool `dati` in mirror; una sola scheda di rete ([Lab 01](/it/01-lab-architecture/)) |
+| Mount SMB | SMB 3.1.1 (`vers=3.1.1`), `cache=strict`, `soft`, `nounix`, `rsize` e `wsize` da 4 MiB (output di `mount` al passo 3) |
+| Mount NFS | NFS 4.2, `hard`, `rsize` e `wsize` da 1 MiB ([Lab 13](/it/13-nfs/)) |
+| Rete | LAN di gestione `172.27.199.0/24`, MTU 1500 ([Lab 21](/it/21-bonding/)) |
+| Non registrato | la versione di Samba sul NAS e la proprietà `sync` dei due dataset: si leggono sul NAS con `smbd --version` e `zfs get sync dati/smb dati/nfs` |
+| Prove | `fio` dal nodo, una sola esecuzione da 20 secondi per caso; battito ogni 2 secondi |
+
+**Cosa misura e cosa non misura.** `fio` sul nodo misura il client del kernel (CIFS o NFS), la rete e il NAS, senza VM. Ogni caso è stato misurato una volta sola, per 20 secondi: il risultato dà un ordine di grandezza, non una statistica. Le tre prove del Test 4 cambiano più parametri insieme (coda, motore di I/O, `fsync`, dimensione dei blocchi), quindi NFS e SMB si confrontano dentro la stessa riga, non tra righe diverse.
 
 ## Procedura
 
@@ -107,7 +123,7 @@ pve Storage
 
 ### 3. Fissare la versione di SMB
 
-Il dialogo non ha un campo per la versione del protocollo: senza indicazioni il client negozia la più alta supportata da entrambi. Fissarla evita che un server mal configurato faccia scendere il collegamento a una versione vecchia. Si imposta da riga di comando, e vale dal mount successivo:
+Il dialogo non ha un campo per la versione del protocollo: senza indicazioni il client negozia la versione più alta, da SMB2 in su, supportata da entrambi (SMB1 non è supportato). Fissarla fa fallire il mount, invece di accettare in silenzio una versione più vecchia, se il server non offre quella richiesta. Si imposta da riga di comando, e vale dal mount successivo:
 
 ```bash title="root@desopve01"
 pvesm set nas-smb --smbversion 3.11
@@ -215,7 +231,7 @@ ls -l prova.txt
 -rwxr-xr-x 1 root root 0 Nov  9 15:51 prova.txt
 ```
 
-`chmod` e `chown` non danno errore ma non cambiano nulla: con `nounix` i permessi li decide il server con le ACL. Per questo SMB non è adatto ai container, che hanno bisogno di proprietari e permessi Unix reali.
+`chmod` e `chown` non danno errore ma non cambiano nulla: con `nounix` i permessi li decide il server con le ACL, e il client mostra per tutti i file i valori fissati dal mount (`uid=0`, `gid=0`, `file_mode=0755`). Per questo la condivisione non va usata per file i cui proprietari e permessi Unix contano, per esempio una cartella montata direttamente in un container.
 
 ### Test 3 – Il NAS smette di rispondere
 
@@ -225,7 +241,7 @@ Sul nodo `desopve01` avvia un «battito» che ogni 2 secondi scrive l'ora sulla 
 nohup sh -c 'while true; do if date +%T > /mnt/pve/nas-smb/battito.txt; then echo "$(date +%T) ok"; else echo "$(date +%T) ERRORE"; fi >> /root/smb-battito.log; sleep 2; done' >/dev/null 2>&1 &
 ```
 
-Sul NAS ferma il servizio SMB (**System** → **Services** → **SMB** → **Stop Service**). Le scritture si bloccano per una decina di secondi, poi falliscono, e così ogni tentativo successivo:
+Sul NAS ferma il servizio SMB (**System** → **Services** → **SMB** → **Stop Service**). Il battito registra l'ora alla fine di ogni tentativo:
 
 ```bash title="root@desopve01"
 tail -4 /root/smb-battito.log
@@ -237,6 +253,8 @@ tail -4 /root/smb-battito.log
 15:55:47 ERRORE
 15:55:59 ERRORE
 ```
+
+Tra l'ultimo `ok` (15:55:35) e il primo `ERRORE` (15:55:47) passano 12 secondi, 2 dei quali sono la pausa del ciclo: la scrittura è rimasta bloccata per circa 10 secondi prima di fallire, e lo stesso è successo al tentativo seguente (15:55:59). Una scrittura a mano riceve l'errore, e `pvestatd` segna lo storage come inattivo:
 
 ```bash title="root@desopve01"
 bash -c 'echo x > /mnt/pve/nas-smb/prova.txt'
@@ -254,9 +272,9 @@ pvesm status | grep nas-smb
 nas-smb          cifs   inactive               0               0               0    0.00%
 ```
 
-È la differenza con NFS del lab 13: lì i processi restavano in attesa, senza errori, finché il server tornava. Qui l'applicazione riceve un errore (`Host is down`). Per un file ISO o un backup in corso vuol dire un'operazione fallita, da ripetere; per il disco di una VM vorrebbe dire errori di I/O nel sistema operativo ospite.
+**Il confronto con il lab 13.** Con NFS, montato `hard`, i processi restavano in attesa senza errori finché il server tornava. Qui, con il mount `soft` che Proxmox VE usa sempre per CIFS, l'applicazione riceve un errore (`Host is down`). I circa 10 secondi di attesa sono quelli osservati in questa combinazione (kernel `7.0.14-28-pve`, TrueNAS 25.10.8); quali timeout del client CIFS li determinino, questa prova non l'ha indagato. Per un file ISO o un backup in corso vuol dire un'operazione fallita, da ripetere; per il disco di una VM vorrebbe dire errori di I/O nel sistema operativo ospite.
 
-Riavvia il servizio SMB: dopo pochi secondi il client si riconnette da solo e le scritture riprendono:
+Riavvia il servizio SMB: il client si riconnette da solo, senza interventi sul nodo, e le scritture riprendono (l'ora esatta del riavvio non è stata registrata):
 
 ```bash title="root@desopve01"
 tail -3 /root/smb-battito.log
@@ -284,7 +302,7 @@ pkill -f "^sh -c while true"; rm -f /mnt/pve/nas-smb/battito.txt /mnt/pve/nas-sm
 
 ### Test 4 – SMB contro NFS
 
-Dal nodo `desopve01` misura con `fio` le stesse scritture sui due storage del NAS (stesso pool, stessa rete):
+Dal nodo `desopve01` misura con `fio` le stesse scritture sui due storage del NAS (stesso pool, stessa rete). Ogni prova dura 20 secondi ed è eseguita una volta:
 
 ```bash title="root@desopve01"
 fio --name=t --directory=/mnt/pve/nas-smb --rw=randwrite --bs=4k --size=1G \
@@ -304,7 +322,7 @@ fio --name=t --directory=/mnt/pve/nas-nfs --rw=randwrite --bs=4k --size=1G \
   write: IOPS=962, BW=3851KiB/s (3943kB/s)(75.9MiB/20179msec); 0 zone resets
 ```
 
-SMB sembra cinque volte più veloce. Ripeti forzando il salvataggio sicuro di ogni scrittura (`--fsync=1`, come fa un database):
+Con queste opzioni SMB fa 5,6 volte gli IOPS di NFS. Ripeti la prova chiedendo che ogni scrittura sia resa stabile prima della successiva (`--fsync=1`, come fa un database):
 
 ```bash title="root@desopve01"
 fio --name=t --directory=/mnt/pve/nas-smb --rw=randwrite --bs=4k --size=1G \
@@ -350,23 +368,37 @@ Cancella i file di prova creati da `fio`:
 rm -f /mnt/pve/nas-smb/t.0.0 /mnt/pve/nas-nfs/t.0.0
 ```
 
-| Test (dal nodo, `fio`) | NFS | SMB |
+| Prova (dal nodo, `fio`, 20 s, una esecuzione) | NFS | SMB |
 |---|---|---|
-| Scrittura casuale 4 KiB, coda 16 | 962 IOPS | 5 430 IOPS |
-| Scrittura sequenziale 1 MiB, coda 4 | 33 MiB/s | 688 MiB/s |
-| Scrittura casuale 4 KiB con `fsync` a ogni scrittura | 339 IOPS | 185 IOPS |
+| Scrittura casuale 4 KiB, coda 16, `libaio`, senza `fsync` | 962 IOPS | 5 430 IOPS |
+| Scrittura sequenziale 1 MiB, coda 4, `libaio`, senza `fsync` | 33 MiB/s | 688 MiB/s |
+| Scrittura casuale 4 KiB, coda 1, `psync`, `fsync` dopo ogni scrittura | 339 IOPS | 185 IOPS |
 
-- Con NFS ogni scrittura diretta arriva al NAS come scrittura **stabile**: il NAS risponde solo dopo averla salvata in modo sicuro (ZIL).
-- Con SMB il NAS conferma la scrittura appena la riceve in RAM e la salva su disco più tardi, a meno che il client non chieda esplicitamente lo svuotamento (`fsync`). Se il NAS si spegnesse di colpo, le ultime scritture confermate andrebbero perse.
-- Quando la sicurezza è la stessa (terzo test), SMB non è più veloce di NFS.
+Ogni punto qui sotto separa ciò che la prova ha misurato da come lo interpretiamo, e indica la verifica che servirebbe.
 
-Per ISO e backup, dove ogni file viene chiuso e verificato, la velocità di SMB è un vantaggio. Per i dischi delle VM, che si aspettano scritture sicure, è un rischio in più.
+1. **Scritture senza `fsync`.**
+   - **Misura:** in scrittura casuale 4 KiB SMB fa 5 430 IOPS contro i 962 di NFS (5,6 volte); in scrittura sequenziale 1 MiB, 688 MiB/s contro 33,3 (circa 20 volte).
+   - **Interpretazione:** la differenza è compatibile con un diverso momento della conferma. Via NFS, le scritture dirette verrebbero confermate dal NAS solo dopo essere state rese stabili, attraverso lo ZIL di ZFS. Via SMB, il NAS potrebbe confermarle appena ricevute in RAM e scriverle su disco più tardi, a meno che il client non chieda esplicitamente lo svuotamento (`fsync`). La prova non lo dimostra, perché non osserva il NAS.
+   - **Verifica:** sul NAS, leggi i contatori dello ZIL (`cat /proc/spl/kstat/zfs/zil`) prima e dopo ogni prova: se l'interpretazione è giusta, `zil_commit_count` cresce molto durante la prova NFS e poco durante quella SMB senza `fsync`. `zfs get sync dati/smb dati/nfs` mostra come i due dataset trattano le scritture sincrone.
+2. **Scritture con un `fsync` dopo ognuna.**
+   - **Misura:** SMB 185 IOPS, NFS 339.
+   - **Interpretazione:** quando ogni scrittura deve diventare stabile prima della successiva, SMB non è più veloce di NFS, e in questa prova è più lento. È coerente con il punto 1: senza `fsync`, il vantaggio di SMB verrebbe dal non aspettare la scrittura stabile.
+   - **Verifica:** gli stessi contatori dello ZIL, che in questa prova dovrebbero crescere in modo simile per i due protocolli.
+3. **La conseguenza, se l'interpretazione è confermata.** Se il NAS si spegnesse di colpo, le ultime scritture SMB già confermate e non ancora rese stabili andrebbero perse; con NFS no.
 
-- [ ] La condivisione `pve` usa il dataset `dati/smb`, e l'utente `svc-pve` ha il controllo completo.
-- [ ] Lo storage `nas-smb` è montato in SMB 3.1.1 su tutti e tre i nodi, con la password in `/etc/pve/priv/storage/`.
-- [ ] La ISO e il backup del container sono visibili da ogni nodo.
-- [ ] Sai che cosa succede con password errata, con `chmod` e con il NAS fermo.
-- [ ] Sai spiegare perché SMB «vince» il primo confronto con NFS e perde il terzo.
+Per ISO e backup la velocità di SMB è un vantaggio, a patto di poter ripetere un'operazione fallita (Test 3) e di controllare i backup con un ripristino di prova (lab 46). Per i dischi delle VM, che contano su scritture confermate, il mount `soft` e la conferma prima della scrittura stabile, se la verifica la conferma, sono due rischi in più.
+
+### Riepilogo dei controlli
+
+| Controllo | Risultato atteso | Osservato in questa prova |
+|---|---|---|
+| Condivisione e ACL | `svc-pve` vede la condivisione `pve` | `pvesm scan cifs`: `pve Storage` |
+| Mount | SMB 3.1.1 su tutti i nodi, password in `/etc/pve/priv/storage/` | `vers=3.1.1`, `soft`, `nounix`; `nas-smb.pw` leggibile solo da root |
+| Contenuti condivisi | ISO e backup visibili da ogni nodo | ISO elencata da `desopve03`; backup del CT 101 scritto da `desopve02` |
+| Password errata | accesso rifiutato | `NT_STATUS_ACCESS_DENIED` |
+| Permessi Unix | `chmod` e `chown` senza effetto e senza errori | `-rwxr-xr-x 1 root root` dopo `chmod 600` e `chown 1000:1000` |
+| NAS fermo | errori invece di attesa; ripresa da sola al ritorno del servizio | `ERRORE` dopo circa 10 s, `Host is down`, storage `inactive`; di nuovo `ok` e `active` dopo il riavvio |
+| Confronto con NFS | NFS e SMB confrontati a parità di `fsync` | senza `fsync` SMB 5,6 e 20 volte NFS; con `fsync` SMB 185 IOPS, NFS 339 |
 
 ## Stato finale del lab
 
@@ -378,17 +410,15 @@ Per ISO e backup, dove ogni file viene chiuso e verificato, la velocità di SMB 
 
 ## Cosa hai imparato
 
-- Lo storage SMB/CIFS è uno storage di tipo file condiviso, montato su ogni nodo in `/mnt/pve/<ID>`, con utente e password salvati in `/etc/pve/priv/storage/`.
-- Sul NAS i permessi si danno con le ACL del dataset; sul client i permessi Unix non esistono.
-- La versione del protocollo si fissa con `pvesm set <ID> --smbversion`.
-- Il mount SMB è `soft`: con il NAS fermo le operazioni falliscono dopo pochi secondi, mentre con NFS restano in attesa.
-- Un confronto di velocità ha senso solo a parità di sicurezza delle scritture: SMB conferma le scritture prima di salvarle, NFS no.
-- SMB è adatto a ISO, template e backup; per i dischi delle VM si preferiscono NFS, iSCSI o Ceph.
+- **Dove usare uno storage SMB:** per ISO, template e backup, soprattutto se il NAS serve già client Windows. Non per i dischi delle VM: Proxmox VE lo monta sempre `soft` (Test 3), e senza `fsync` le scritture potrebbero essere confermate prima di essere stabili (Test 4, da verificare).
+- **Come configurarlo in modo controllato:** un utente di servizio dedicato con le ACL sul dataset, la versione del protocollo fissata con `pvesm set <ID> --smbversion`, la password in `/etc/pve/priv/storage/`, da aggiornare lì se cambia sul NAS.
+- **Come riconoscere i guasti tipici dal messaggio:** `NT_STATUS_ACCESS_DENIED` per le credenziali, `chmod` e `chown` senza effetto per i permessi decisi dal server, `Host is down` per il server irraggiungibile con il mount `soft`.
+- **Come confrontare due storage:** a parità di garanzie sulla scrittura (con e senza `fsync`), dichiarando coda, motore di I/O e durata delle prove, e ripetendole prima di trarre conclusioni.
 
 ## Riferimenti
 
-- [Proxmox VE – CIFS Backend](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#storage_cifs)
-- [Proxmox VE – `pvesm`](https://pve.proxmox.com/pve-docs/pvesm.1.html)
-- [TrueNAS – Adding SMB Shares](https://www.truenas.com/docs/scale/scaletutorials/shares/smb/addsmbshares/)
-- [TrueNAS – Configuring Active Directory](https://www.truenas.com/docs/scale/scaletutorials/credentials/directoryservices/configuringadscale/)
-- [`mount.cifs(8)` – opzioni `soft`, `vers`, `nounix`](https://man7.org/linux/man-pages/man8/mount.cifs.8.html)
+- [Proxmox VE – CIFS Backend (l'opzione `soft` impostata sempre)](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#storage_cifs)
+- [Proxmox VE – `pvesm` (opzione `smbversion`)](https://pve.proxmox.com/pve-docs/pvesm.1.html)
+- [TrueNAS 25.10 – Windows Shares (SMB)](https://www.truenas.com/docs/scale/25.10/scaletutorials/shares/smb/)
+- [TrueNAS 25.10 – Configuring Active Directory](https://www.truenas.com/docs/scale/25.10/scaletutorials/credentials/directoryservices/configadscale/)
+- [`mount.cifs(8)` – opzioni `soft`, `hard`, `vers`, `nounix`](https://man7.org/linux/man-pages/man8/mount.cifs.8.html)
