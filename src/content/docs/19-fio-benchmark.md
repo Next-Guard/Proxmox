@@ -18,10 +18,9 @@ duration: 1 hour 30 minutes (about 45 minutes of which are spent waiting for the
 
 ## Objectives
 
-- Measure the same workload, with the same tool and the same VM, on six different storages.
-- Understand what IOPS, bandwidth and latency measure, and why the *queue depth* changes everything.
-- Recognize "fake" numbers: reads from cache, never-written blocks, writes acknowledged from RAM.
-- Read the lab results for what they are, and know what to measure in production.
+- Produce a comparable table of IOPS, bandwidth and latency for six different storages, measured with the same workload, the same VM and the same method.
+- For every number, be able to say which part of the I/O path may have shaped it (caches, never-written blocks, how writes are acknowledged) and which check would confirm it.
+- Have two repeatable scripts, [`bench.sh`](/files/19/bench.sh) and [`riassunto.py`](/files/19/riassunto.py), to run the same measurement on another system.
 
 ## How it works
 
@@ -29,32 +28,55 @@ duration: 1 hour 30 minutes (about 45 minutes of which are spent waiting for the
 
 | Measurement | What it tells you | Typical test |
 |---|---|---|
-| **IOPS** | how many operations per second | small blocks (4 KiB) at random positions: databases, operating systems |
-| **Bandwidth** (MB/s) | how much data per second | large blocks (1 MiB) in sequence: backups, copies, video |
+| **IOPS** | operations per second | small blocks (4 KiB) at random offsets: databases, operating systems |
+| **Bandwidth** (MB/s) | data per second | large blocks (1 MiB) in sequence: backups, copies, video |
 | **Latency** (ms) | how long a single operation waits | one operation at a time (*QD1*) |
 
-The **queue depth** (QD) is how many operations are "in flight" at the same time. With QD32 the storage can work on many of them in parallel and the IOPS go up. With QD1 each operation waits for the previous one: you measure pure latency, which is what an application feels when it writes and waits for the acknowledgment.
+The **queue depth** (QD) is the number of operations in flight at the same time. At QD32 the storage can work on many of them in parallel, so IOPS go up. At QD1 each operation waits for the previous one, so you measure the response time of a single operation: what an application feels when it writes and waits for the acknowledgment.
 
-### The three benchmark pitfalls
+fio reports three different latencies. **slat** is the submission latency. **clat** (*completion latency*) is the time from submitting an operation to its completion. **lat** is the total latency and includes both. Every table in this lab states which one it shows.
 
-1. **Caches.** There are several layers of cache between the VM and the disk:
-   - the VM's own cache, which `fio --direct=1` bypasses;
-   - the QEMU cache, absent when the disk uses `cache=none`, the Proxmox default;
-   - the **ZFS ARC** on the host or on the NAS, which you **cannot** bypass.
+### Three benchmark pitfalls
 
-   A read served from RAM is worth tens of thousands of IOPS even if the disk underneath is slow.
+1. **Caches.** Several cache layers sit between the VM and the disk:
+   - the page cache of the guest operating system, which `fio --direct=1` bypasses;
+   - the QEMU cache, which is not used when the disk is set to `cache=none`, the Proxmox default;
+   - the **ZFS ARC** on the node or on the NAS. Depending on the ZFS version and on the properties of the dataset or zvol (`primarycache`, `direct`), it may serve reads from RAM even when the VM uses `--direct=1`.
 
-2. **Never-written blocks.** On *thin* storage (ZFS, LVM-thin, Ceph), reading a block that was never written does not touch the disk: the storage answers with "zeros" on its own. Before measuring reads you must **fill** the test area (*preconditioning*).
-3. **Writes acknowledged from RAM.** Many storages acknowledge a write as soon as it is in memory and flush it to disk later, unless the system explicitly asks for an `fsync`. "Normal" writes and writes with `fsync` therefore have very different costs: you need to measure both.
+   A read served from RAM can reach tens of thousands of IOPS even when the disk underneath is slow.
 
-### The method used
+2. **Never-written blocks.** On *thin* storage (ZFS, LVM-thin, Ceph), reading a block that was never written usually never reaches the disk: the storage answers with zeros. Before measuring reads, **fill** the test area first (*preconditioning*).
+3. **Writes acknowledged from RAM.** Many storages acknowledge a write as soon as it is in memory and flush it to disk later, unless the system explicitly asks for an `fsync`. Plain writes and writes followed by `fsync` cost very different amounts of time, so measure both.
 
-- **Same VM, same jobs:** a Debian 13 VM with an 8 GiB disk for each storage, all on `VirtIO SCSI single` with `iothread=1` and `cache=none`. The cluster needs one VM (`bench01`); `local-lvm` and `tank`, which live on `desopve04`, need a second, identical VM (`bench04`).
-- **Raw device:** fio writes directly to `/dev/disk/by-id/...`, with no file system, using `--direct=1` and `libaio`.
+### Method
+
+- **Same VM, same jobs:** a Debian 13 VM with one 8 GiB disk per storage, all on `VirtIO SCSI single` with `iothread=1` and `cache=none`. The cluster needs one VM (`bench01`); `local-lvm` and `tank` live on `desopve04`, so they need a second, identical VM (`bench04`).
+- **Raw device:** fio writes straight to `/dev/disk/by-id/...`, with no file system, using `--direct=1` and `libaio`.
 - **Preconditioning:** before the tests, the whole test area of each disk (2 GiB) is written once.
-- **Five 20-second jobs** (plus 3 seconds of warm-up), repeated **twice**. The table shows the average and, in parentheses, how far apart the two runs are.
-- **One extra job with an `fsync` after every write**, to measure the cost of a write that is truly safe on disk.
-- The tests run on **one storage at a time**, never in parallel.
+- **Five 20-second jobs** (plus a 3-second ramp-up), each run **twice**. The table shows the average and, in parentheses, how far apart the two runs are.
+- **One extra job with an `fsync` after every write**, to measure the cost of a write that has to reach stable storage.
+- Only **one storage is tested at a time**, never several in parallel.
+
+### Test environment and versions
+
+The results further down come from a run carried out in November 2026 with the configuration below. You need it to read them correctly: with different versions, options or hardware, the same jobs give different numbers.
+
+| Component | Configuration used |
+|---|---|
+| Proxmox VE | 9.2.26, kernel `7.0.14-28-pve` ([Lab 04](/04-first-access-repositories-updates/)) |
+| Test VM | Debian 13 from the cloud image, 2 vCPUs of type `host`, 2 GiB of RAM, fio 3.39 |
+| VM disks | VirtIO SCSI single, `iothread=1`, `cache=none`, default `aio` (`io_uring`), no `discard`; raw 8 GiB devices with a 2 GiB test area |
+| `local-zfs` | ZFS mirror on the two system disks of `desopve01` ([Lab 03](/03-install-proxmox-ve/)), ARC with the limit set by the installer |
+| `local-lvm` | LVM-thin on the system disk of `desopve04` ([Lab 03](/03-install-proxmox-ve/), [Lab 09](/09-lvm-and-lvm-thin/)) |
+| `tank` | ZFS RAIDZ1 on the four 20 GB disks of `desopve04`, plus a hot spare; ARC capped at 2 GiB ([Lab 10](/10-zfs/)) |
+| `nas-nfs` | NFS 4.2 to the `dati/nfs` dataset of the TrueNAS SCALE 25.10 NAS, on a mirrored ZFS pool ([Lab 12](/12-truenas-nas/), [Lab 13](/13-nfs/)); VM disk in raw format |
+| `nas-lvm` | Shared LVM on a 40 GiB iSCSI zvol of the same NAS, over two multipath paths ([Lab 15](/15-iscsi-lvm-multipath/)) |
+| `rbd-vm` | Ceph 20.2 (tentacle), replicated pool `size 3` / `min_size 2` on seven OSDs across nodes 01-03, public and cluster networks on dedicated VLANs ([Lab 17](/17-ceph-installation/), [Lab 18](/18-ceph-growth-maintenance-failures/)) |
+| Network | MTU 1500 on every link ([Lab 21](/21-bonding/)) |
+
+Disk and controller models are redacted, as explained in the [manual's conventions](/the-lab/#conventions): read the numbers as properties of this configuration, not of a particular disk model.
+
+**What the test measures, and what it does not.** It measures the full path as a VM sees it: the guest kernel, the virtual controller, QEMU, the Proxmox storage layer and, for network storages, the network plus the NAS or the OSDs. It does not isolate the individual layers, so a high or low value does not tell you on its own which layer produced it. It does not measure many VMs working in parallel. With a 2 GiB test area, smaller than the RAM of the nodes and of the NAS, caches can affect the reads. Two 20-second runs give an idea of the variability, not a statistic.
 
 ## Procedure
 
@@ -220,19 +242,27 @@ sudo fio --name=sync --filename=/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-s
     --time_based --runtime=15 --ramp_time=2 --output-format=json
 ```
 
-The fio JSON files contain everything (IOPS, bandwidth, mean latencies and percentiles). The table for the normal workload is produced by the [`files/19/riassunto.py`](/files/19/riassunto.py) script, which reads `jobs[0].read` and `jobs[0].write` from each file and computes the average and the spread of the two runs:
+The fio JSON files hold everything: IOPS, bandwidth, mean latencies and percentiles. The [`files/19/riassunto.py`](/files/19/riassunto.py) script builds the table for the plain workload: it reads `jobs[0].read` and `jobs[0].write` from each file and computes the average and the spread of the two runs. For latency it uses `clat_ns.mean`, the mean completion latency:
 
 ```bash title="labuser@bench01"
 python3 riassunto.py ~/res
 ```
 
-For the `fsync` table, just read `jobs[0].write.iops`, `jobs[0].write.lat_ns.mean` and `jobs[0].sync.lat_ns.mean` in the JSON of the last job.
+For the `fsync` table, read `jobs[0].write.iops`, `jobs[0].write.lat_ns.mean` (total latency) and `jobs[0].sync.lat_ns.mean` (fsync latency) in the JSON of the last job. The 99th percentile of the QD1 write without `fsync` is in `jobs[0].write.clat_ns.percentile` of the `rw4kqd1` files: unless told otherwise, fio computes percentiles on the completion latency.
 
 ## Verification and tests: the results
 
-### Normal workload (without fsync)
+The test has succeeded when:
 
-| Storage | 4k random read QD32 (IOPS) | 4k random write QD32 (IOPS) | 4k write QD1 (mean latency, ms) | 1M sequential read (MB/s) | 1M sequential write (MB/s) |
+- every storage has the JSON files of all the jobs, for both runs, and `~/res/DONE` exists;
+- `riassunto.py` prints a table with no empty cells;
+- you can explain, or at least check, the spread between the two runs.
+
+The absolute values depend on the infrastructure. The ones below are the results of the run described in [Test environment and versions](#test-environment-and-versions).
+
+### Plain workload (no fsync)
+
+| Storage | 4k random read QD32 (IOPS) | 4k random write QD32 (IOPS) | 4k write QD1, mean completion latency (clat, ms) | 1M sequential read (MB/s) | 1M sequential write (MB/s) |
 |---|---|---|---|---|---|
 | `local-zfs` (ZFS mirror, local) | 44,289 (±3%) | 2,336 (±50%) | 0.21 (±6%) | 3,289 (±0%) | 42 (±19%) |
 | `local-lvm` (LVM-thin, local) | 29,414 (±2%) | 9,347 (±20%) | 1.70 (±4%) | 291 (±3%) | 540 (±9%) |
@@ -241,9 +271,9 @@ For the `fsync` table, just read `jobs[0].write.iops`, `jobs[0].write.lat_ns.mea
 | `nas-lvm` (iSCSI + LVM, multipath) | 20,424 (±5%) | 4,182 (±15%) | 0.74 (±17%) | 1,082 (±2%) | 15 (±36%) |
 | `rbd-vm` (Ceph, 3-way replication) | 10,357 (±17%) | 306 (±11%) | 8.31 (±25%) | 983 (±1%) | 20 (±27%) |
 
-### Safe writes (fsync after every write, QD1)
+### Writes with fsync (fsync after every write, QD1)
 
-| Storage | IOPS | Write latency (ms) | fsync latency (ms) | 99th percentile of QD1 latency without fsync (ms) |
+| Storage | IOPS | Mean total write latency (lat, ms) | Mean fsync latency (ms) | QD1 write without fsync: 99th percentile completion latency (clat, ms) |
 |---|---|---|---|---|
 | `local-zfs` | 288 | 0.52 | 3.39 | 1.06 |
 | `local-lvm` | 534 | 1.46 | 1.80 | 3.95 |
@@ -252,26 +282,43 @@ For the `fsync` table, just read `jobs[0].write.iops`, `jobs[0].write.lat_ns.mea
 | `nas-lvm` | 138 | 0.83 | 7.12 | 2.54 |
 | `rbd-vm` | 26 | 38.21 | 38.53 | 42.21 |
 
-### How to read these numbers
+### Reading the results
 
-1. **ZFS reads come from RAM.** `local-zfs` reads 3.3 GB/s sequentially and `tank` 1 GB/s: these are reads from the **ARC**, the ZFS cache in the node's RAM. The data just written by the preconditioning is still in memory. `local-lvm`, which has no cache in the node's RAM, reads "only" 291 MB/s, that is, the real speed of its disk. The same applies to NFS and iSCSI, which are served from the RAM of the NAS (also running ZFS).
-2. **Ceph pays for the network and the replication.** Every write to `rbd-vm` goes to the primary OSD and from there to two more copies, across the network. The QD1 latency is 8 ms, against 0.2-1.7 ms for the local disks. With `fsync` it rises to 38 ms, hence 26 IOPS. With Ceph, performance comes from **parallelism** (many VMs, many OSDs, deep queues), not from the single operation.
-3. **NFS versus iSCSI.** On the same NAS, QD32 random writes reach 181 IOPS over NFS and 4,182 over iSCSI:
-   - with `O_DIRECT`, the NFS client sends writes that the server acknowledges only after committing them to stable storage;
-   - over iSCSI, the NAS acknowledges from RAM and writes later, unless the client asks for a flush.
+Each point separates what the test measured from how we interpret it, and names the check that would confirm the interpretation.
 
-   With an `fsync` after every write the two technologies come close: 194 and 138 IOPS.
+1. **Sequential reads.**
+   - **Measured:** `local-zfs` reads sequentially at 3,289 MB/s, `tank` at 1,036 MB/s and `local-lvm` at 291 MB/s.
+   - **Interpretation:** the `local-zfs` figure is consistent with a large contribution from the cache, since the preconditioning had just written the test area. This measurement, however, does not separate the effect of the ARC from the rest of the I/O path. The same applies to `tank`, which has a smaller ARC (2 GiB). The 291 MB/s of `local-lvm` likewise describe the configuration under test: attributing them to the disk alone needs an additional check. The reads from `nas-nfs` (1,208 MB/s) and `nas-lvm` (1,082 MB/s) may partly come from the cache of the NAS, which also runs ZFS, but this test does not show it.
+   - **How to check:**
+     - during the test, watch the ARC statistics on the node (and on the NAS) with `arcstat 1`: a hit rate close to 100% means reads are served from RAM;
+     - repeat the reads on a test area larger than the RAM available to the ARC, or with `primarycache=metadata` temporarily set on the test zvol;
+     - for `local-lvm`, benchmark the physical disk directly from the node with fio in read-only mode (`--readonly --direct=1`); comparing it with the VM result shows how much the rest of the path costs.
+2. **Ceph and the single operation.**
+   - **Measured:** QD1 writes on `rbd-vm` have a mean completion latency of 8.31 ms (±25%), against 0.21-1.70 ms on the local storages. With an `fsync` after every write the rate drops to 26 IOPS, at 38.53 ms per `fsync`.
+   - **Interpretation:** this is consistent with how Ceph acknowledges a write: the primary OSD forwards it to the other two replicas and replies only after they confirm, so every operation crosses the network several times. The test does not, however, separate the network's share from that of the OSD disks.
+   - **How to check:** during the test, `ceph osd perf` shows the commit latency of each OSD; `rados bench -p rbd-vm 30 write -b 4096 -t 1` measures single-queue 4k writes without the VM in the way; a `ping` between nodes on the Ceph VLAN gives the latency of the network alone. With deeper queues and more clients, Ceph spreads the work across many OSDs, which is why it should also be measured in parallel (see below).
+3. **NFS and iSCSI on the same NAS.**
+   - **Measured:** QD32 random writes reach 181 IOPS on `nas-nfs` and 4,182 on `nas-lvm`. With an `fsync` after every write the two get close: 194 and 138 IOPS.
+   - **Interpretation:** the gap is consistent with how the two protocols acknowledge writes. The NFS server would acknowledge the client's `O_DIRECT` writes only once they are on stable storage, whereas over iSCSI the NAS can acknowledge from RAM and write later, unless the client asks for a flush. The values converging with `fsync` points the same way, but this test does not prove it.
+   - **How to check:** on the NAS, `zfs get sync dati/nfs dati/iscsi/pve` shows how ZFS handles synchronous writes on the two volumes; on the node, `nfsstat -m` shows the effective NFS mount options. If the interpretation is right, repeating the test with `sync=always` on the iSCSI zvol should bring `nas-lvm` close to NFS.
+4. **Variability.**
+   - **Measured:** QD32 random writes and sequential writes vary by up to ±50% between the two runs (`local-zfs`), and by ±35-36% on `tank` and `nas-lvm`.
+   - **Interpretation:** there is more than one possible cause: activity elsewhere in the lab (Ceph, the NAS, the shared network), and the periodic flushes with which ZFS commits data to disk every few seconds, which land differently in two 20-second windows. The test cannot tell them apart.
+   - **How to check:** more and longer runs, with the rest of the lab idle, while recording disk activity on the node with `iostat -x 1` or `zpool iostat 1`.
+5. **Sequential writes on `local-lvm`.**
+   - **Measured:** `local-lvm` writes sequentially at 540 MB/s and reads at 291 MB/s. With `fsync` it completes 534 writes per second, at 1.80 ms per `fsync`.
+   - **Interpretation:** writes faster than reads, and flushes acknowledged in under 2 ms, suggest a write cache below LVM, in the controller or in the disk. The test does not tell which layer provides it, nor whether it is protected against power loss.
+   - **How to check:** the write-cache state of the disk (`hdparm -W` or `sdparm --get=WCE`) and of the controller, and a longer sequential write that exceeds the cache size.
 
-4. **Variability matters.** Sequential writes and QD32 random writes vary by up to ±50% between two runs: the rest of the lab (Ceph, NAS, shared network) is never idle. A single run is not enough to draw conclusions.
-5. **The numbers describe this lab, not the technologies.** The lab has inexpensive disks, controllers with their own cache, a network shared by all the services and nodes with few CPUs. The 540 MB/s that `local-lvm` writes sequentially mostly measure its controller's write cache. In production, with NVMe SSDs and 25 Gbit/s networks, the ratios between the storages are very different.
+**In short:** the ratios between the storages hold for this infrastructure. With different hardware, networks and versions they change, sometimes a lot. The method, on the other hand, carries over as it is.
 
 ### What to measure in production
 
-- Always on a **preconditioned** area larger than the RAM of the nodes (and of the NAS), so that the caches do not skew the reads.
-- Several runs, longer ones (at least 60 s), at different times of day. Report the median and percentiles (p99), not just the average.
-- Both the "normal" workload and the one with `fsync`: a database lives on `fsync`.
-- For Ceph: several VMs or several jobs in parallel (`--numjobs`), because Ceph's strength is scalability. `rados bench` and `rbd bench` measure the cluster without the VM in between.
-- Write everything down: Proxmox version, disk options (`cache`, `iothread`, `discard`), block size and queue depth.
+- A **preconditioned** test area larger than the RAM of the nodes (and of the NAS), so that caches do not distort the reads.
+- More runs, longer ones (at least 60 seconds), at different times of day. Report the median and percentiles (p99), not only the mean, and always state which latency you report (clat or lat).
+- Both the plain workload and the one with `fsync`: a database lives on `fsync`.
+- For Ceph: several VMs or several parallel jobs (`--numjobs`), because Ceph spreads the load across many OSDs. `rados bench` and `rbd bench` measure the cluster without a VM in between.
+- Write everything down, as in [Test environment and versions](#test-environment-and-versions): versions, disk options (`cache`, `iothread`, `aio`, `discard`), block size and queue depth, size of the test area, date.
 
 ### Cleanup
 
@@ -292,17 +339,20 @@ qm stop 191 && qm destroy 191 --purge && rm -f /root/bench /root/bench.pub
 
 ## What you learned
 
-- IOPS, bandwidth and latency are three different things. The queue depth determines which one you are measuring.
-- Before measuring reads you must write the test area, otherwise you are measuring empty blocks. ZFS reads often come from RAM.
-- A write acknowledged from RAM and a write with `fsync` differ in cost by an order of magnitude: a serious benchmark measures both.
-- Ceph has high latency on a single operation and gives its best in parallel. Local storages have low latency but are not shared.
-- The same NAS behaves differently over NFS and over iSCSI, because of the way each one acknowledges writes.
-- A benchmark in the lab teaches the **method**. The numbers to base decisions on are measured on production hardware.
+- **Telling whether a benchmark measures the workload you care about.** Before trusting a number you check five things: whether reads can come from a cache (a freshly written area, smaller than RAM, with the ARC active); whether fio uses `--direct=1`; how large the test area is compared with the RAM of the nodes and of the NAS; how long each test runs; how many runs you have and how far apart they are.
+- **Picking the metric that answers the question.** IOPS at deep queues describe the parallel load of many VMs. QD1 latency describes an application that waits for every write, and you should say which latency you mean (clat or lat). Bandwidth matters for backups and copies.
+- **Deciding when you need the `fsync` test.** If the real workload calls `fsync` (databases, logs), a result without `fsync` does not represent it.
+- **Keeping measurements and explanations apart.** Next to every interpretation you can name the check that would confirm it: `arcstat`, `ceph osd perf`, `rados bench`, a test on the node's own disk.
+- **Using a comparison for what it is.** A storage comparison holds for the infrastructure it was run on: before a production decision, repeat the same method on the production hardware.
 
 ## References
 
 - [fio – documentation](https://fio.readthedocs.io/en/latest/fio_doc.html)
-- [Proxmox VE – Virtual disk options (cache, iothread)](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#qm_hard_disk)
+- [fio – interpreting the output: slat, clat and lat](https://fio.readthedocs.io/en/latest/fio_doc.html#interpreting-the-output)
+- [Proxmox VE – Virtual disk options (cache, iothread, aio)](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#qm_hard_disk)
 - [Proxmox VE – Cloud-init support](https://pve.proxmox.com/pve-docs/pve-admin-guide.html#qm_cloud_init)
-- [Proxmox VE – Importing disk images (`import-from`)](https://pve.proxmox.com/pve-docs/qm.1.html)
-- [Ceph – Benchmarking a cluster](https://docs.ceph.com/en/latest/start/hardware-recommendations/)
+- [Proxmox VE – `qm` and importing disk images (`import-from`)](https://pve.proxmox.com/pve-docs/qm.1.html)
+- [OpenZFS – the `primarycache` property](https://openzfs.github.io/openzfs-docs/man/master/7/zfsprops.7.html#primarycache)
+- [Ceph – `rados bench` (the `rados` man page)](https://docs.ceph.com/en/latest/man/8/rados/)
+- [Proxmox – Proxmox VE Ceph Benchmark 2023/12](https://www.proxmox.com/en/downloads/proxmox-virtual-environment/documentation/proxmox-ve-ceph-benchmark-2023-12)
+- [Ceph – Hardware recommendations](https://docs.ceph.com/en/latest/start/hardware-recommendations/)
