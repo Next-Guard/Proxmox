@@ -314,7 +314,7 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
    - The active MDS was on `desopve02`: CephFS fails over to the standby MDS on `desopve01`.
    - The OSDs are *down* but stay *in*: no copy is moved.
 
-4. The node comes back online (in this lab after about 70 seconds; a server with a long POST can take a few minutes). Ceph recovers only the writes made in the meantime; then remove the flag:
+4. The node comes back online. In this lab it took roughly 70 seconds, an approximate observation that the outputs do not record; a server with a long POST can take a few minutes. Ceph recovers only the writes made in the meantime; then remove the flag:
 
    ```bash title="root@desopve01"
    ceph -s | grep -E "health|noout|pgs:"
@@ -476,7 +476,7 @@ Before rebooting a node, for example for a kernel update, set `noout`: Ceph will
 
    The new node contributes only disks.
 
-8. In this lab the rebalancing onto the fourth host took about a minute and a half. Two snapshots of the status, 3 and 64 seconds after the new OSDs joined:
+8. Ceph rebalances the data onto the fourth host. The outputs do not record when the rebalancing ended: in this lab it was roughly a minute and a half after the OSDs joined, an approximate observation. To time it, follow `ceph -w` or repeat `ceph pg stat` until every PG is `active+clean`. Two snapshots of the status, 3 and 64 seconds after the new OSDs joined, show it in progress, with 32 remapped PGs at first and 7 after 64 seconds:
 
    ```bash title="root@desopve04"
    ceph -s

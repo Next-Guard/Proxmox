@@ -406,7 +406,7 @@ Separating Ceph traffic from the management network (172.27.199.0/24) prevents h
    2026-11-09 17:23:03 migration finished successfully (duration 00:00:15)
    ```
 
-   In 15 seconds only the VM's RAM is transferred. The same 16 GiB disk on local storage would take minutes (lab 11).
+   Only the VM's RAM is transferred: the disk stays on Ceph. The three figures in the log measure different things, as [Lab 48](/48-migrations/#how-it-works) explains: the task took 15 seconds; the 130 ms are the downtime QEMU reports for the final switchover, not the pause a client sees; and the `average migration speed` is not a measured throughput but the guest's total RAM divided by the duration of the memory phase in whole seconds, so with 2 GiB of RAM 1.0 GiB/s only says that this phase lasted about 2 seconds. For comparison, in [Lab 11](/11-zfs-replication/) the same VM, with its 16 GiB disk on local storage, took 1 minute 13 seconds, 57 of them for the disk mirror.
 
 3. Move the VM back to `desopve01`:
 
@@ -562,7 +562,7 @@ RBD provides block devices for VMs and containers. For **files** (ISOs, template
 
    Each host holds about a third of the data: this is the effect of the per-host CRUSH rule.
 
-4. **Migration:** VM 100 moves between nodes in about 15 seconds with 130 ms of downtime, without copying its disk.
+4. **Migration:** VM 100 moves between nodes without copying its disk: a 15-second task, with 130 ms of downtime reported by QEMU.
 
 ## Final lab state
 
