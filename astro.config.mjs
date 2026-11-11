@@ -76,10 +76,15 @@ export default defineConfig({
 				Hero: './src/components/Hero.astro',
 				PageTitle: './src/components/PageTitle.astro',
 				Footer: './src/components/Footer.astro',
+				Header: './src/components/Header.astro',
 			},
 			head: [
 				{ tag: 'meta', attrs: { name: 'author', content: 'NextGuard' } },
 				{ tag: 'meta', attrs: { name: 'theme-color', content: '#0b1222' } },
+				{
+					tag: 'script',
+					content: `(function(){try{var k='pc-lang',p=location.pathname,it=p==='/it'||p.indexOf('/it/')===0,s=localStorage.getItem(k);if(s){return}var l=(navigator.languages&&navigator.languages[0])||navigator.language||'';if(/^it\\b/i.test(l)&&!it){localStorage.setItem(k,'it');location.replace('/it'+(p==='/'?'/':p)+location.search+location.hash)}else{localStorage.setItem(k,it?'it':'en')}}catch(e){}})();`,
+				},
 			],
 			plugins: [starlightLinksValidator()],
 		}),
